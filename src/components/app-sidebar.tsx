@@ -39,9 +39,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
-import Image from "next/image";
 
 // Type definitions for menu items
 type MenuItem = {
