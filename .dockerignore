@@ -1,0 +1,39 @@
+## Exclude development-only content from Docker build context
+
+# Large/dev bundles; keep only documentation
+build-docs-scripts-sql-ai/**
+!build-docs-scripts-sql-ai/docs/**
+build-docs-scripts-sql/**
+!build-docs-scripts-sql/docs/**
+
+# Local scripts/tools not required at runtime
+scripts/**
+tools/**
+old-ai-docs/**
+.ai-compliance-functions/**
+
+# Supabase export bundle (deployed separately, not needed in Next image)
+build-docs-scripts-sql-ai/supabase-export/**
+supabase-export/**
+
+# Node/Yarn
+node_modules
+npm-debug.log
+yarn-error.log
+
+# VCS and editors
+.git
+.gitignore
+.vscode
+.idea
+*.code-workspace
+
+
+
+
+
+
+
+
+
+

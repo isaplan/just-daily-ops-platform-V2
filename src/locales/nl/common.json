@@ -1,0 +1,70 @@
+{
+  "navigation": {
+    "finance": "Financiën",
+    "pnl": "W&V",
+    "balance": "Balans",
+    "dailyOps": "Dagelijkse Operaties",
+    "kpis": "KPI's",
+    "trends": "Trends",
+    "productivity": "Productiviteit",
+    "insights": "We Wisten Dit Niet"
+  },
+  "pnl": {
+    "title": "W&V Balans",
+    "description": "Winst & Verliesrekening met gedetailleerde kostenopbouw",
+    "filters": {
+      "year": "Jaar",
+      "location": "Locatie",
+      "clear": "Wissen"
+    },
+    "locations": {
+      "all": "Alle Locaties",
+      "kinsbergen": "Van Kinsbergen",
+      "barbea": "Bar Bea",
+      "lamour": "L'Amour Toujours"
+    },
+    "table": {
+      "category": "Categorie",
+      "total": "Totaal",
+      "january": "Jan",
+      "february": "Feb",
+      "march": "Mrt",
+      "april": "Apr",
+      "may": "Mei",
+      "june": "Jun",
+      "july": "Jul",
+      "august": "Aug",
+      "september": "Sep",
+      "october": "Okt",
+      "november": "Nov",
+      "december": "Dec"
+    },
+    "alerts": {
+      "noData": "Geen W&V gegevens beschikbaar voor de geselecteerde criteria.",
+      "loading": "W&V gegevens laden...",
+      "error": "Fout bij het laden van W&V gegevens. Probeer het opnieuw.",
+      "databaseWarning": "Database tijdelijk niet beschikbaar. Toont testgegevens."
+    },
+    "categories": {
+      "revenue": "Netto-omzet groepen",
+      "costOfSales": "Kostprijs van de omzet",
+      "labor": "Arbeidskosten",
+      "otherCosts": "Overige bedrijfskosten",
+      "depreciation": "Afschrijvingen",
+      "financial": "Financiële baten en lasten",
+      "result": "Resultaat"
+    }
+  },
+  "common": {
+    "loading": "Laden...",
+    "error": "Fout",
+    "success": "Succes",
+    "cancel": "Annuleren",
+    "save": "Opslaan",
+    "edit": "Bewerken",
+    "delete": "Verwijderen",
+    "close": "Sluiten",
+    "expand": "Uitklappen",
+    "collapse": "Inklappen"
+  }
+}

@@ -1,0 +1,71 @@
+---
+alwaysApply: true
+---
+
+# 📋 DEVELOPMENT STANDARDS
+
+## ⚛️ REACT
+✅ **DO:**
+- PascalCase file naming (`UserProfile.tsx`)
+- TypeScript interfaces for all props
+- Hooks at top level of components
+- Import order: React → External → Internal → Assets
+- Named exports for components, default exports for pages
+
+❌ **NEVER:**
+- Class components (functional only)
+
+---
+
+## 🎨 TAILWIND CSS
+✅ **DO:**
+- Use utility classes directly in JSX
+- Use `cva` (Class Variance Authority) for component variants
+- Use theme values from `tailwind.config.ts` only
+
+❌ **NEVER:**
+- `@apply` in global CSS
+- Inline styles (use Tailwind utilities instead)
+- Arbitrary values (use theme values)
+
+---
+
+## ⚡ NEXT.JS
+✅ **DO:**
+- Add `'use client'` directive for client components
+- Use Server Components for data fetching (default)
+- Use Client Components for interactivity only
+- Use Server Actions for mutations
+- Follow App Router conventions (`app/` directory)
+- Proper import order and organization
+
+---
+
+## 🔐 SUPABASE (CRITICAL - SECURITY)
+✅ **DO:**
+- Use `@supabase/ssr` package exclusively
+- Use `getAll()` and `setAll()` cookie methods only
+- Always return `supabaseResponse` in middleware
+- Always call `auth.getUser()` in middleware
+
+❌ **NEVER:**
+- Use `@supabase/auth-helpers-nextjs` (deprecated)
+- Use individual cookie methods (`get`/`set`/`remove`)
+
+---
+
+## 🎨 SHADCN/UI (CRITICAL - UI CONSISTENCY)
+✅ **DO:**
+- **ALWAYS** use shadcn/ui components when available
+- Import from `@/components/ui/[component]`
+- Use proper shadcn component names and props
+- Follow shadcn component patterns and structure
+
+❌ **NEVER:**
+- Create custom implementations of shadcn components
+- Reinvent shadcn functionality
+- Use custom styling when shadcn provides the component
+
+---
+
+**Violation of these standards = compliance issue**

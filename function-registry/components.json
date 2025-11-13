@@ -1,0 +1,1996 @@
+{
+  "type": "components",
+  "functions": [
+    {
+      "file": "src/components/ui/accordion.tsx",
+      "name": "accordion",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9587b5ca80cf0aa6",
+      "updated": "2025-11-03T15:54:21.101Z"
+    },
+    {
+      "file": "src/components/finance/AdvancedPeriodSelector.tsx",
+      "name": "AdvancedPeriodSelector",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9f4e7ba51f20f920",
+      "updated": "2025-11-03T15:54:20.944Z"
+    },
+    {
+      "file": "src/lib/finance/chartDataAggregator.ts",
+      "name": "aggregateByQuarter",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1895df32eb8b09b6",
+      "updated": "2025-11-03T15:54:21.145Z"
+    },
+    {
+      "file": "src/lib/bork/aggregation-service.ts",
+      "name": "aggregation-service",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c451b72a9a1640bd",
+      "updated": "2025-11-03T15:54:21.120Z"
+    },
+    {
+      "file": "src/lib/eitje/aggregation-service.ts",
+      "name": "aggregation-service",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "a54b8ef43d8dcd3d",
+      "updated": "2025-11-03T15:54:21.125Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/aggregation-service.ts",
+      "name": "aggregation-service",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "08b4d7279505794c",
+      "updated": "2025-11-03T15:54:21.149Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/aggregator.ts",
+      "name": "aggregator",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "5958af6d47f90325",
+      "updated": "2025-11-03T15:54:21.149Z"
+    },
+    {
+      "file": "src/components/ui/alert.tsx",
+      "name": "alert",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6352c232d36b2aeb",
+      "updated": "2025-11-03T15:54:21.101Z"
+    },
+    {
+      "file": "src/components/ui/alert-dialog.tsx",
+      "name": "alert-dialog",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c8b01137c7552e63",
+      "updated": "2025-11-03T15:54:21.101Z"
+    },
+    {
+      "file": "src/lib/finance/universal/analysis/sheetAnalyzer.ts",
+      "name": "analyzeSheet",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "f228f1031aea05dc",
+      "updated": "2025-11-03T15:54:21.152Z"
+    },
+    {
+      "file": "src/lib/bork/api-client.ts",
+      "name": "api-client",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "40dc65e1a6bb1b96",
+      "updated": "2025-11-03T15:54:21.121Z"
+    },
+    {
+      "file": "src/components/finance/ApiCleanSlateTabs.tsx",
+      "name": "ApiCleanSlateTabs",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "025cebfa4f1b422d",
+      "updated": "2025-11-03T15:54:20.944Z"
+    },
+    {
+      "file": "src/components/app-sidebar.tsx",
+      "name": "AppSidebar",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "122c267ae79068b8",
+      "updated": "2025-11-03T15:54:20.942Z"
+    },
+    {
+      "file": "src/components/ui/aspect-ratio.tsx",
+      "name": "aspect-ratio",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "d72c73d629e37995",
+      "updated": "2025-11-03T15:54:21.102Z"
+    },
+    {
+      "file": "src/components/ui/avatar.tsx",
+      "name": "avatar",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4a8bc00e5514912c",
+      "updated": "2025-11-03T15:54:21.102Z"
+    },
+    {
+      "file": "src/components/ui/badge.tsx",
+      "name": "badge",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "95cf3d2d616ddab5",
+      "updated": "2025-11-03T15:54:21.102Z"
+    },
+    {
+      "file": "src/lib/bork/batch-processor.ts",
+      "name": "batch-processor",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "46938ea63b1bb4c2",
+      "updated": "2025-11-03T15:54:21.121Z"
+    },
+    {
+      "file": "src/lib/finance/universal/database/batchInserter.ts",
+      "name": "batchInserter",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7bd58a41cfb05d89",
+      "updated": "2025-11-03T15:54:21.152Z"
+    },
+    {
+      "file": "src/components/finance/BorkApiConfiguration.tsx",
+      "name": "BorkApiConfiguration",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "4b8e7e8c1d4069a6",
+      "updated": "2025-11-03T15:54:20.945Z"
+    },
+    {
+      "file": "src/components/finance/bork-api-connect.tsx",
+      "name": "BorkApiConnect",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d892e11de4a0abd9",
+      "updated": "2025-11-03T15:54:21.094Z"
+    },
+    {
+      "file": "src/components/finance/BorkApiConnectionTest.tsx",
+      "name": "BorkApiConnectionTest",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b68fbc1bb977b615",
+      "updated": "2025-11-03T15:54:20.951Z"
+    },
+    {
+      "file": "src/components/finance/BorkCronjobConfig.tsx",
+      "name": "BorkCronjobConfig",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b7ae3b10fc11ad3e",
+      "updated": "2025-11-03T22:28:28.928Z"
+    },
+    {
+      "file": "src/components/finance/BorkMasterSync.tsx",
+      "name": "BorkMasterSync",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "881caf7c7a3c8bff",
+      "updated": "2025-11-03T15:54:20.951Z"
+    },
+    {
+      "file": "src/components/ui/breadcrumb.tsx",
+      "name": "breadcrumb",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e5589a54c1ed4210",
+      "updated": "2025-11-03T15:54:21.102Z"
+    },
+    {
+      "file": "src/lib/finance/universal/analysis/mappingBuilder.ts",
+      "name": "buildProposedMapping",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "505e0cf2b11cd490",
+      "updated": "2025-11-03T15:54:21.151Z"
+    },
+    {
+      "file": "src/lib/finance/universal/processing/recordBuilder.ts",
+      "name": "buildRecord",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "5f6b0e9e8ee2dc49",
+      "updated": "2025-11-03T15:54:21.155Z"
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "name": "button",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "680d7ab648b5a1d2",
+      "updated": "2025-11-03T15:54:21.102Z"
+    },
+    {
+      "file": "src/lib/finance/pnl-calculations.ts",
+      "name": "calculateMonthlyPnL",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d89294be33f086f8",
+      "updated": "2025-11-03T15:54:21.147Z"
+    },
+    {
+      "file": "src/components/finance/CalculationSheet.tsx",
+      "name": "CalculationSheet",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7029b25503f29d7b",
+      "updated": "2025-11-03T15:54:20.963Z"
+    },
+    {
+      "file": "src/components/ui/calendar.tsx",
+      "name": "calendar",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "845a0b0fdec33d8d",
+      "updated": "2025-11-03T15:54:21.102Z"
+    },
+    {
+      "file": "src/components/ui/card.tsx",
+      "name": "card",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2cd95f54be4a1c17",
+      "updated": "2025-11-03T15:54:21.103Z"
+    },
+    {
+      "file": "src/components/ui/carousel.tsx",
+      "name": "carousel",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "561cab7fcb619dee",
+      "updated": "2025-11-03T15:54:21.103Z"
+    },
+    {
+      "file": "src/components/roadmap/CategoryAutocomplete.tsx",
+      "name": "CategoryAutocomplete",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b334ade0a1376abd",
+      "updated": "2025-11-03T15:54:21.098Z"
+    },
+    {
+      "file": "src/components/finance/CategoryBreakdown.tsx",
+      "name": "CategoryBreakdown",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2ec23c9189635010",
+      "updated": "2025-11-03T15:54:20.964Z"
+    },
+    {
+      "file": "src/components/finance/CategoryFilterSheet.tsx",
+      "name": "CategoryFilterSheet",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3fdb5fade5d998b0",
+      "updated": "2025-11-03T15:54:20.967Z"
+    },
+    {
+      "file": "src/components/ui/chart.tsx",
+      "name": "chart",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "d4890d082c3d817d",
+      "updated": "2025-11-03T15:54:21.103Z"
+    },
+    {
+      "file": "src/components/ui/checkbox.tsx",
+      "name": "checkbox",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "178f8177bedb1704",
+      "updated": "2025-11-03T15:54:21.103Z"
+    },
+    {
+      "file": "src/lib/bork/cleanup-service.ts",
+      "name": "cleanup-service",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "78c0c49df44e17e0",
+      "updated": "2025-11-03T15:54:21.121Z"
+    },
+    {
+      "file": "src/lib/eitje/_backup_complex/client.ts",
+      "name": "client",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d44719e86ff202cf",
+      "updated": "2025-11-03T15:54:21.123Z"
+    },
+    {
+      "file": "src/lib/utils.ts",
+      "name": "cn",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "51bbf14cd1f84f49",
+      "updated": "2025-11-03T15:54:21.160Z"
+    },
+    {
+      "file": "src/components/finance/COGSBreakdown.tsx",
+      "name": "COGSBreakdown",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a40d94775afdbfa0",
+      "updated": "2025-11-03T15:54:20.962Z"
+    },
+    {
+      "file": "src/components/ui/collapsible.tsx",
+      "name": "collapsible",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "fbe07841b794e0d7",
+      "updated": "2025-11-03T15:54:21.104Z"
+    },
+    {
+      "file": "src/components/finance/ColumnMapper.tsx",
+      "name": "ColumnMapper",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "5cadbb1effb681e8",
+      "updated": "2025-11-03T15:54:20.982Z"
+    },
+    {
+      "file": "src/components/ui/command.tsx",
+      "name": "command",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2b640fee593528d4",
+      "updated": "2025-11-03T15:54:21.104Z"
+    },
+    {
+      "file": "src/middleware.ts",
+      "name": "config",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "b3698b730bc612d7",
+      "updated": "2025-11-03T15:54:21.160Z"
+    },
+    {
+      "file": "src/lib/finance/bork/connectionStatusService.ts",
+      "name": "connectionStatusService",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4edac385fe854e10",
+      "updated": "2025-11-03T15:54:21.128Z"
+    },
+    {
+      "file": "src/components/ui/context-menu.tsx",
+      "name": "context-menu",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2d294c5e421c41b8",
+      "updated": "2025-11-03T15:54:21.104Z"
+    },
+    {
+      "file": "src/integrations/supabase/client.ts",
+      "name": "createClient",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "82931da33386a028",
+      "updated": "2025-11-03T15:54:21.120Z"
+    },
+    {
+      "file": "src/lib/eitje/_backup_complex/service.ts",
+      "name": "createEitjeApiService",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "dab6450fe0fb5df1",
+      "updated": "2025-11-03T15:54:21.124Z"
+    },
+    {
+      "file": "src/lib/eitje/api-service.ts",
+      "name": "createEitjeApiService",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2a2e35d1eab16c47",
+      "updated": "2025-11-03T15:54:21.125Z"
+    },
+    {
+      "file": "src/lib/integrated/aggregation-service.ts",
+      "name": "createIntegratedAggregationService",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1f48b4ddea846706",
+      "updated": "2025-11-03T15:54:21.157Z"
+    },
+    {
+      "file": "src/lib/sync/real-data-sync.ts",
+      "name": "createRealDataSyncService",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "53fadfb436f1910a",
+      "updated": "2025-11-03T15:54:21.159Z"
+    },
+    {
+      "file": "src/components/finance/CronSyncHistory.tsx",
+      "name": "CronSyncHistory",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1ba4003755cddb57",
+      "updated": "2025-11-03T15:54:21.013Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/daily-ops/layout.tsx",
+      "name": "DailyOpsLayout",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9f9f0681acb75d04",
+      "updated": "2025-11-03T15:54:20.864Z"
+    },
+    {
+      "file": "src/app/(dashboard)/layout.tsx",
+      "name": "DashboardLayout",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "aff66cb84fb7564a",
+      "updated": "2025-11-03T15:54:20.882Z"
+    },
+    {
+      "file": "src/lib/finance/pnl-balance/data-extractor.ts",
+      "name": "data-extractor",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "a6650ca6068ceae9",
+      "updated": "2025-11-03T22:28:28.979Z"
+    },
+    {
+      "file": "src/components/finance/DataAccessTest.tsx",
+      "name": "DataAccessTest",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d24912c80b24ee87",
+      "updated": "2025-11-03T15:54:21.074Z"
+    },
+    {
+      "file": "src/lib/bork/database.ts",
+      "name": "database",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "03220437b2e61da0",
+      "updated": "2025-11-03T15:54:21.121Z"
+    },
+    {
+      "file": "src/components/finance/DatabaseStorage.tsx",
+      "name": "DatabaseStorage",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "1453043e03614a30",
+      "updated": "2025-11-03T15:54:21.081Z"
+    },
+    {
+      "file": "src/components/finance/DataFilters.tsx",
+      "name": "DataFilters",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7e9ab7f0dcab77a0",
+      "updated": "2025-11-03T15:54:21.074Z"
+    },
+    {
+      "file": "src/components/finance/data-imports.tsx",
+      "name": "DataImports",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "de8507bb34d57884",
+      "updated": "2025-11-03T15:54:21.094Z"
+    },
+    {
+      "file": "src/components/finance/DataMapping.tsx",
+      "name": "DataMapping",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "c50b66215f5d64ec",
+      "updated": "2025-11-03T15:54:21.078Z"
+    },
+    {
+      "file": "src/components/finance/DataTable.tsx",
+      "name": "DataTable",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "33cfb4aefe7998e9",
+      "updated": "2025-11-03T15:54:21.078Z"
+    },
+    {
+      "file": "src/components/finance/DataValidation.tsx",
+      "name": "DataValidation",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "5e6c0f5cda07b5f2",
+      "updated": "2025-11-03T15:54:21.080Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/database.ts",
+      "name": "deletePowerBIData",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "b45532c97fead02a",
+      "updated": "2025-11-03T15:54:21.150Z"
+    },
+    {
+      "file": "src/contexts/DepartmentContext.tsx",
+      "name": "DepartmentProvider",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "932c799527229c60",
+      "updated": "2025-11-03T15:54:21.117Z"
+    },
+    {
+      "file": "src/lib/finance/common/file-detector.ts",
+      "name": "detectFileType",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "dafce2dafaa25775",
+      "updated": "2025-11-03T15:54:21.145Z"
+    },
+    {
+      "file": "src/lib/finance/universal/matching/headerDetector.ts",
+      "name": "detectHeaderRow",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d00ba293f8212a1f",
+      "updated": "2025-11-03T15:54:21.153Z"
+    },
+    {
+      "file": "src/components/ui/dialog.tsx",
+      "name": "dialog",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8e755711b3fd5e8d",
+      "updated": "2025-11-03T15:54:21.104Z"
+    },
+    {
+      "file": "src/components/ui/drawer.tsx",
+      "name": "drawer",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3739cdfc80503412",
+      "updated": "2025-11-03T15:54:21.105Z"
+    },
+    {
+      "file": "src/components/ui/dropdown-menu.tsx",
+      "name": "dropdown-menu",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b1ede0a4144b6485",
+      "updated": "2025-11-03T15:54:21.105Z"
+    },
+    {
+      "file": "src/lib/finance/universal/config/constants.ts",
+      "name": "DUTCH_MONTHS",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "157e88f88af50b1a",
+      "updated": "2025-11-03T15:54:21.152Z"
+    },
+    {
+      "file": "src/lib/monthConverter.ts",
+      "name": "dutchMonthToNumber",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ec8caf0648fa8a49",
+      "updated": "2025-11-03T15:54:21.158Z"
+    },
+    {
+      "file": "src/lib/eitje/_backup_complex/api-service-updated.ts",
+      "name": "EITJE_ENDPOINTS",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "eda42869059bc1d4",
+      "updated": "2025-11-03T15:54:21.123Z"
+    },
+    {
+      "file": "src/lib/eitje/_backup_complex/config.ts",
+      "name": "EITJE_ENDPOINTS",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4525d375ffc8f756",
+      "updated": "2025-11-03T15:54:21.123Z"
+    },
+    {
+      "file": "src/lib/eitje/eitje-types.ts",
+      "name": "EITJE_ENDPOINTS",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "eb086197f63a15b0",
+      "updated": "2025-11-03T15:54:21.126Z"
+    },
+    {
+      "file": "src/lib/finance/eitje/fieldMappings.ts",
+      "name": "EITJE_FIELD_MAPPINGS",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "124294e0e66f8ff2",
+      "updated": "2025-11-03T15:54:21.146Z"
+    },
+    {
+      "file": "src/lib/eitje/eitje-api-client.ts",
+      "name": "eitje-api-client",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "dbbb7dc77b0feead",
+      "updated": "2025-11-03T15:54:21.125Z"
+    },
+    {
+      "file": "src/lib/eitje/eitje-database.ts",
+      "name": "eitje-database",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "35ae089ac33ff434",
+      "updated": "2025-11-03T15:54:21.126Z"
+    },
+    {
+      "file": "src/components/finance/EitjeApiConfiguration.tsx",
+      "name": "EitjeApiConfiguration",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "441659d6d1da6e3e",
+      "updated": "2025-11-03T15:54:21.081Z"
+    },
+    {
+      "file": "src/components/finance/EitjeCronjobConfig.tsx",
+      "name": "EitjeCronjobConfig",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ec80dea680e45559",
+      "updated": "2025-11-03T15:54:21.081Z"
+    },
+    {
+      "file": "src/components/view-data/EitjeDataFilters.tsx",
+      "name": "EitjeDataFilters",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "dd95fc859a526f7f",
+      "updated": "2025-11-03T15:54:21.116Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/layout.tsx",
+      "name": "EitjeDataLayout",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "13be2dd798d64f9e",
+      "updated": "2025-11-03T15:54:20.873Z"
+    },
+    {
+      "file": "src/app/(dashboard)/view-data/eitje-data/layout.tsx",
+      "name": "EitjeDataLayout",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "17991e4239a5afa2",
+      "updated": "2025-11-03T15:54:20.885Z"
+    },
+    {
+      "file": "src/components/finance/EnhancedManualSync.tsx",
+      "name": "EnhancedManualSync",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8dfc4ecac2bc208e",
+      "updated": "2025-11-03T15:54:21.082Z"
+    },
+    {
+      "file": "src/lib/eitje/env-utils.ts",
+      "name": "env-utils",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c53ce505a8cce162",
+      "updated": "2025-11-07T10:22:50.989Z"
+    },
+    {
+      "file": "src/lib/finance/bork/extractors.ts",
+      "name": "extractBorkLocation",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a6983debe9a496ce",
+      "updated": "2025-11-03T15:54:21.129Z"
+    },
+    {
+      "file": "src/lib/finance/eitje/extractors.ts",
+      "name": "extractors",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "29c838b4ec85752c",
+      "updated": "2025-11-03T15:54:21.146Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/extractors.ts",
+      "name": "extractPowerBILocation",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2237eb5fcae67467",
+      "updated": "2025-11-03T15:54:21.150Z"
+    },
+    {
+      "file": "src/lib/finance/universal/config/fieldRequirements.ts",
+      "name": "FIELD_REQUIREMENTS",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "cbdae36b67af87a4",
+      "updated": "2025-11-03T15:54:21.152Z"
+    },
+    {
+      "file": "src/lib/finance/universal/config/fieldSynonyms.ts",
+      "name": "FIELD_SYNONYMS",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6d500660bdfe1adc",
+      "updated": "2025-11-03T15:54:21.152Z"
+    },
+    {
+      "file": "src/components/finance/FinanceAIChatbot.tsx",
+      "name": "FinanceAIChatbot",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9b519be3a1d0c80d",
+      "updated": "2025-11-03T15:54:21.083Z"
+    },
+    {
+      "file": "src/contexts/FinanceImportContext.tsx",
+      "name": "FinanceImportProvider",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "153c1d40a869ef1e",
+      "updated": "2025-11-03T15:54:21.117Z"
+    },
+    {
+      "file": "src/services/FinanceImportService.ts",
+      "name": "FinanceImportService",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "7681699c6424365d",
+      "updated": "2025-11-03T15:54:21.160Z"
+    },
+    {
+      "file": "src/components/finance/FinanceKpiCards.tsx",
+      "name": "FinanceKpiCards",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6a14e495e9903bf1",
+      "updated": "2025-11-03T15:54:21.083Z"
+    },
+    {
+      "file": "src/components/finance/FinanceLocationComparisonChart.tsx",
+      "name": "FinanceLocationComparisonChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f8ebd52ce8b4bd4d",
+      "updated": "2025-11-03T15:54:21.084Z"
+    },
+    {
+      "file": "src/components/finance/FinanceRevenueTrendChart.tsx",
+      "name": "FinanceRevenueTrendChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3242abf1abd50cf1",
+      "updated": "2025-11-03T15:54:21.084Z"
+    },
+    {
+      "file": "src/components/finance/financial-analytics.tsx",
+      "name": "FinancialAnalytics",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "63a0952e51efddf1",
+      "updated": "2025-11-03T15:54:21.094Z"
+    },
+    {
+      "file": "src/components/finance/FinancialChatSidepanel.tsx",
+      "name": "FinancialChatSidepanel",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8cd2cb160b576102",
+      "updated": "2025-11-03T15:54:21.084Z"
+    },
+    {
+      "file": "src/components/finance/FlexibleMetricChart.tsx",
+      "name": "FlexibleMetricChart",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "29d318356bc14f83",
+      "updated": "2025-11-03T15:54:21.085Z"
+    },
+    {
+      "file": "src/components/ui/form.tsx",
+      "name": "form",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "7f6f3b157f0c0888",
+      "updated": "2025-11-03T15:54:21.105Z"
+    },
+    {
+      "file": "src/lib/dateFormatters.ts",
+      "name": "formatDateDDMMYY",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "73f458ed298fe938",
+      "updated": "2025-11-03T15:54:21.122Z"
+    },
+    {
+      "file": "src/components/finance/SmartPeriodSelector.tsx",
+      "name": "getDateRangeForPreset",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "46b113297a786d3e",
+      "updated": "2025-11-03T15:54:21.092Z"
+    },
+    {
+      "file": "src/components/view-data/DateFilterPresets.tsx",
+      "name": "getDateRangeForPreset",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f249abaa1574da41",
+      "updated": "2025-11-03T15:54:21.116Z"
+    },
+    {
+      "file": "src/lib/dateUtils.ts",
+      "name": "getPeriodRange",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d3426b4076b39502",
+      "updated": "2025-11-03T15:54:21.122Z"
+    },
+    {
+      "file": "src/components/ui/hover-card.tsx",
+      "name": "hover-card",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8d606e166ef5f9bc",
+      "updated": "2025-11-03T15:54:21.105Z"
+    },
+    {
+      "file": "src/lib/i18n.ts",
+      "name": "i18n",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "65bbc4c156a984ea",
+      "updated": "2025-11-03T15:54:21.156Z"
+    },
+    {
+      "file": "src/components/providers/i18n-client-wrapper.tsx",
+      "name": "I18nClientWrapper",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "41220abaa7309cc4",
+      "updated": "2025-11-03T15:54:21.095Z"
+    },
+    {
+      "file": "src/components/providers/i18n-provider.tsx",
+      "name": "I18nProvider",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "aa25472c6d595873",
+      "updated": "2025-11-03T15:54:21.096Z"
+    },
+    {
+      "file": "src/components/finance/ImportHistory.tsx",
+      "name": "ImportHistory",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "beb6387cba404839",
+      "updated": "2025-11-03T15:54:21.086Z"
+    },
+    {
+      "file": "src/components/ui/input.tsx",
+      "name": "input",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ee872d2141e68953",
+      "updated": "2025-11-03T15:54:21.106Z"
+    },
+    {
+      "file": "src/components/ui/input-otp.tsx",
+      "name": "input-otp",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a301658db5430d30",
+      "updated": "2025-11-03T15:54:21.106Z"
+    },
+    {
+      "file": "src/components/finance/InteractiveMetricChart.tsx",
+      "name": "InteractiveMetricChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "5813038ac765c929",
+      "updated": "2025-11-03T15:54:21.086Z"
+    },
+    {
+      "file": "src/components/ui/label.tsx",
+      "name": "label",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "292b45ff630de012",
+      "updated": "2025-11-03T15:54:21.106Z"
+    },
+    {
+      "file": "src/components/ui/language-switcher.tsx",
+      "name": "LanguageSwitcher",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "44fc18a2d88c9df8",
+      "updated": "2025-11-03T15:54:21.108Z"
+    },
+    {
+      "file": "src/lib/finance/universal/matching/fuzzyMatcher.ts",
+      "name": "levenshteinDistance",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9345f3bf142c6350",
+      "updated": "2025-11-03T15:54:21.153Z"
+    },
+    {
+      "file": "src/components/finance/LocationMultiSelect.tsx",
+      "name": "LocationMultiSelect",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "98c20481b04fe438",
+      "updated": "2025-11-03T15:54:21.087Z"
+    },
+    {
+      "file": "src/services/LocationService.ts",
+      "name": "LocationService",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "221d070ea87fb70e",
+      "updated": "2025-11-03T15:54:21.161Z"
+    },
+    {
+      "file": "src/lib/finance/universal/database/logger.ts",
+      "name": "logger",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a66bb53a8fa2b436",
+      "updated": "2025-11-03T15:54:21.153Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/categoryMapper.ts",
+      "name": "mapCategoryToHierarchy",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1cc33e85572c44a6",
+      "updated": "2025-11-03T15:54:21.149Z"
+    },
+    {
+      "file": "src/components/sales/MasterDataUpdateNotification.tsx",
+      "name": "MasterDataUpdateNotification",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e8bce052dc3b8f6b",
+      "updated": "2025-11-03T15:54:21.099Z"
+    },
+    {
+      "file": "src/lib/finance/common/location-matcher.ts",
+      "name": "matchLocation",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b8ec2706b5df9f2f",
+      "updated": "2025-11-03T15:54:21.145Z"
+    },
+    {
+      "file": "src/components/ui/menubar.tsx",
+      "name": "menubar",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9a44756ba91e4c48",
+      "updated": "2025-11-03T15:54:21.108Z"
+    },
+    {
+      "file": "src/app/layout.tsx",
+      "name": "metadata",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "58fe88a07793deac",
+      "updated": "2025-11-03T15:54:20.941Z"
+    },
+    {
+      "file": "src/components/eitje/month-card.tsx",
+      "name": "MonthCard",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b4bfd17bf5060c4b",
+      "updated": "2025-11-03T15:54:20.943Z"
+    },
+    {
+      "file": "src/components/ui/navigation-menu.tsx",
+      "name": "navigation-menu",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "92736fbbe66e31d1",
+      "updated": "2025-11-03T15:54:21.109Z"
+    },
+    {
+      "file": "src/lib/finance/universal/matching/headerNormalizer.ts",
+      "name": "normalizeHeader",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "3e2319b7fcbb624e",
+      "updated": "2025-11-03T15:54:21.153Z"
+    },
+    {
+      "file": "src/lib/helpers/stringHelpers.ts",
+      "name": "normalizeHeader",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "89f02549b07f40df",
+      "updated": "2025-11-03T15:54:21.156Z"
+    },
+    {
+      "file": "src/lib/stringHelpers.ts",
+      "name": "normalizeHeader",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "89f02549b07f40df",
+      "updated": "2025-11-03T15:54:21.159Z"
+    },
+    {
+      "file": "src/lib/finance/eitje/orchestrator.ts",
+      "name": "orchestrator",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "29c838b4ec85752c",
+      "updated": "2025-11-03T15:54:21.146Z"
+    },
+    {
+      "file": "src/lib/finance/universal/orchestrator.ts",
+      "name": "orchestrator",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "cdc082ee4510ca03",
+      "updated": "2025-11-03T15:54:21.154Z"
+    },
+    {
+      "file": "src/lib/finance/eitje/orchestratorV2.ts",
+      "name": "orchestratorV2",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "29c838b4ec85752c",
+      "updated": "2025-11-03T15:54:21.147Z"
+    },
+    {
+      "file": "src/components/finance/PaginatedDataDisplay.tsx",
+      "name": "PaginatedDataDisplay",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3d68c8d4253f419d",
+      "updated": "2025-11-03T15:54:21.087Z"
+    },
+    {
+      "file": "src/components/ui/pagination.tsx",
+      "name": "pagination",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ac9da1e191c34855",
+      "updated": "2025-11-03T15:54:21.109Z"
+    },
+    {
+      "file": "src/lib/dateHelpers.ts",
+      "name": "parseDateValue",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "174899a86c467bc8",
+      "updated": "2025-11-03T15:54:21.122Z"
+    },
+    {
+      "file": "src/lib/finance/universal/parsers/dateParser.ts",
+      "name": "parseDateValue",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d5319af3e09f9552",
+      "updated": "2025-11-03T15:54:21.154Z"
+    },
+    {
+      "file": "src/lib/helpers/dateHelpers.ts",
+      "name": "parseDateValue",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "174899a86c467bc8",
+      "updated": "2025-11-03T15:54:21.156Z"
+    },
+    {
+      "file": "src/lib/finance/universal/parsers/hoursParser.ts",
+      "name": "parseHours",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "421ed79c55ff4b63",
+      "updated": "2025-11-03T15:54:21.154Z"
+    },
+    {
+      "file": "src/lib/finance/universal/parsers/monthParser.ts",
+      "name": "parseMonth",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b687c7eb918585dd",
+      "updated": "2025-11-03T15:54:21.154Z"
+    },
+    {
+      "file": "src/lib/finance/universal/parsers/numberParser.ts",
+      "name": "parseNumber",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ecb48986f5a2ce89",
+      "updated": "2025-11-03T15:54:21.154Z"
+    },
+    {
+      "file": "src/lib/helpers/numberHelpers.ts",
+      "name": "parseNumber",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "51478850291d3016",
+      "updated": "2025-11-03T15:54:21.156Z"
+    },
+    {
+      "file": "src/lib/numberHelpers.ts",
+      "name": "parseNumber",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "51478850291d3016",
+      "updated": "2025-11-03T15:54:21.158Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/parser.ts",
+      "name": "parsePowerBISheet",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "144faee7aa614e4d",
+      "updated": "2025-11-03T15:54:21.150Z"
+    },
+    {
+      "file": "src/components/finance/PeriodSelector.tsx",
+      "name": "PeriodSelector",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9e871e71b39da2e2",
+      "updated": "2025-11-03T15:54:21.087Z"
+    },
+    {
+      "file": "src/components/ui/popover.tsx",
+      "name": "popover",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ee5f78ece57c9e8e",
+      "updated": "2025-11-03T15:54:21.109Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/imports/powerbi-import.tsx",
+      "name": "PowerBIImport",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "dc0221b154719650",
+      "updated": "2025-11-03T15:54:20.877Z"
+    },
+    {
+      "file": "src/components/finance/PreviewTable.tsx",
+      "name": "PreviewTable",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8ebd9e353385ca0b",
+      "updated": "2025-11-03T15:54:21.087Z"
+    },
+    {
+      "file": "src/lib/finance/bork/orchestrator.ts",
+      "name": "processBorkSales",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "941f3893878e069c",
+      "updated": "2025-11-03T15:54:21.144Z"
+    },
+    {
+      "file": "src/lib/finance/bork/orchestratorV2.ts",
+      "name": "processBorkSalesV2",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "c199dbad623ab73b",
+      "updated": "2025-11-03T15:54:21.145Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/orchestrator.ts",
+      "name": "processPowerBIPnL",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e9503f30accc2995",
+      "updated": "2025-11-03T15:54:21.150Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/orchestratorV2.ts",
+      "name": "processPowerBIPnLV2",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1a37a90d68c62ac6",
+      "updated": "2025-11-03T15:54:21.150Z"
+    },
+    {
+      "file": "src/components/finance/profit-loss-chart.tsx",
+      "name": "ProfitLossChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e9992d4b8cb63c00",
+      "updated": "2025-11-03T15:54:21.095Z"
+    },
+    {
+      "file": "src/components/ui/progress.tsx",
+      "name": "progress",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b6ab3b74ec4bcd74",
+      "updated": "2025-11-03T15:54:21.109Z"
+    },
+    {
+      "file": "src/lib/eitje/progress-tracker.ts",
+      "name": "progress-tracker",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "efbe446bd5fb70b4",
+      "updated": "2025-11-03T15:54:21.126Z"
+    },
+    {
+      "file": "src/components/providers.tsx",
+      "name": "Providers",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "30626bbf1ff99f27",
+      "updated": "2025-11-03T15:54:21.098Z"
+    },
+    {
+      "file": "src/lib/queryClient.ts",
+      "name": "queryClient",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9140c32eabd0b716",
+      "updated": "2025-11-03T15:54:21.159Z"
+    },
+    {
+      "file": "src/components/ui/radio-group.tsx",
+      "name": "radio-group",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "995ec983735b2045",
+      "updated": "2025-11-03T15:54:21.110Z"
+    },
+    {
+      "file": "src/components/finance/RawDataStorage.tsx",
+      "name": "RawDataStorage",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9a3ca2629696a1f3",
+      "updated": "2025-11-03T15:54:21.087Z"
+    },
+    {
+      "file": "src/components/finance/RawResponseViewer.tsx",
+      "name": "RawResponseViewer",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2f13ef01b1cf8bd5",
+      "updated": "2025-11-03T15:54:21.088Z"
+    },
+    {
+      "file": "src/components/ui/resizable.tsx",
+      "name": "resizable",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a31af34c14c7c866",
+      "updated": "2025-11-03T15:54:21.110Z"
+    },
+    {
+      "file": "src/lib/finance/pnl-balance/category-mapper.ts",
+      "name": "REVENUE_MAPPINGS",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1b31c2fee17a4d75",
+      "updated": "2025-11-03T22:28:28.979Z"
+    },
+    {
+      "file": "src/components/finance/RevenueChart.tsx",
+      "name": "RevenueChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4e44258094fb5bb8",
+      "updated": "2025-11-03T15:54:21.088Z"
+    },
+    {
+      "file": "src/components/finance/revenue-chart.tsx",
+      "name": "RevenueChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "76d8af700a09277b",
+      "updated": "2025-11-03T15:54:21.095Z"
+    },
+    {
+      "file": "src/components/finance/RevenueKpiCard.tsx",
+      "name": "RevenueKpiCard",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "00f9a3452e120583",
+      "updated": "2025-11-03T15:54:21.088Z"
+    },
+    {
+      "file": "src/components/finance/RevenueTrendChart.tsx",
+      "name": "RevenueTrendChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f17f02d1f8230a8d",
+      "updated": "2025-11-03T15:54:21.089Z"
+    },
+    {
+      "file": "src/components/roadmap/RoadmapFormSheet.tsx",
+      "name": "RoadmapFormSheet",
+      "type": "component",
+      "status": "completed",
+      "touch_again": true,
+      "checksum": "1f3e37b45cde8a6c",
+      "updated": "2025-11-03T15:54:21.099Z"
+    },
+    {
+      "file": "src/components/roadmap/RoadmapItemCard.tsx",
+      "name": "RoadmapItemCard",
+      "type": "component",
+      "status": "completed",
+      "touch_again": true,
+      "checksum": "536e3751b645aefd",
+      "updated": "2025-11-03T15:54:21.099Z"
+    },
+    {
+      "file": "src/lib/finance/universal/processing/rowProcessor.ts",
+      "name": "rowProcessor",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "1f11e186469bc23d",
+      "updated": "2025-11-03T15:54:21.155Z"
+    },
+    {
+      "file": "src/components/finance/sales-by-category-chart.tsx",
+      "name": "SalesByCategoryChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "0fa58e8f3955cb98",
+      "updated": "2025-11-03T15:54:21.095Z"
+    },
+    {
+      "file": "src/components/sales/SalesCategoryFilter.tsx",
+      "name": "SalesCategoryFilter",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e2e1881ce23b21e6",
+      "updated": "2025-11-03T15:54:21.100Z"
+    },
+    {
+      "file": "src/components/sales/SalesChart.tsx",
+      "name": "SalesChart",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b9487e232e41fd51",
+      "updated": "2025-11-03T15:54:21.100Z"
+    },
+    {
+      "file": "src/components/finance/SalesIntelligenceCard.tsx",
+      "name": "SalesIntelligenceCard",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "fb16624902074214",
+      "updated": "2025-11-03T15:54:21.089Z"
+    },
+    {
+      "file": "src/components/sales/SalesKpiCard.tsx",
+      "name": "SalesKpiCard",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "87d2ce584ac711d8",
+      "updated": "2025-11-03T15:54:21.101Z"
+    },
+    {
+      "file": "src/lib/finance/universal/mappingCache.ts",
+      "name": "saveMappingCache",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1bd1e9cd4ef09483",
+      "updated": "2025-11-03T15:54:21.153Z"
+    },
+    {
+      "file": "src/components/finance/SchemaResolverDialog.tsx",
+      "name": "SchemaResolverDialog",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "72bda98c42aa045a",
+      "updated": "2025-11-03T15:54:21.090Z"
+    },
+    {
+      "file": "src/components/ui/scroll-area.tsx",
+      "name": "scroll-area",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "998181a10164aa6e",
+      "updated": "2025-11-03T15:54:21.110Z"
+    },
+    {
+      "file": "src/components/ui/select.tsx",
+      "name": "select",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a2b62120a033b36c",
+      "updated": "2025-11-03T15:54:21.111Z"
+    },
+    {
+      "file": "src/components/ui/separator.tsx",
+      "name": "separator",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6c271e740c3d7b54",
+      "updated": "2025-11-03T15:54:21.111Z"
+    },
+    {
+      "file": "src/integrations/supabase/server.ts",
+      "name": "server",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "fb5de038061afc52",
+      "updated": "2025-11-03T15:54:21.120Z"
+    },
+    {
+      "file": "src/components/ui/sheet.tsx",
+      "name": "sheet",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e7d726b34d0f3214",
+      "updated": "2025-11-03T15:54:21.111Z"
+    },
+    {
+      "file": "src/components/view-data/ShowMoreColumnsToggle.tsx",
+      "name": "ShowMoreColumnsToggle",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "664a1ead3058bb28",
+      "updated": "2025-11-08T00:51:34.199Z"
+    },
+    {
+      "file": "src/components/ui/sidebar.tsx",
+      "name": "sidebar",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "1795e3f8ed94d73a",
+      "updated": "2025-11-03T15:54:21.112Z"
+    },
+    {
+      "file": "src/lib/finance/simple-import.ts",
+      "name": "simple-import",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "06e72d73a8e7fdf9",
+      "updated": "2025-11-03T15:54:21.151Z"
+    },
+    {
+      "file": "src/components/finance/SimpleApiTest.tsx",
+      "name": "SimpleApiTest",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c39ab08eda1bfd8a",
+      "updated": "2025-11-03T15:54:21.090Z"
+    },
+    {
+      "file": "src/components/finance/SimpleApiTestV2.tsx",
+      "name": "SimpleApiTestV2",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "7dcaf3db0382b284",
+      "updated": "2025-11-03T15:54:21.090Z"
+    },
+    {
+      "file": "src/components/finance/SimpleDataImport.tsx",
+      "name": "SimpleDataImport",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "986e239b5e4e300b",
+      "updated": "2025-11-03T15:54:21.091Z"
+    },
+    {
+      "file": "src/components/finance/SimpleDataImportFixed.tsx",
+      "name": "SimpleDataImport",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "88b4c078aaf01b68",
+      "updated": "2025-11-03T15:54:21.091Z"
+    },
+    {
+      "file": "src/components/ui/skeleton.tsx",
+      "name": "skeleton",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "a229c310b9cbcb01",
+      "updated": "2025-11-03T15:54:21.113Z"
+    },
+    {
+      "file": "src/components/ui/slider.tsx",
+      "name": "slider",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b81a683197551322",
+      "updated": "2025-11-03T15:54:21.113Z"
+    },
+    {
+      "file": "src/components/ui/sonner.tsx",
+      "name": "sonner",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "391edec27da1ca3c",
+      "updated": "2025-11-03T15:54:21.113Z"
+    },
+    {
+      "file": "src/lib/schemaValidator.ts",
+      "name": "suggestColumnMapping",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1867054bd53f158f",
+      "updated": "2025-11-03T15:54:21.159Z"
+    },
+    {
+      "file": "src/lib/finance/powerbi/summaryProcessor.ts",
+      "name": "summaryProcessor",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "cdfb703a55fa3122",
+      "updated": "2025-11-03T15:54:21.151Z"
+    },
+    {
+      "file": "src/components/ui/switch.tsx",
+      "name": "switch",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "99cda942c2d215d8",
+      "updated": "2025-11-03T15:54:21.113Z"
+    },
+    {
+      "file": "src/components/ui/table.tsx",
+      "name": "table",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f79c140adf3beaf4",
+      "updated": "2025-11-03T15:54:21.113Z"
+    },
+    {
+      "file": "src/components/ui/tabs.tsx",
+      "name": "tabs",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e4531547c3adbdb4",
+      "updated": "2025-11-03T15:54:21.114Z"
+    },
+    {
+      "file": "src/components/ui/textarea.tsx",
+      "name": "textarea",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2f5b24d28dc5c418",
+      "updated": "2025-11-03T15:54:21.114Z"
+    },
+    {
+      "file": "src/components/ui/toast.tsx",
+      "name": "toast",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "50d187a334203b7b",
+      "updated": "2025-11-03T15:54:21.114Z"
+    },
+    {
+      "file": "src/components/ui/toaster.tsx",
+      "name": "Toaster",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "600d661340ddc3ee",
+      "updated": "2025-11-03T15:54:21.114Z"
+    },
+    {
+      "file": "src/components/ui/toggle.tsx",
+      "name": "toggle",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "fb0f786bce638fd4",
+      "updated": "2025-11-03T15:54:21.115Z"
+    },
+    {
+      "file": "src/components/ui/toggle-group.tsx",
+      "name": "toggle-group",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a3ea231230c8fff2",
+      "updated": "2025-11-03T15:54:21.115Z"
+    },
+    {
+      "file": "src/components/ui/tooltip.tsx",
+      "name": "tooltip",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "bd9361649477cf94",
+      "updated": "2025-11-03T15:54:21.116Z"
+    },
+    {
+      "file": "src/components/finance/UniversalFileUpload.tsx",
+      "name": "UniversalFileUpload",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b776367d32934915",
+      "updated": "2025-11-03T15:54:21.093Z"
+    },
+    {
+      "file": "src/components/finance/UniversalMappingDialog.tsx",
+      "name": "UniversalMappingDialog",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "df6af9b193fc2fd8",
+      "updated": "2025-11-03T15:54:21.093Z"
+    },
+    {
+      "file": "src/hooks/useDebouncedValue.ts",
+      "name": "useDebouncedValue",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c876c7d3ef3d57c1",
+      "updated": "2025-11-03T15:54:21.117Z"
+    },
+    {
+      "file": "src/hooks/useFinanceData.ts",
+      "name": "useFinanceData",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7c0426e3ddc31c1c",
+      "updated": "2025-11-03T15:54:21.118Z"
+    },
+    {
+      "file": "src/hooks/use-mobile.tsx",
+      "name": "useIsMobile",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "21eff740f9e5c965",
+      "updated": "2025-11-03T15:54:21.117Z"
+    },
+    {
+      "file": "src/hooks/useLaborData.ts",
+      "name": "useLaborData",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "49d2c53cc466fa05",
+      "updated": "2025-11-03T15:54:21.118Z"
+    },
+    {
+      "file": "src/hooks/useOptimizedQuery.ts",
+      "name": "useOptimizedQuery",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "66b951d02bee3c6a",
+      "updated": "2025-11-03T15:54:21.118Z"
+    },
+    {
+      "file": "src/hooks/usePnLByCategory.ts",
+      "name": "usePnLByCategory",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d425b39442145c3c",
+      "updated": "2025-11-03T15:54:21.118Z"
+    },
+    {
+      "file": "src/hooks/usePnLCalculations.ts",
+      "name": "usePnLCalculations",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b9c8dfc087e877f4",
+      "updated": "2025-11-03T15:54:21.118Z"
+    },
+    {
+      "file": "src/hooks/usePnLSummary.ts",
+      "name": "usePnLSummary",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "42cf1e69d98e130e",
+      "updated": "2025-11-03T15:54:21.119Z"
+    },
+    {
+      "file": "src/hooks/useRevenueData.ts",
+      "name": "useRevenueData",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "116ded2460744310",
+      "updated": "2025-11-03T15:54:21.119Z"
+    },
+    {
+      "file": "src/hooks/useSalesByCategory.ts",
+      "name": "useSalesByCategory",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "82aecc4a4ac02206",
+      "updated": "2025-11-03T15:54:21.119Z"
+    },
+    {
+      "file": "src/hooks/useSalesData.ts",
+      "name": "useSalesData",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "17eddf8a94b2c48d",
+      "updated": "2025-11-03T15:54:21.119Z"
+    },
+    {
+      "file": "src/hooks/useSalesIntelligence.ts",
+      "name": "useSalesIntelligence",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b0731cda1867b14f",
+      "updated": "2025-11-03T15:54:21.119Z"
+    },
+    {
+      "file": "src/hooks/use-toast.ts",
+      "name": "useToast",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "716f927d81408d30",
+      "updated": "2025-11-03T15:54:21.117Z"
+    },
+    {
+      "file": "src/hooks/useUserRole.ts",
+      "name": "useUserRole",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7e967a4aa7d5956b",
+      "updated": "2025-11-03T15:54:21.120Z"
+    },
+    {
+      "file": "src/lib/finance/universal/processing/validator.ts",
+      "name": "validateRecord",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "0d936eff568534d9",
+      "updated": "2025-11-03T15:54:21.155Z"
+    },
+    {
+      "file": "src/lib/finance/pnl-balance/calculation-validator.ts",
+      "name": "validateValue",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "588b156ddf99a8fe",
+      "updated": "2025-11-03T22:28:28.978Z"
+    },
+    {
+      "file": "src/lib/eitje/_backup_complex/validators.ts",
+      "name": "validators",
+      "type": "component",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "4e17b32ebc2f0f85",
+      "updated": "2025-11-03T15:54:21.124Z"
+    },
+    {
+      "file": "src/lib/bork/xlsx-parser.ts",
+      "name": "xlsx-parser",
+      "type": "component",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d9502ef43cff0329",
+      "updated": "2025-11-03T15:54:21.121Z"
+    }
+  ],
+  "count": 221,
+  "last_updated": "2025-11-08T01:16:18.671Z"
+}

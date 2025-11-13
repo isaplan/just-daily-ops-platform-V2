@@ -1,0 +1,226 @@
+name: AI Compliance Check
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+
+jobs:
+  compliance-check:
+    name: Compliance Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff analysis
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Get changed files
+        id: changed-files
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PRs, compare against base branch
+            BASE_SHA=${{ github.event.pull_request.base.sha }}
+            HEAD_SHA=${{ github.event.pull_request.head.sha }}
+            CHANGED=$(git diff --name-only --diff-filter=ACM $BASE_SHA..$HEAD_SHA | grep -E '\.(ts|tsx|js|jsx)$' || true)
+          else
+            # For pushes, compare against previous commit
+            CHANGED=$(git diff --name-only --diff-filter=ACM HEAD~1..HEAD | grep -E '\.(ts|tsx|js|jsx)$' || true)
+          fi
+          
+          if [ -z "$CHANGED" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No TypeScript/JavaScript files changed"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "$CHANGED" > changed_files.txt
+            echo "Changed files:"
+            echo "$CHANGED"
+          fi
+      
+      - name: Detect Branch Type
+        id: branch-type
+        run: |
+          # Determine if we're on main/master or feature branch
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
+          else
+            TARGET_BRANCH="${{ github.ref_name }}"
+          fi
+          
+          echo "Target branch: $TARGET_BRANCH"
+          
+          if [[ "$TARGET_BRANCH" == "main" ]] || [[ "$TARGET_BRANCH" == "master" ]]; then
+            echo "type=main" >> $GITHUB_OUTPUT
+            echo "🔴 Main branch detected - strict enforcement"
+          else
+            echo "type=feature" >> $GITHUB_OUTPUT
+            echo "🟡 Feature branch detected - warn-only mode"
+          fi
+      
+      - name: Run Pre-Execution Compliance Check
+        id: pre-check
+        if: steps.changed-files.outputs.changed == 'true'
+        run: |
+          echo "🛡️ Running pre-execution compliance checks..."
+          echo "Branch type: ${{ steps.branch-type.outputs.type }}"
+          
+          CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
+          
+          # Run pre-execution check
+          if [ -f "tools/compliance/pre-execution-check.js" ]; then
+            PRE_RESULT=$(node tools/compliance/pre-execution-check.js "CI compliance check" $CHANGED_FILES 2>&1)
+            PRE_EXIT=$?
+            
+            echo "===PRE-EXECUTION CHECK OUTPUT==="
+            echo "$PRE_RESULT"
+            echo "===END PRE-CHECK OUTPUT==="
+            
+            # Extract status from JSON output
+            PRE_STATUS=$(echo "$PRE_RESULT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || echo "UNKNOWN")
+            
+            # Branch-aware enforcement
+            if [ "${{ steps.branch-type.outputs.type }}" == "main" ]; then
+              # MAIN BRANCH: Hard block on violations
+              if [ $PRE_EXIT -ne 0 ] || [ "$PRE_STATUS" = "BLOCK" ]; then
+                echo "❌ Pre-execution check BLOCKED on main branch - violations detected"
+                echo "$PRE_RESULT"
+                exit 1
+              elif [ "$PRE_STATUS" = "WARN" ]; then
+                echo "⚠️ Pre-execution check WARNED on main branch"
+                echo "$PRE_RESULT"
+                # Still fail on main for warnings
+                exit 1
+              else
+                echo "✅ Pre-execution check PASSED"
+              fi
+            else
+              # FEATURE BRANCH: Warn only, never block
+              if [ $PRE_EXIT -ne 0 ] || [ "$PRE_STATUS" = "BLOCK" ]; then
+                echo "⚠️ Pre-execution check found issues (feature branch - warn only)"
+                echo "$PRE_RESULT"
+                # Don't exit, just warn
+              elif [ "$PRE_STATUS" = "WARN" ]; then
+                echo "⚠️ Pre-execution check WARNED (feature branch)"
+                echo "$PRE_RESULT"
+              else
+                echo "✅ Pre-execution check PASSED"
+              fi
+            fi
+          else
+            echo "⚠️ Pre-execution check script not found, skipping"
+          fi
+      
+      - name: Run Post-Execution Compliance Check
+        id: post-check
+        if: steps.changed-files.outputs.changed == 'true'
+        run: |
+          echo "🛡️ Running post-execution compliance checks..."
+          echo "Branch type: ${{ steps.branch-type.outputs.type }}"
+          
+          CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
+          
+          # Run post-execution check
+          if [ -f "tools/compliance/post-execution-check.js" ]; then
+            POST_RESULT=$(node tools/compliance/post-execution-check.js $CHANGED_FILES 2>&1)
+            POST_EXIT=$?
+            
+            echo "===POST-EXECUTION CHECK OUTPUT==="
+            echo "$POST_RESULT"
+            echo "===END POST-CHECK OUTPUT==="
+            
+            # Branch-aware enforcement
+            if [ "${{ steps.branch-type.outputs.type }}" == "main" ]; then
+              # MAIN BRANCH: Hard block on violations
+              if [ $POST_EXIT -ne 0 ]; then
+                echo "❌ Post-execution check BLOCKED on main branch - violations detected"
+                echo "$POST_RESULT"
+                exit 1
+              else
+                echo "✅ Post-execution check PASSED"
+              fi
+            else
+              # FEATURE BRANCH: Warn only, check for permission log
+              if [ $POST_EXIT -ne 0 ]; then
+                echo "⚠️ Post-execution check found violations (feature branch - warn only)"
+                echo "$POST_RESULT"
+                
+                # Check if permission log exists for protected file modifications
+                if [ -f ".ai-compliance-permissions.json" ]; then
+                  echo "📝 Permission log found - checking for approvals"
+                  PERMISSION_COUNT=$(cat .ai-compliance-permissions.json | grep -c '"approved_by": "user"' || echo "0")
+                  echo "Found $PERMISSION_COUNT permission(s) logged"
+                  
+                  if [ "$PERMISSION_COUNT" -gt 0 ]; then
+                    echo "✅ Protected file modifications have logged permissions"
+                  else
+                    echo "⚠️ No permissions found in log. Please verify approvals."
+                  fi
+                else
+                  echo "⚠️ No permission log found. If protected files were modified, permissions should be logged."
+                fi
+                
+                # Don't exit, just warn
+              else
+                echo "✅ Post-execution check PASSED"
+              fi
+            fi
+          else
+            echo "⚠️ Post-execution check script not found, skipping"
+          fi
+      
+      - name: Check for bypass flags in commit messages
+        run: |
+          echo "🔍 Checking commit messages for bypass attempts..."
+          
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            COMMITS=$(git log --format="%B" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+          else
+            COMMITS=$(git log --format="%B" -1)
+          fi
+          
+          # Check for bypass flags in commit messages
+          if echo "$COMMITS" | grep -qiE "\[skip.*ci\]|\[no.*verify\]|\[bypass\]|--no-verify|--no-gpg-sign"; then
+            echo "❌ ERROR: Bypass flags detected in commit message!"
+            echo "Commit messages cannot contain: [skip ci], [no verify], [bypass], --no-verify, --no-gpg-sign"
+            echo ""
+            echo "Commits:"
+            echo "$COMMITS"
+            exit 1
+          fi
+          
+          echo "✅ No bypass flags detected in commit messages"
+      
+      - name: Compliance check summary
+        if: always()
+        run: |
+          echo "## 🛡️ Compliance Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.pre-check.outcome }}" == "success" ]; then
+            echo "✅ Pre-execution check: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.pre-check.outcome }}" == "failure" ]; then
+            echo "❌ Pre-execution check: **BLOCKED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ Pre-execution check: **SKIPPED**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.post-check.outcome }}" == "success" ]; then
+            echo "✅ Post-execution check: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.post-check.outcome }}" == "failure" ]; then
+            echo "⚠️ Post-execution check: **VIOLATIONS DETECTED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ Post-execution check: **SKIPPED**" >> $GITHUB_STEP_SUMMARY
+          fi
+

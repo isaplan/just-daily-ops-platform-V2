@@ -1,0 +1,75 @@
+{
+  "version": "2.0.0",
+  "last_updated": "2025-11-08T01:16:18.671Z",
+  "registry_files": {
+    "api-routes": {
+      "file": "api-routes.json",
+      "count": 58,
+      "updated": "2025-11-08T01:16:18.671Z"
+    },
+    "pages": {
+      "file": "pages.json",
+      "count": 60,
+      "updated": "2025-11-08T01:16:18.671Z"
+    },
+    "components": {
+      "file": "components.json",
+      "count": 221,
+      "updated": "2025-11-08T01:16:18.671Z"
+    },
+    "services": {
+      "file": "services.json",
+      "count": 4,
+      "updated": "2025-11-08T01:16:18.671Z"
+    },
+    "hooks": {
+      "file": "hooks.json",
+      "count": 0,
+      "updated": "2025-11-08T01:16:18.671Z"
+    },
+    "modules": {
+      "file": "modules.json",
+      "count": 0,
+      "updated": "2025-11-08T01:16:18.671Z"
+    },
+    "archive-reference": {
+      "file": "archive-reference.json",
+      "count": 1,
+      "updated": "2025-01-27T00:00:00.000Z"
+    }
+  },
+  "summary": {
+    "total_functions": 343,
+    "by_status": {
+      "completed": 286,
+      "in-progress": 57,
+      "archived": 1
+    },
+    "protected": 283
+  },
+  "archive_config": {
+    "folder": "old-pages-sql-scripts",
+    "status": "reference_only",
+    "excluded_from_checks": true,
+    "usage_restrictions": {
+      "direct_copy": false,
+      "direct_import": false,
+      "direct_reference": false
+    }
+  },
+  "last_scan": {
+    "timestamp": "2025-11-08T01:16:18.671Z",
+    "files_scanned": 345,
+    "changes": {
+      "new": 0,
+      "updated": 0,
+      "removed": 0,
+      "unchanged": 343
+    }
+  },
+  "compliance_config": {
+    "auto_tracking": true,
+    "violation_prevention": true,
+    "progress_monitoring": true
+  }
+}

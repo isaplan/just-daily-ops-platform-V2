@@ -1,0 +1,12 @@
+#!/bin/bash
+echo "🚀 Deploying Aggregation Edge Functions..."
+echo ""
+echo "If Supabase CLI is installed:"
+echo "  supabase functions deploy bork-aggregate-data"
+echo "  supabase functions deploy eitje-aggregate-data"
+echo ""
+echo "Or use Supabase Dashboard (recommended):"
+echo "  1. Go to: https://supabase.com/dashboard/project/vrucbxdudchboznunndz/functions"
+echo "  2. Create new functions and paste code from:"
+echo "     - supabase/functions/bork-aggregate-data/index.ts"
+echo "     - supabase/functions/eitje-aggregate-data/index.ts"

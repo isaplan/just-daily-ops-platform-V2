@@ -1,0 +1,346 @@
+# ⚠️  MIGRATED TO ARCHIVE - DO NOT USE DIRECTLY
+# Migrated: 2025-11-13 01:18:49
+# Original: /Users/alviniomolina/Documents/GitHub/just-daily-ops-platform/.cursor/rules/compliance-rules.mdc.backup
+
+---
+alwaysApply: true
+---
+
+# 🛡️ CURSOR AI COMPLIANCE RULES - ALWAYS ENFORCED
+
+## 🛑 **RULE #0: UNDERSTAND → CLARIFY → CONFIRM → BUILD**
+### **THE MOST IMPORTANT RULE (OVERRIDES ALL OTHERS)**
+
+**Before ANY action:**
+1. **Understand EXACTLY what user wants** - Read carefully, don't skim
+2. **Identify assumptions** - What am I assuming that wasn't explicitly stated?
+3. **Ask clarifying questions** - If ANYTHING is unclear or assumed
+4. **Confirm the plan** - Show what you'll do, wait for approval
+5. **Align on scope** - Make sure we're on the same page
+6. **ONLY THEN: Execute** - Do exactly what was approved, no more, no less
+
+### **🚫 NEVER:**
+- ❌ Jump into assumptions and start building
+- ❌ Build what you THINK user wants
+- ❌ Add "helpful" features that weren't requested
+- ❌ Make architectural decisions without asking
+- ❌ Assume scope or approach
+
+### **✅ ALWAYS:**
+- ✅ Do EXACTLY what is asked (no more, no less)
+- ✅ Ask if ANYTHING is unclear or requires assumption
+- ✅ Get explicit approval before proceeding
+- ✅ Confirm we're on the same page
+
+**IF IN DOUBT → ASK. IF ASSUMING → ASK. IF UNCLEAR → ASK.**
+
+---
+
+## 🚫 **ABSOLUTE PROHIBITIONS (UNBREAKABLE)**
+
+### **🔒 REGISTRY PROTECTION (CRITICAL - HARD BLOCK)**
+**NEVER modify files marked with `"touch_again": false` in `function-registry.json`**
+
+Protected files include (but not limited to):
+- All API routes in `src/app/api/**/*` (58+ routes)
+- All UI components in `src/components/ui/**/*` (30+ components)
+- All finance components in `src/components/finance/**/*`
+- All completed utility libraries in `src/lib/**/*`
+- All completed hooks in `src/hooks/**/*`
+- See `function-registry.json` for complete list (284+ protected files)
+
+**ENFORCEMENT:** 
+- Check `function-registry.json` BEFORE touching ANY file
+- If `"touch_again": false` → **STOP IMMEDIATELY** → Report to user → Do not proceed
+- These are production-tested, working files - ANY modification will break the system
+
+### **📏 SIZE LIMITS (HARD BLOCK)**
+- **Maximum 100 lines changed per file per task**
+- **Maximum 20 lines deleted per file** (prevents accidental removal)
+- **No full file replacements** (threshold: >80% of lines changed)
+
+**ENFORCEMENT:**
+- Estimate change size BEFORE starting
+- If >100 lines needed → **STOP** → Break into smaller tasks → Ask user to approve each
+- Use `search_replace` for targeted changes, never full rewrites
+
+### **🚫 NO BYPASS FLAGS (CRITICAL - SECURITY)**
+**NEVER use these git commands or flags:**
+- ❌ `git commit --no-verify` (bypasses pre-commit hooks)
+- ❌ `git push --force` (bypasses branch protection)
+- ❌ `git push --no-verify` (bypasses compliance checks)
+- ❌ Any command modifying `.git/hooks/` or compliance scripts
+
+**If compliance check fails:**
+1. **STOP immediately**
+2. **Report all violations to user**
+3. **Wait for explicit user decision**
+4. **NEVER assume permission to bypass**
+
+---
+
+## ✅ **MANDATORY PRE-EXECUTION CHECK**
+
+**BEFORE ANY code modification, you MUST:**
+
+1. **Run Pre-Check Script:**
+node tools/compliance/pre-execution-check.js "<task description>"2. **Parse JSON Output:**
+- Status: `PASS` = proceed, `WARN` = show warnings, `BLOCK` = **STOP**
+- Existing code: Review before creating new code
+- Violations: Fix violations before proceeding
+
+3. **Act on Status:**
+- **BLOCK** → **STOP** → Report violations → Wait for user decision → Do NOT proceed
+- **WARN** → Show warnings (existing code found) → Ask user to confirm → Wait for approval
+- **PASS** → Proceed cautiously → Use existing code if found → Minimal changes only
+
+---
+
+## 🔍 **MANDATORY POST-EXECUTION CHECK**
+
+**AFTER ANY code modification, you MUST:**
+
+1. **Run Post-Check Script:**
+node tools/compliance/post-execution-check.js [modified files]2. **Parse JSON Output:**
+- Status: `PASS` = no violations, `VIOLATIONS` = violations found
+- Summary: Files modified, lines changed, violation counts
+- Violations: List with severity (CRITICAL, HIGH, MEDIUM, LOW)
+
+3. **Act on Violations:**
+- **Report immediately** to user with:
+  - List of all violations
+  - Severity levels
+  - Suggested fixes
+  - Required actions
+- **Ask user** to choose: Fix now, Continue as-is, or Revert
+- **STOP** until user decides
+
+---
+
+## 📋 **DEVELOPMENT STANDARDS (ALWAYS FOLLOW)**
+
+### **⚛️ REACT STANDARDS**
+- ✅ PascalCase file naming (e.g., `UserProfile.tsx`)
+- ✅ TypeScript interfaces for all props
+- ✅ Hooks at top level of components
+- ✅ Proper import order: React → External → Internal → Assets
+- ✅ Named exports for components, default exports for pages
+- ❌ Never use class components (functional only)
+
+### **🎨 TAILWIND CSS STANDARDS**
+- ✅ Use utility classes directly in JSX
+- ✅ Use `cva` (Class Variance Authority) for component variants
+- ✅ Use theme values from `tailwind.config.ts` (no arbitrary values)
+- ❌ Never use `@apply` in global CSS
+- ❌ Never use inline styles (use Tailwind utilities)
+
+### **⚡ NEXT.JS STANDARDS**
+- ✅ Add `'use client'` directive for client components
+- ✅ Use Server Components for data fetching (default)
+- ✅ Use Client Components for interactivity only
+- ✅ Use Server Actions for mutations
+- ✅ Proper import order and organization
+- ✅ Follow App Router conventions (`app/` directory)
+
+### **🔐 SUPABASE STANDARDS (CRITICAL - SECURITY)**
+- ✅ Use `@supabase/ssr` package exclusively
+- ✅ Use `getAll()` and `setAll()` cookie methods only
+- ✅ Always return `supabaseResponse` in middleware
+- ✅ Always call `auth.getUser()` in middleware
+- ❌ **NEVER** use `@supabase/auth-helpers-nextjs` (deprecated)
+- ❌ **NEVER** use individual cookie methods (`get/set/remove`)
+
+### **🎨 SHADCN/UI STANDARDS (CRITICAL - UI CONSISTENCY)**
+- ✅ **ALWAYS** use shadcn/ui components when available
+- ✅ Import from `@/components/ui/[component]`
+- ✅ Use proper shadcn component names and props
+- ✅ Follow shadcn component patterns and structure
+- ❌ **NEVER** create custom implementations of shadcn components
+- ❌ **NEVER** reinvent shadcn functionality
+- ❌ **NEVER** use custom styling when shadcn provides the component
+
+---
+
+## 🏗️ **INCREMENTAL CHANGES PATTERN**
+
+### **🔧 MODULAR BUILD PATTERN (100-LINE RULE)**
+For every 100 lines examined, follow this hierarchy:
+- **Page = Parent** (e.g., bork-api page)
+- **Tab = Child** (e.g., connection-test tab)
+- **Component = Grandchild** (e.g., SimpleApiTest component)
+- **Sibling Tabs = Independent children**
+- **Test each level** before moving to next
+
+### **✅ ALLOWED PATTERNS**
+- ✅ Incremental improvements (small, targeted changes)
+- ✅ New feature development (in new files)
+- ✅ Bug fixes and optimizations (minimal changes)
+- ✅ Following established patterns
+- ✅ Using existing utilities and components
+
+### **❌ AVOID PATTERNS**
+- ❌ Rebuilding existing working code
+- ❌ Replacing entire files
+- ❌ Deleting existing functionality without approval
+- ❌ Making assumptions about user intent
+- ❌ Working on multiple unrelated files simultaneously
+- ❌ Bypassing registry checks
+
+### **🔄 LOOP PREVENTION (HARDCODED RULE)**
+If same issue not fixed after 2 tries, on 3rd attempt:
+1. **STOP** and reconsider the solution
+2. **ANALYZE** what didn't work in previous attempts
+3. **IDENTIFY** the root cause of failure
+4. **PROPOSE** a completely different approach
+5. **ASK** user for permission to try new approach
+6. **MOVE ON** if no clear solution after 3 attempts
+7. **LOG** the failure and what was attempted
+
+---
+
+## 🎯 **CODE REUSE (MANDATORY)**
+
+### **🔍 SEARCH BEFORE CREATING**
+**Before creating ANY new code:**
+1. **Search** for existing implementations in:
+   - `src/lib/` - Utility functions
+   - `src/hooks/` - Custom React hooks
+   - `src/components/` - Reusable components
+   - `src/types/` - Type definitions
+2. **Reuse** existing code whenever possible
+3. **Extend** existing functionality rather than rebuild
+4. **Ask** user if uncertain about existing code
+
+### **📦 EXISTING UTILITIES**
+This project has extensive utilities in:
+- `src/lib/supabase/` - Supabase clients (server, browser, middleware)
+- `src/lib/eitje/` - Eitje API integration utilities
+- `src/lib/bork/` - Bork API integration utilities
+- `src/lib/finance/` - Finance calculation utilities
+- `src/components/ui/` - 30+ shadcn/ui components
+- `src/hooks/` - Custom React hooks
+
+**ALWAYS check these before creating new code**
+
+---
+
+## 🚦 **VIOLATION SEVERITIES**
+
+### **🔴 CRITICAL (IMMEDIATE ACTION REQUIRED)**
+- Modified a protected file (`touch_again: false`)
+- Used git bypass flags (`--no-verify`, `--force`)
+- Modified compliance scripts or hooks
+- **ACTION:** Revert changes immediately → Report to user → Wait for instructions
+
+### **🟠 HIGH (MUST FIX)**
+- Exceeded 100-line limit per file
+- Replaced entire file (>80% changed)
+- Deleted a file with working functionality
+- Used deprecated packages (`@supabase/auth-helpers-nextjs`)
+- **ACTION:** Break down into smaller changes → Use incremental approach → Resubmit
+
+### **🟡 MEDIUM (REVIEW REQUIRED)**
+- Deleted >20 lines from a file
+- Deleted >5 import statements
+- Removed >2 export statements
+- Created custom implementation of shadcn component
+- **ACTION:** Verify deleted code is not needed → Review with user
+
+### **🔵 LOW (OPTIMIZE)**
+- >30 whitespace-only changes
+- Non-standard import order
+- **ACTION:** Use formatter → Follow conventions
+
+---
+
+## 📊 **WORKFLOW ENFORCEMENT**
+
+### **🔄 STANDARD WORKFLOW**
+1. **User requests code change**
+2. **AI checks `function-registry.json`** → Verify file not protected
+3. **AI runs `pre-execution-check.js`** → Parse output → Act on status
+4. **If PASS:** Execute code modification (max 100 lines)
+5. **AI runs `post-execution-check.js`** → Parse output → Report violations
+6. **If violations:** Report to user → Wait for decision → Do NOT proceed
+7. **If PASS:** Confirm completion → Summarize changes
+
+### **⚠️ WHEN TO STOP**
+- Pre-check returns `BLOCK` status
+- Protected file detected (`touch_again: false`)
+- Change requires >100 lines
+- Existing code found that accomplishes the task
+- User has not approved proposed changes
+- After 2 failed attempts at same fix
+
+### **✅ WHEN TO PROCEED**
+- Pre-check returns `PASS` status
+- Change is <100 lines
+- File is NOT protected in registry
+- User has explicitly approved
+- Following all development standards
+
+---
+
+## 🎯 **SUCCESS METRICS**
+
+You're doing well if:
+- ✅ User doesn't have to repeat requests
+- ✅ Protected files stay untouched
+- ✅ Changes are minimal and targeted
+- ✅ No existing functionality is destroyed
+- ✅ User knows exactly what will change before it happens
+- ✅ Code follows all development standards
+- ✅ Modular testing pattern is followed
+- ✅ Pre/post-checks always run
+- ✅ Violations are reported immediately
+
+---
+
+## 🔧 **QUICK REFERENCE**
+
+### **BEFORE ANY CODE CHANGE:**
+# 1. Check registry
+grep -A 1 "\"file\": \"path/to/file\"" function-registry.json
+
+# 2. Run pre-check
+node tools/compliance/pre-execution-check.js "your task description"
+
+# 3. If BLOCK or WARN → STOP → Report to user### **AFTER ANY CODE CHANGE:**
+# 1. Run post-check
+node tools/compliance/post-execution-check.js path/to/modified/files
+
+# 2. If violations → STOP → Report to user → Wait for decision### **EXEMPT FILES (No size checks, but still registry-protected):**
+- `function-registry.json`
+- `ai-tracking-system.json`
+- `progress-log.json`
+- `.ai-compliance-*.json`
+- `test-results.json`
+- `build-log.json`
+
+### **EXCLUDED PATHS (No compliance checks):**
+- `node_modules/`
+- `.git/`
+- `.next/`
+- `dist/`
+- `build/`
+
+---
+
+## 💡 **REMEMBER**
+
+1. **ASK FIRST** - Always confirm before making changes
+2. **CHECK REGISTRY** - Before touching ANY file
+3. **RUN PRE-CHECK** - Before any code modification
+4. **STAY SMALL** - Max 100 lines per file
+5. **USE EXISTING** - Search before creating
+6. **RUN POST-CHECK** - After any code modification
+7. **REPORT VIOLATIONS** - Immediately, don't hide them
+8. **WAIT FOR USER** - Never assume permission to bypass
+
+---
+
+**Status**: 🛡️ **UNBREAKABLE RULES ACTIVE**  
+**Mode**: DEFENSIVE ONLY  
+**Protected Files**: 284+ files in `function-registry.json`  
+**Max Lines Per Change**: 100  
+**Bypass Flags**: ❌ FORBIDDEN

@@ -1,0 +1,52 @@
+{
+  "products": [
+    {
+      "id": "prod_1",
+      "name": "Premium Subscription",
+      "description": "Full access to all features for 1 month",
+      "price": 29.99,
+      "currency": "EUR",
+      "image": "/api/placeholder/300/200",
+      "category": "subscription"
+    },
+    {
+      "id": "prod_2",
+      "name": "Enterprise Plan",
+      "description": "Advanced features for teams",
+      "price": 99.99,
+      "currency": "EUR",
+      "image": "/api/placeholder/300/200",
+      "category": "subscription"
+    },
+    {
+      "id": "prod_3",
+      "name": "Basic Package",
+      "description": "Essential features for individuals",
+      "price": 9.99,
+      "currency": "EUR",
+      "image": "/api/placeholder/300/200",
+      "category": "package"
+    },
+    {
+      "id": "prod_4",
+      "name": "Pro Add-on",
+      "description": "Additional tools and integrations",
+      "price": 19.99,
+      "currency": "EUR",
+      "image": "/api/placeholder/300/200",
+      "category": "addon"
+    },
+    {
+      "id": "prod_5",
+      "name": "Custom Solution",
+      "description": "Tailored solution for your needs",
+      "price": 199.99,
+      "currency": "EUR",
+      "image": "/api/placeholder/300/200",
+      "category": "custom"
+    }
+  ]
+}
+
+
+

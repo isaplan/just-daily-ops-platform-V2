@@ -1,0 +1,45 @@
+{
+  "type": "archive-reference",
+  "name": "old-pages-sql-scripts",
+  "path": "old-pages-sql-scripts",
+  "status": "archived",
+  "touch_again": false,
+  "usage_restrictions": {
+    "direct_copy": false,
+    "direct_import": false,
+    "direct_reference": false,
+    "purpose": "reference_only"
+  },
+  "description": "Archive folder containing old/unused pages, SQL scripts, and legacy code. Files are kept for reference only and should not be copied directly. If a page is needed, it must be updated to MVVM architecture and integrated properly.",
+  "migration_date": "2025-01-27",
+  "structure": {
+    "pages": "Old page components not in active sidebar",
+    "sql-scripts": "Old SQL setup/fix scripts (replaced by migrations)",
+    "database-references": "Old database migration scripts",
+    "old-functions": "Deprecated utility functions",
+    "test-scripts": "Old test/debug scripts",
+    "backups": "Backup files"
+  },
+  "reuse_process": [
+    "1. Inform the team - Discuss why this page is needed",
+    "2. Create new MVVM structure (Model, Service, ViewModel, View)",
+    "3. Update to current patterns (Composer style + Chat/Claude error handling)",
+    "4. Test thoroughly before integrating",
+    "5. Update sidebar if adding to navigation"
+  ],
+  "compliance": {
+    "excluded_from_checks": true,
+    "excluded_from_registry_scan": true,
+    "excluded_from_pre_check": true,
+    "excluded_from_post_check": true
+  },
+  "metadata": {
+    "total_files": "~156+",
+    "pages": "~50+",
+    "sql_scripts": "~43",
+    "test_scripts": "~40",
+    "database_references": "~12",
+    "backup_files": "~10+"
+  }
+}
+

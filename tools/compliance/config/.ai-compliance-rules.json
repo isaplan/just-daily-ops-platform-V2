@@ -1,0 +1,26 @@
+{
+  "maxLinesPerChange": 100,
+  "maxDeletions": 20,
+  "fullReplacementThreshold": 0.8,
+  "excludedPaths": ["node_modules", ".git", ".next", "dist", "build"],
+  "fileExtensions": [".ts", ".tsx", ".js", ".jsx", ".json"],
+  "exemptFiles": [
+    "function-registry.json",
+    "ai-tracking-system.json",
+    ".ai-compliance-messages.json",
+    ".ai-compliance-status.json",
+    "progress-log.json",
+    "test-results.json",
+    "build-log.json"
+  ],
+  "search": {
+    "maxResults": 5,
+    "minKeywordLength": 3,
+    "useContentSearch": true
+  },
+  "stopWords": [
+    "the", "and", "or", "but", "for", "with", "this", "that",
+    "from", "into", "onto", "upon", "over", "under", "above", "below"
+  ]
+}
+

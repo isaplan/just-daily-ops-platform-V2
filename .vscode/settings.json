@@ -1,0 +1,25 @@
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "task.autoDetect": "on",
+  "task.quickOpen.history": 10,
+  "task.quickOpen.detail": true,
+  "task.problemMatchers.neverPrompt": false,
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/dist/**": true
+  },
+  "files.associations": {
+    ".ai-compliance-messages.json": "jsonc",
+    ".ai-compliance-status.json": "jsonc"
+  },
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "never"
+  },
+  "task.allowAutomaticTasks": "on"
+}
+
+

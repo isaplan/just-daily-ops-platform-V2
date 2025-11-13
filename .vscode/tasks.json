@@ -1,0 +1,94 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Compliance: Auto Post-Check",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/.ai-compliance-functions/post-execution-check.js"
+      ],
+      "problemMatcher": {
+        "owner": "compliance",
+        "fileLocation": "relative",
+        "pattern": {
+          "regexp": "^\\s*File:\\s*(.+)$",
+          "file": 1
+        },
+        "severity": "error",
+        "message": {
+          "regexp": "^\\s*(.+)$",
+          "format": "$1"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "isBackground": false
+    },
+    {
+      "label": "Compliance: Watch Files",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/.ai-compliance-functions/auto-compliance.js"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "beginsPattern": "Starting",
+          "endsPattern": "started successfully"
+        }
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "Compliance: Check Status",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/.ai-compliance-functions/ai-compliance-checker.js"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "type": "npm",
+      "script": "compile",
+      "path": ".vscode-extension",
+      "problemMatcher": "$tsc",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      },
+      "label": "npm: compile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
+
+

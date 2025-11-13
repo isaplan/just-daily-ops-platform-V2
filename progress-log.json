@@ -1,0 +1,226 @@
+{
+  "_metadata": {
+    "systemActive": true,
+    "lastUpdated": "2025-11-02T23:50:00.000Z",
+    "currentSession": "2025_11_02",
+    "currentFocus": "Eitje Aggregation - Completing remaining tasks before merge to main"
+  },
+  "session_2025_10_29": {
+    "date": "2025_10_29",
+    "sessionStart": "2025-10-29T01:35:52.834Z",
+    "current_focus": "AI Compliance System Installation",
+    "completed_tasks": [
+      {
+        "task": "Install AI Compliance System",
+        "status": "completed",
+        "timestamp": "2025-10-29T01:35:52.834Z",
+        "files_created": [
+          "function-registry.json",
+          "progress-log.json",
+          "ai-tracking-system.json",
+          ".ai-compliance-functions/"
+        ]
+      }
+    ],
+    "active_tasks": [],
+    "key_achievements": [
+      "Self-installed AI compliance system",
+      "Generated all required tracking files",
+      "Created automated compliance monitoring"
+    ],
+    "compliance_status": {
+      "score": 100,
+      "status": "excellent",
+      "last_check": "2025-10-29T01:35:52.834Z"
+    }
+  },
+  "session_2025_11_02": {
+    "date": "2025_11_02",
+    "sessionStart": "2025-11-02T23:50:00.000Z",
+    "current_focus": "Eitje Aggregation - All tasks completed and merged to main",
+    "active_tasks": [],
+    "completed_tasks": [
+      {
+        "task": "Re-run Eitje aggregation for all data",
+        "status": "completed",
+        "timestamp": "2025-11-02T23:50:00.000Z",
+        "result": "16/16 operations successful (8 months × 2 endpoints)",
+        "fixes_applied": [
+          "Fixed date calculation bug in aggregate route (approved exception)"
+        ],
+        "files_created": ["scripts/re-run-eitje-aggregation.js"],
+        "files_modified": ["src/app/api/eitje/aggregate/route.ts"]
+      },
+      {
+        "task": "Show names instead of IDs in UI",
+        "status": "completed",
+        "timestamp": "2025-11-03T22:30:00.000Z",
+        "files": [
+          "src/app/(dashboard)/finance/data/eitje-data/finance/page.tsx",
+          "src/app/(dashboard)/finance/data/eitje-data/hours/page.tsx",
+          "src/app/(dashboard)/finance/data/eitje-data/labor-costs/page.tsx",
+          "src/app/(dashboard)/finance/data/eitje-data/data-imported/page.tsx"
+        ]
+      },
+      {
+        "task": "Add Data Imported page with raw_data unpacking",
+        "status": "completed",
+        "timestamp": "2025-11-03T22:30:00.000Z",
+        "files_created": ["src/app/(dashboard)/finance/data/eitje-data/data-imported/page.tsx"]
+      },
+      {
+        "task": "Fix network error handling with retry logic",
+        "status": "completed",
+        "timestamp": "2025-11-03T22:30:00.000Z",
+        "improvements": [
+          "Added exponential backoff retry (3 attempts for network errors)",
+          "Better error messages for network failures",
+          "Automatic retry with user feedback"
+        ]
+      },
+      {
+        "task": "Map raw_data fields to existing columns",
+        "status": "completed",
+        "timestamp": "2025-11-03T22:30:00.000Z",
+        "improvements": [
+          "Extract all fields from raw_data JSONB",
+          "Map to existing table columns",
+          "Fix object rendering issues in React"
+        ]
+      },
+      {
+        "task": "Merge all Eitje aggregation changes to main",
+        "status": "completed",
+        "timestamp": "2025-11-03T22:35:00.000Z",
+        "merged_branches": [
+          "migration-aggregated-eitje",
+          "eitje-api",
+          "aggregated-all-raw-data-eitje",
+          "feature/cronjob-setup",
+          "feature/test-eitje-cronjob"
+        ],
+        "result": "All branches successfully merged and pushed to GitHub"
+      }
+    ],
+    "next_task_after_completion": {
+      "task": "Build Cursor Extension for Compliance Checks",
+      "status": "parked",
+      "priority": "medium",
+      "description": "Create VS Code/Cursor extension to intercept file saves and run pre/post-execution compliance checks automatically",
+      "challenges": [
+        "VS Code Extension API cannot intercept AI tool calls before execution",
+        "Can intercept file saves (onWillSaveTextDocument)",
+        "Can detect file changes (onDidChangeTextDocument)"
+      ],
+      "proposed_solution": {
+        "type": "hybrid",
+        "components": [
+          "File save hook - Block saves with violations",
+          "File watcher - Post-execution checks + warnings",
+          "Status bar indicator - Show compliance status",
+          "Output channel - Compliance feedback"
+        ]
+      },
+      "files_to_create": [
+        ".vscode-extension/package.json",
+        ".vscode-extension/src/extension.ts",
+        ".vscode-extension/src/compliance-hooks.ts",
+        ".vscode-extension/src/compliance-ui.ts"
+      ],
+      "research_needed": [
+        "Cursor-specific extension APIs (if any)",
+        "Integration with existing .ai-compliance-functions scripts",
+        "Extension packaging and installation"
+      ],
+      "dependencies": [
+        "VS Code Extension API (vscode package)",
+        "Integration with .ai-compliance-functions/pre-execution-check.js",
+        "Integration with .ai-compliance-functions/post-execution-check.js"
+      ],
+      "estimated_effort": "2-3 days (research + implementation + testing)",
+      "references": [
+        "docs/pre-post-execution-checks-implementation.md",
+        ".ai-rules-docs/ai-operating-constraints.md (lines 73-389)"
+      ],
+      "note": "Current implementation status: scripts exist, enforcement relies on manual execution. Extension will automate enforcement at file save level."
+    },
+    "planned_major_task": {
+      "task": "Bi-Directional Relational Architecture for Eitje Data",
+      "status": "planned",
+      "priority": "high",
+      "description": "Implement proper bi-directional relationships between locations, teams, users, and labor data with unpacked raw data tables",
+      "blocked_by": [
+        "Merge all Eitje aggregation changes to main",
+        "Complete current Eitje aggregation tasks"
+      ],
+      "architecture_plan": {
+        "summary": "Create unpacked raw tables with foreign keys to master tables, enabling bi-directional queries from any point in the hierarchy (Location ↔ Teams ↔ Users ↔ Hours ↔ Labor Costs ↔ Productivity)",
+        "key_components": [
+          "1. Unpacking Service - Extract all raw_data fields to normalized columns with FK references to master tables",
+          "2. Unpacked Raw Table - eitje_time_registration_shifts_unpacked with UUID foreign keys to users, teams, environments, locations",
+          "3. Worker-Level Aggregation - eitje_labor_hours_by_worker with FK relationships for per-worker queries",
+          "4. Daily Productivity Table - eitje_labor_costs_daily with FK and pre-calculated productivity metrics",
+          "5. Master Data Linking - Resolve Eitje INTEGER IDs to UUID foreign keys during unpacking",
+          "6. Bi-directional Query Support - Enable queries from any point: Location→Teams→Users→Hours or User→Teams→Locations→Costs"
+        ],
+        "tables_needed": [
+          "eitje_time_registration_shifts_unpacked (unpacked raw data with FK to users, teams, environments, locations)",
+          "eitje_labor_hours_by_worker (worker-level aggregation with FK for bi-directional queries)",
+          "eitje_labor_costs_daily (daily summaries with FK and pre-calculated productivity: revenue/hours, cost% of revenue)"
+        ],
+        "relational_hierarchy": {
+          "locations (UUID)": {
+            "1:many": "eitje_environments",
+            "via": "location_id FK"
+          },
+          "eitje_environments (UUID)": {
+            "1:many": "eitje_teams",
+            "via": "environment_id FK"
+          },
+          "eitje_teams (UUID)": {
+            "many_to_many": "eitje_users",
+            "via": "shifts/unpacked data"
+          },
+          "eitje_users (UUID)": {
+            "has": "hours, wage_cost",
+            "via": "unpacked/aggregated tables"
+          }
+        },
+        "benefits": [
+          "Bi-directional queries: Query from Location→Teams→Users→Hours OR User→Teams→Locations→Costs",
+          "Pre-calculated aggregations minimize runtime calculations (productivity, costs already computed)",
+          "Proper referential integrity via foreign keys ensures data consistency",
+          "Easy data verification via unpacked tables (see all raw_data fields as columns)",
+          "Fast UI queries via aggregated tables (no joins needed for summaries)",
+          "All relationships maintained: location connects with teams connects with users connects with labor costs connects with hours"
+        ],
+        "implementation_steps": [
+          "1. Create unpacking service (src/lib/eitje/unpack-service.ts) that resolves Eitje INTEGER IDs to UUID foreign keys",
+          "2. Create unpacked table migration with foreign key constraints to master tables",
+          "3. Create aggregated table migrations (by_worker and daily) with FK relationships",
+          "4. Migrate existing raw data to unpacked format (resolve and link UUIDs)",
+          "5. Update aggregation process to read from unpacked tables (faster, no JSONB parsing)",
+          "6. Update UI pages to use new unpacked/aggregated tables with proper joins"
+        ],
+        "query_examples": {
+          "location_to_hours": "Location → Teams → Users → Hours (aggregated)",
+          "user_to_productivity": "User → Teams → Locations → Labor Costs & Productivity",
+          "team_to_revenue": "Team → Locations → Revenue → Labor Productivity %"
+        }
+      },
+      "estimated_effort": "3-5 days",
+      "dependencies": [
+        "Merge eitje-api branch to main",
+        "Complete current Eitje aggregation tasks",
+        "Ensure master data tables (eitje_users, eitje_teams, eitje_environments) are populated with UUIDs"
+      ],
+      "related_files": [
+        "supabase/migrations/*_create_eitje_unpacked_tables.sql",
+        "supabase/migrations/*_create_eitje_aggregated_with_fk.sql",
+        "src/lib/eitje/unpack-service.ts",
+        "src/app/api/eitje/unpack/route.ts",
+        "src/app/(dashboard)/finance/data/eitje-data/**/page.tsx"
+      ]
+    }
+  }
+}
