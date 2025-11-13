@@ -1,0 +1,258 @@
+# ⚠️  MIGRATED TO ARCHIVE - DO NOT USE DIRECTLY
+# Migrated: 2025-11-13 01:18:49
+# Original: /Users/alviniomolina/Documents/GitHub/just-daily-ops-platform/.test-scripts/migrate-database.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Database Migration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .result { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .progress { width: 100%; height: 20px; background-color: #f0f0f0; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-bar { height: 100%; background-color: #007bff; transition: width 0.3s; }
+        .table-info { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Supabase Database Migration</h1>
+        <p><strong>From:</strong> cajxmwyiwrhzryvawjkm.supabase.co (Old)</p>
+        <p><strong>To:</strong> vrucbxdudchboznunndz.supabase.co (New)</p>
+        
+        <div class="table-info">
+            <h3>Migration Steps:</h3>
+            <ol>
+                <li>✅ Create schema in new database</li>
+                <li>🔄 Export data from old database</li>
+                <li>🔄 Import data to new database</li>
+                <li>✅ Verify migration</li>
+            </ol>
+        </div>
+
+        <button onclick="startMigration()" class="btn-primary">🚀 Start Migration</button>
+        <button onclick="testConnections()" class="btn-warning">🔍 Test Connections</button>
+        <button onclick="verifyMigration()" class="btn-success">✅ Verify Migration</button>
+        
+        <div class="progress" id="progress" style="display: none;">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Database configurations
+        const OLD_DB = {
+            url: 'https://cajxmwyiwrhzryvawjkm.supabase.co',
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhanhtd3lpd3JoenJ5dmF3amttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzA3ODYsImV4cCI6MjA3NDc0Njc4Nn0.fxTY36IVlMiocfwx6R7DoViIOgq-U-EFxtbz9Y_3wsQ'
+        };
+        
+        const NEW_DB = {
+            url: 'https://vrucbxdudchboznunndz.supabase.co',
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZydWNieGR1ZGNoYm96bnVubmR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1MzQzNjYsImV4cCI6MjA3NjExMDM2Nn0.C8B9Z7iHTmOb0ucfnBmkBeiXgWscyf8dUt2hWFjK90o'
+        };
+
+        // Tables to migrate (in order of dependencies)
+        const TABLES_TO_MIGRATE = [
+            'locations',
+            'api_credentials', 
+            'sales_imports',
+            'sales_import_items',
+            'bork_sales_data',
+            'powerbi_pnl_data',
+            'pnl_line_items',
+            'pnl_monthly_summary'
+        ];
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function updateProgress(current, total) {
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+            const percentage = (current / total) * 100;
+            
+            progress.style.display = 'block';
+            progressBar.style.width = `${percentage}%`;
+        }
+
+        async function testConnections() {
+            document.getElementById('results').innerHTML = '';
+            addResult('🔍 Testing database connections...', 'info');
+            
+            // Test old database
+            try {
+                const oldResponse = await fetch(`${OLD_DB.url}/rest/v1/locations?select=count`, {
+                    headers: {
+                        'apikey': OLD_DB.key,
+                        'Authorization': `Bearer ${OLD_DB.key}`
+                    }
+                });
+                
+                if (oldResponse.ok) {
+                    addResult('✅ Old database connection successful', 'success');
+                } else {
+                    addResult(`❌ Old database connection failed: ${oldResponse.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Old database error: ${error.message}`, 'error');
+            }
+            
+            // Test new database
+            try {
+                const newResponse = await fetch(`${NEW_DB.url}/rest/v1/locations?select=count`, {
+                    headers: {
+                        'apikey': NEW_DB.key,
+                        'Authorization': `Bearer ${NEW_DB.key}`
+                    }
+                });
+                
+                if (newResponse.ok) {
+                    addResult('✅ New database connection successful', 'success');
+                } else {
+                    addResult(`❌ New database connection failed: ${newResponse.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ New database error: ${error.message}`, 'error');
+            }
+        }
+
+        async function startMigration() {
+            document.getElementById('results').innerHTML = '';
+            addResult('🚀 Starting database migration...', 'info');
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < TABLES_TO_MIGRATE.length; i++) {
+                const tableName = TABLES_TO_MIGRATE[i];
+                updateProgress(i, TABLES_TO_MIGRATE.length);
+                
+                try {
+                    addResult(`📦 Migrating table: ${tableName}...`, 'info');
+                    
+                    // Export from old database
+                    const exportResponse = await fetch(`${OLD_DB.url}/rest/v1/${tableName}?select=*`, {
+                        headers: {
+                            'apikey': OLD_DB.key,
+                            'Authorization': `Bearer ${OLD_DB.key}`
+                        }
+                    });
+                    
+                    if (!exportResponse.ok) {
+                        if (exportResponse.status === 404) {
+                            addResult(`⚠️ Table '${tableName}' not found in old database - skipping`, 'warning');
+                            continue;
+                        } else {
+                            throw new Error(`Export failed: ${exportResponse.status}`);
+                        }
+                    }
+                    
+                    const data = await exportResponse.json();
+                    addResult(`📊 Found ${data.length} records in ${tableName}`, 'info');
+                    
+                    if (data.length === 0) {
+                        addResult(`✅ Table '${tableName}' is empty - skipping`, 'success');
+                        continue;
+                    }
+                    
+                    // Import to new database
+                    const importResponse = await fetch(`${NEW_DB.url}/rest/v1/${tableName}`, {
+                        method: 'POST',
+                        headers: {
+                            'apikey': NEW_DB.key,
+                            'Authorization': `Bearer ${NEW_DB.key}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'resolution=ignore-duplicates'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (importResponse.ok) {
+                        addResult(`✅ Successfully migrated ${data.length} records to ${tableName}`, 'success');
+                        successCount++;
+                    } else {
+                        const errorText = await importResponse.text();
+                        addResult(`❌ Failed to import ${tableName}: ${importResponse.status} - ${errorText}`, 'error');
+                        errorCount++;
+                    }
+                    
+                } catch (error) {
+                    addResult(`❌ Error migrating ${tableName}: ${error.message}`, 'error');
+                    errorCount++;
+                }
+            }
+            
+            updateProgress(TABLES_TO_MIGRATE.length, TABLES_TO_MIGRATE.length);
+            
+            // Summary
+            addResult(`<h3>📊 Migration Summary</h3>
+                <p>✅ Successful: ${successCount} tables</p>
+                <p>❌ Failed: ${errorCount} tables</p>
+                <p>📦 Total: ${TABLES_TO_MIGRATE.length} tables</p>`, 
+                errorCount === 0 ? 'success' : 'warning'
+            );
+        }
+
+        async function verifyMigration() {
+            document.getElementById('results').innerHTML = '';
+            addResult('🔍 Verifying migration...', 'info');
+            
+            for (const tableName of TABLES_TO_MIGRATE) {
+                try {
+                    // Check old database
+                    const oldResponse = await fetch(`${OLD_DB.url}/rest/v1/${tableName}?select=count`, {
+                        headers: {
+                            'apikey': OLD_DB.key,
+                            'Authorization': `Bearer ${OLD_DB.key}`
+                        }
+                    });
+                    
+                    // Check new database
+                    const newResponse = await fetch(`${NEW_DB.url}/rest/v1/${tableName}?select=count`, {
+                        headers: {
+                            'apikey': NEW_DB.key,
+                            'Authorization': `Bearer ${NEW_DB.key}`
+                        }
+                    });
+                    
+                    if (oldResponse.ok && newResponse.ok) {
+                        const oldData = await oldResponse.json();
+                        const newData = await newResponse.json();
+                        
+                        const oldCount = oldData.length;
+                        const newCount = newData.length;
+                        
+                        if (oldCount === newCount) {
+                            addResult(`✅ ${tableName}: ${newCount} records (matches old database)`, 'success');
+                        } else {
+                            addResult(`⚠️ ${tableName}: ${newCount} records (old had ${oldCount})`, 'warning');
+                        }
+                    } else {
+                        addResult(`❌ Could not verify ${tableName}`, 'error');
+                    }
+                    
+                } catch (error) {
+                    addResult(`❌ Error verifying ${tableName}: ${error.message}`, 'error');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

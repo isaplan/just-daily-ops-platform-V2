@@ -1,0 +1,32 @@
+## Exclude development-only assets from Vercel uploads
+
+# Large/dev bundles; keep only documentation
+build-docs-scripts-sql-ai/**
+!build-docs-scripts-sql-ai/docs/**
+build-docs-scripts-sql/**
+!build-docs-scripts-sql/docs/**
+
+# Local scripts/tools not required at runtime
+scripts/**
+tools/**
+old-ai-docs/**
+.ai-compliance-functions/**
+
+# Supabase export bundle is not needed for Next.js build artifacts
+build-docs-scripts-sql-ai/supabase-export/**
+supabase-export/**
+
+# Editor and workspace files
+.vscode/**
+.idea/**
+*.code-workspace
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,94 @@
+# ⚠️  MIGRATED TO ARCHIVE - DO NOT USE DIRECTLY
+# Migrated: 2025-11-13 01:18:49
+# Original: /Users/alviniomolina/Documents/GitHub/just-daily-ops-platform/.test-scripts/test-database-connection.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>Supabase Database Connection Test</h1>
+    <button onclick="testConnection()">Test Connection</button>
+    <div id="results"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://vrucbxdudchboznunndz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZydWNieGR1ZGNoYm96bnVubmR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1MzQzNjYsImV4cCI6MjA3NjExMDM2Nn0.C8B9Z7iHTmOb0ucfnBmkBeiXgWscyf8dUt2hWFjK90o';
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function testConnection() {
+            document.getElementById('results').innerHTML = '';
+            
+            addResult('🔍 Testing Supabase connection...', 'info');
+            
+            try {
+                // Test basic connection
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/locations?select=*&limit=1`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    addResult('✅ Supabase connection successful!', 'success');
+                    
+                    // Test if locations table exists
+                    const data = await response.json();
+                    addResult(`📊 Found ${data.length} location(s)`, 'success');
+                    
+                    // Test other required tables
+                    await testTable('sales_imports');
+                    await testTable('bork_sales_data');
+                    await testTable('api_credentials');
+                    
+                } else {
+                    addResult(`❌ Connection failed: ${response.status} ${response.statusText}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Connection error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTable(tableName) {
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${tableName}?select=*&limit=1`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    addResult(`✅ Table '${tableName}' exists`, 'success');
+                } else if (response.status === 404) {
+                    addResult(`❌ Table '${tableName}' not found - needs to be created`, 'error');
+                } else {
+                    addResult(`⚠️ Table '${tableName}' error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Table '${tableName}' error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

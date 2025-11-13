@@ -1,0 +1,11 @@
+{
+  "functions": [],
+  "database_schema": {
+    "active_tables": {}
+  },
+  "compliance_config": {
+    "auto_tracking": true,
+    "violation_prevention": true,
+    "progress_monitoring": true
+  }
+}

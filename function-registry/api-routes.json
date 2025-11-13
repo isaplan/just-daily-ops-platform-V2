@@ -1,0 +1,529 @@
+{
+  "type": "api-routes",
+  "functions": [
+    {
+      "file": "src/app/api/admin/create-aggregated-tables/route.ts",
+      "name": "Admin Create-aggregated-tables API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a2ebdae05bffd9d0",
+      "updated": "2025-11-03T15:54:20.893Z"
+    },
+    {
+      "file": "src/app/api/docs/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ddcc17d86070e198",
+      "updated": "2025-11-03T15:54:20.909Z"
+    },
+    {
+      "file": "src/app/api/locations/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c26e26c37ef05d25",
+      "updated": "2025-11-03T15:54:20.920Z"
+    },
+    {
+      "file": "src/app/api/raw-data/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9e6ae3d4a04be3b2",
+      "updated": "2025-11-03T15:54:20.920Z"
+    },
+    {
+      "file": "src/app/api/setup-aggregated-table/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "751867e9a3a56683",
+      "updated": "2025-11-03T15:54:20.922Z"
+    },
+    {
+      "file": "src/app/api/show-jsonb/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d6d2a5db040be622",
+      "updated": "2025-11-03T15:54:20.931Z"
+    },
+    {
+      "file": "src/app/api/bork/aggregate/route.ts",
+      "name": "Bork Aggregate API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2d00a66d3560215b",
+      "updated": "2025-11-03T15:54:20.894Z"
+    },
+    {
+      "file": "src/app/api/bork/bypass-rls-sync/route.ts",
+      "name": "Bork Bypass-rls-sync API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "890d91781686a605",
+      "updated": "2025-11-03T15:54:20.895Z"
+    },
+    {
+      "file": "src/app/api/bork/cleanup/route.ts",
+      "name": "Bork Cleanup API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c8eb33b06c4ea8c3",
+      "updated": "2025-11-03T15:54:20.895Z"
+    },
+    {
+      "file": "src/app/api/bork/credentials/route.ts",
+      "name": "Bork Credentials API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f3e51e886b6d6e12",
+      "updated": "2025-11-03T15:54:20.895Z"
+    },
+    {
+      "file": "src/app/api/bork/direct-master-sync/route.ts",
+      "name": "Bork Direct-master-sync API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "3e7bd2c10c866f11",
+      "updated": "2025-11-03T15:54:20.896Z"
+    },
+    {
+      "file": "src/app/api/bork/disable-rls/route.ts",
+      "name": "Bork Disable-rls API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "fe7eed3ef9983f2f",
+      "updated": "2025-11-03T15:54:20.896Z"
+    },
+    {
+      "file": "src/app/api/bork/fix-rls-policies/route.ts",
+      "name": "Bork Fix-rls-policies API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "42fe9941576c9da0",
+      "updated": "2025-11-03T15:54:20.896Z"
+    },
+    {
+      "file": "src/app/api/bork/master-sync/route.ts",
+      "name": "Bork Master-sync API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ce0e2c7c11067e31",
+      "updated": "2025-11-03T15:54:20.897Z"
+    },
+    {
+      "file": "src/app/api/bork/process/route.ts",
+      "name": "Bork Process API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "349514864a690d73",
+      "updated": "2025-11-03T15:54:20.897Z"
+    },
+    {
+      "file": "src/app/api/bork/simple-test/route.ts",
+      "name": "Bork Simple-test API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "bcc50040335c27d3",
+      "updated": "2025-11-03T15:54:20.898Z"
+    },
+    {
+      "file": "src/app/api/bork/status/route.ts",
+      "name": "Bork Status API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "bc1544de03f80f85",
+      "updated": "2025-11-03T15:54:20.898Z"
+    },
+    {
+      "file": "src/app/api/bork/sync/route.ts",
+      "name": "Bork Sync API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "60439855c4ce0128",
+      "updated": "2025-11-03T15:54:20.898Z"
+    },
+    {
+      "file": "src/app/api/bork/sync-config/route.ts",
+      "name": "Bork Sync-config API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "624a903e81c3775a",
+      "updated": "2025-11-03T22:28:28.902Z"
+    },
+    {
+      "file": "src/app/api/bork/test/route.ts",
+      "name": "Bork Test API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b1e622a9bf8c4d4b",
+      "updated": "2025-11-03T15:54:20.900Z"
+    },
+    {
+      "file": "src/app/api/bork/test-insert/route.ts",
+      "name": "Bork Test-insert API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f9414b133f4ee74a",
+      "updated": "2025-11-03T15:54:20.905Z"
+    },
+    {
+      "file": "src/app/api/bork/test-master-endpoints/route.ts",
+      "name": "Bork Test-master-endpoints API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2f1064bb33b230ec",
+      "updated": "2025-11-03T15:54:20.905Z"
+    },
+    {
+      "file": "src/app/api/bork/test-simple-insert/route.ts",
+      "name": "Bork Test-simple-insert API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "98b11269d5d59203",
+      "updated": "2025-11-03T15:54:20.906Z"
+    },
+    {
+      "file": "src/app/api/bork/validate/route.ts",
+      "name": "Bork Validate API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "237e4d113090735c",
+      "updated": "2025-11-03T15:54:20.906Z"
+    },
+    {
+      "file": "src/app/api/bork/validate-revenue/route.ts",
+      "name": "Bork Validate-revenue API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "46ba2bb9866a3f5f",
+      "updated": "2025-11-03T15:54:20.907Z"
+    },
+    {
+      "file": "src/app/api/cron/sync-history/route.ts",
+      "name": "Cron Sync-history API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "66c35f349d2da281",
+      "updated": "2025-11-03T15:54:20.908Z"
+    },
+    {
+      "file": "src/app/api/eitje/aggregate/route.ts",
+      "name": "Eitje Aggregate API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "49b5a389a87814a3",
+      "updated": "2025-11-03T15:54:20.910Z"
+    },
+    {
+      "file": "src/app/api/eitje/connect/route.ts",
+      "name": "Eitje Connect API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "08e1ad499bf21379",
+      "updated": "2025-11-03T15:54:20.910Z"
+    },
+    {
+      "file": "src/app/api/eitje/credentials/route.ts",
+      "name": "Eitje Credentials API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "67519167efaddae4",
+      "updated": "2025-11-03T15:54:20.911Z"
+    },
+    {
+      "file": "src/app/api/eitje/data/route.ts",
+      "name": "Eitje Data API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "84b345ac1bf1743e",
+      "updated": "2025-11-03T15:54:20.911Z"
+    },
+    {
+      "file": "src/app/api/eitje/endpoint-status/route.ts",
+      "name": "Eitje Endpoint-status API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "941fa9f7faa1d810",
+      "updated": "2025-11-03T15:54:20.912Z"
+    },
+    {
+      "file": "src/app/api/eitje/manage/route.ts",
+      "name": "Eitje Manage API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "85eb2222a14e53db",
+      "updated": "2025-11-03T15:54:20.912Z"
+    },
+    {
+      "file": "src/app/api/eitje/process/route.ts",
+      "name": "Eitje Process API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ce5f6f5e09ddca09",
+      "updated": "2025-11-03T15:54:20.912Z"
+    },
+    {
+      "file": "src/app/api/eitje/process-all/route.ts",
+      "name": "Eitje Process-all API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "bf3378497188ae7f",
+      "updated": "2025-11-03T15:54:20.913Z"
+    },
+    {
+      "file": "src/app/api/eitje/process-endpoint/route.ts",
+      "name": "Eitje Process-endpoint API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "5677c58f0d0a5553",
+      "updated": "2025-11-03T15:54:20.913Z"
+    },
+    {
+      "file": "src/app/api/eitje/progress/route.ts",
+      "name": "Eitje Progress API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3bd025870749b328",
+      "updated": "2025-11-03T15:54:20.914Z"
+    },
+    {
+      "file": "src/app/api/eitje/raw-data/route.ts",
+      "name": "Eitje Raw-data API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "76ae064ba4ddfe16",
+      "updated": "2025-11-03T15:54:20.914Z"
+    },
+    {
+      "file": "src/app/api/eitje/simple-test/route.ts",
+      "name": "Eitje Simple-test API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9f193e2d46ccb929",
+      "updated": "2025-11-03T15:54:20.914Z"
+    },
+    {
+      "file": "src/app/api/eitje/status/route.ts",
+      "name": "Eitje Status API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b30cfa892194d0b2",
+      "updated": "2025-11-03T15:54:20.915Z"
+    },
+    {
+      "file": "src/app/api/eitje/sync/route.ts",
+      "name": "Eitje Sync API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "ff857f9def77486e",
+      "updated": "2025-11-03T15:54:20.915Z"
+    },
+    {
+      "file": "src/app/api/eitje/sync-config/route.ts",
+      "name": "Eitje Sync-config API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b8d3da7abcf98d73",
+      "updated": "2025-11-03T15:54:20.915Z"
+    },
+    {
+      "file": "src/app/api/eitje/sync-endpoint/route.ts",
+      "name": "Eitje Sync-endpoint API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6ca454b066d082cf",
+      "updated": "2025-11-03T15:54:20.916Z"
+    },
+    {
+      "file": "src/app/api/eitje/test-all-endpoints/route.ts",
+      "name": "Eitje Test-all-endpoints API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "87080d084d2a4745",
+      "updated": "2025-11-03T15:54:20.916Z"
+    },
+    {
+      "file": "src/app/api/eitje/test-endpoint/route.ts",
+      "name": "Eitje Test-endpoint API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "968d6ed523de28c9",
+      "updated": "2025-11-03T15:54:20.916Z"
+    },
+    {
+      "file": "src/app/api/finance/pnl-aggregate/route.ts",
+      "name": "Finance Pnl-aggregate API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3b84d6722535da0e",
+      "updated": "2025-11-03T15:54:20.917Z"
+    },
+    {
+      "file": "src/app/api/finance/pnl-aggregated-data/route.ts",
+      "name": "Finance Pnl-aggregated-data API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "0d7b0674cd2e1b7c",
+      "updated": "2025-11-03T15:54:20.917Z"
+    },
+    {
+      "file": "src/app/api/finance/pnl-aggregated-subcategories/route.ts",
+      "name": "Finance Pnl-aggregated-subcategories API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e7a58f0e8fd93885",
+      "updated": "2025-11-03T15:54:20.918Z"
+    },
+    {
+      "file": "src/app/api/finance/pnl-data/route.ts",
+      "name": "Finance Pnl-data API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "191be2ee6bef4574",
+      "updated": "2025-11-03T15:54:20.918Z"
+    },
+    {
+      "file": "src/app/api/finance/pnl-revenue/route.ts",
+      "name": "Finance Pnl-revenue API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3ea72d4527eeab49",
+      "updated": "2025-11-03T15:54:20.919Z"
+    },
+    {
+      "file": "src/app/api/finance/pnl-test-aggregation/route.ts",
+      "name": "Finance Pnl-test-aggregation API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4432d511c4976b15",
+      "updated": "2025-11-03T15:54:20.919Z"
+    },
+    {
+      "file": "src/app/api/integrated/aggregate/route.ts",
+      "name": "Integrated Aggregate API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4ea7639a8ff0104d",
+      "updated": "2025-11-03T15:54:20.919Z"
+    },
+    {
+      "file": "src/app/api/roadmap/automate/route.ts",
+      "name": "Roadmap Automate API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "db0062686c4197d3",
+      "updated": "2025-11-04T01:30:36.600Z"
+    },
+    {
+      "file": "src/app/api/sales/aggregated/route.ts",
+      "name": "Sales Aggregated API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "84cefbab0952ef51",
+      "updated": "2025-11-03T15:54:20.922Z"
+    },
+    {
+      "file": "src/app/api/sync/manual/route.ts",
+      "name": "Sync Manual API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f7d755d4a2d16955",
+      "updated": "2025-11-03T15:54:20.935Z"
+    },
+    {
+      "file": "src/app/api/sync/simple-test/route.ts",
+      "name": "Sync Simple-test API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8f7af69de1afdbc5",
+      "updated": "2025-11-03T15:54:20.938Z"
+    },
+    {
+      "file": "src/app/api/sync/start/route.ts",
+      "name": "Sync Start API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "51f3af34e2c31d72",
+      "updated": "2025-11-03T15:54:20.940Z"
+    },
+    {
+      "file": "src/app/api/sync/status/route.ts",
+      "name": "Sync Status API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "40c8f9c2ff3866a3",
+      "updated": "2025-11-03T15:54:20.940Z"
+    },
+    {
+      "file": "src/app/api/sync/stop/route.ts",
+      "name": "Sync Stop API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b85dac49b5900a61",
+      "updated": "2025-11-03T15:54:20.940Z"
+    }
+  ],
+  "count": 58,
+  "last_updated": "2025-11-08T01:16:18.671Z"
+}

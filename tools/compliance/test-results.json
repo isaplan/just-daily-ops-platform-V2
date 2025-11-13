@@ -1,0 +1,345 @@
+{
+  "startTime": "2025-10-31T17:24:17.866Z",
+  "testInterval": "2 hours",
+  "totalDuration": "48 hours",
+  "maxTests": 24,
+  "tests": [
+    {
+      "testNumber": 1,
+      "timestamp": "2025-10-31T17:24:17.872Z",
+      "elapsedTime": 6,
+      "preCheck": {
+        "status": "PASS",
+        "duration": 176,
+        "message": "Pre-execution check passed",
+        "violations": [],
+        "existingCode": []
+      },
+      "postCheck": {
+        "status": "VIOLATIONS",
+        "duration": 2152,
+        "message": "8 violation(s) detected",
+        "violations": [
+          {
+            "type": "SIZE_VIOLATION",
+            "file": ".ai-compliance-functions/periodic-test-monitor.js",
+            "linesChanged": 364,
+            "maxAllowed": 100,
+            "message": "File .ai-compliance-functions/periodic-test-monitor.js had 364 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": ".ai-compliance-functions/periodic-test-monitor.js",
+            "message": "File .ai-compliance-functions/periodic-test-monitor.js appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": ".ai-compliance-functions/post-execution-check.js",
+            "linesChanged": 402,
+            "maxAllowed": 100,
+            "message": "File .ai-compliance-functions/post-execution-check.js had 402 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": ".ai-compliance-functions/post-execution-check.js",
+            "message": "File .ai-compliance-functions/post-execution-check.js appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": ".ai-compliance-functions/pre-execution-check.js",
+            "linesChanged": 281,
+            "maxAllowed": 100,
+            "message": "File .ai-compliance-functions/pre-execution-check.js had 281 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": ".ai-compliance-functions/pre-execution-check.js",
+            "message": "File .ai-compliance-functions/pre-execution-check.js appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "scripts/test-eitje-cronjob.js",
+            "linesChanged": 351,
+            "maxAllowed": 100,
+            "message": "File scripts/test-eitje-cronjob.js had 351 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "scripts/trigger-eitje-cron.js",
+            "linesChanged": 102,
+            "maxAllowed": 100,
+            "message": "File scripts/trigger-eitje-cron.js had 102 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          }
+        ],
+        "summary": {
+          "totalFilesModified": 15,
+          "totalLinesChanged": 2136,
+          "violationsCount": 8,
+          "criticalViolations": 0,
+          "highViolations": 8,
+          "mediumViolations": 0
+        }
+      },
+      "overallStatus": "FAIL",
+      "duration": 2330
+    },
+    {
+      "testNumber": 2,
+      "timestamp": "2025-10-31T22:32:10.290Z",
+      "elapsedTime": 18472439,
+      "preCheck": {
+        "status": "PASS",
+        "duration": 138,
+        "message": "Pre-execution check passed",
+        "violations": [],
+        "existingCode": []
+      },
+      "postCheck": {
+        "status": "VIOLATIONS",
+        "duration": 2429,
+        "message": "25 violation(s) detected",
+        "violations": [
+          {
+            "type": "SIZE_VIOLATION",
+            "file": ".ai-compliance-functions/periodic-test-monitor.js",
+            "linesChanged": 364,
+            "maxAllowed": 100,
+            "message": "File .ai-compliance-functions/periodic-test-monitor.js had 364 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": ".ai-compliance-functions/periodic-test-monitor.js",
+            "message": "File .ai-compliance-functions/periodic-test-monitor.js appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": ".ai-compliance-functions/post-execution-check.js",
+            "linesChanged": 402,
+            "maxAllowed": 100,
+            "message": "File .ai-compliance-functions/post-execution-check.js had 402 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": ".ai-compliance-functions/post-execution-check.js",
+            "message": "File .ai-compliance-functions/post-execution-check.js appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": ".ai-compliance-functions/pre-execution-check.js",
+            "linesChanged": 281,
+            "maxAllowed": 100,
+            "message": "File .ai-compliance-functions/pre-execution-check.js had 281 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": ".ai-compliance-functions/pre-execution-check.js",
+            "message": "File .ai-compliance-functions/pre-execution-check.js appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "EXCESSIVE_DELETION",
+            "file": "src/app/(dashboard)/finance/eitje-api/page.tsx",
+            "linesDeleted": 22,
+            "message": "File src/app/(dashboard)/finance/eitje-api/page.tsx had 22 lines deleted, may have removed working functionality",
+            "severity": "MEDIUM",
+            "requiredAction": "Verify that deleted code was not needed"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "src/app/api/cron/sync-history/route.ts",
+            "linesChanged": 215,
+            "maxAllowed": 100,
+            "message": "File src/app/api/cron/sync-history/route.ts had 215 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": "src/app/api/cron/sync-history/route.ts",
+            "message": "File src/app/api/cron/sync-history/route.ts appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "src/app/api/eitje/sync-config/route.ts",
+            "linesChanged": 159,
+            "maxAllowed": 100,
+            "message": "File src/app/api/eitje/sync-config/route.ts had 159 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": "src/app/api/eitje/sync-config/route.ts",
+            "message": "File src/app/api/eitje/sync-config/route.ts appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "src/components/finance/CronSyncHistory.tsx",
+            "linesChanged": 217,
+            "maxAllowed": 100,
+            "message": "File src/components/finance/CronSyncHistory.tsx had 217 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": "src/components/finance/CronSyncHistory.tsx",
+            "message": "File src/components/finance/CronSyncHistory.tsx appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "src/components/finance/EitjeCronjobConfig.tsx",
+            "linesChanged": 295,
+            "maxAllowed": 100,
+            "message": "File src/components/finance/EitjeCronjobConfig.tsx had 295 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": "src/components/finance/EitjeCronjobConfig.tsx",
+            "message": "File src/components/finance/EitjeCronjobConfig.tsx appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": "src/lib/i18n.ts",
+            "message": "File src/lib/i18n.ts appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "EXCESSIVE_DELETION",
+            "file": "src/lib/i18n.ts",
+            "linesDeleted": 24,
+            "message": "File src/lib/i18n.ts had 24 lines deleted, may have removed working functionality",
+            "severity": "MEDIUM",
+            "requiredAction": "Verify that deleted code was not needed"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": "supabase/functions/eitje-api-sync/index.ts",
+            "message": "File supabase/functions/eitje-api-sync/index.ts appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "supabase/functions/eitje-incremental-sync/index.ts",
+            "linesChanged": 401,
+            "maxAllowed": 100,
+            "message": "File supabase/functions/eitje-incremental-sync/index.ts had 401 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "FULL_FILE_REPLACEMENT",
+            "file": "supabase/functions/eitje-incremental-sync/index.ts",
+            "message": "File supabase/functions/eitje-incremental-sync/index.ts appears to be fully replaced instead of incremental changes",
+            "severity": "HIGH",
+            "requiredAction": "Use incremental changes instead of replacing entire files"
+          },
+          {
+            "type": "EXCESSIVE_DELETION",
+            "file": "supabase/functions/eitje-incremental-sync/index.ts",
+            "linesDeleted": 48,
+            "message": "File supabase/functions/eitje-incremental-sync/index.ts had 48 lines deleted, may have removed working functionality",
+            "severity": "MEDIUM",
+            "requiredAction": "Verify that deleted code was not needed"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": ".ai-compliance-functions/test-results.json",
+            "linesChanged": 114,
+            "maxAllowed": 100,
+            "message": "File .ai-compliance-functions/test-results.json had 114 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "scripts/check-eitje-sync-activity.js",
+            "linesChanged": 144,
+            "maxAllowed": 100,
+            "message": "File scripts/check-eitje-sync-activity.js had 144 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "scripts/test-eitje-cronjob.js",
+            "linesChanged": 351,
+            "maxAllowed": 100,
+            "message": "File scripts/test-eitje-cronjob.js had 351 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          },
+          {
+            "type": "SIZE_VIOLATION",
+            "file": "scripts/trigger-eitje-cron.js",
+            "linesChanged": 102,
+            "maxAllowed": 100,
+            "message": "File scripts/trigger-eitje-cron.js had 102 lines changed, exceeds 100-line limit",
+            "severity": "HIGH",
+            "requiredAction": "Break down into smaller changes (max 100 lines per file)"
+          }
+        ],
+        "summary": {
+          "totalFilesModified": 29,
+          "totalLinesChanged": 4004,
+          "violationsCount": 25,
+          "criticalViolations": 0,
+          "highViolations": 22,
+          "mediumViolations": 3
+        }
+      },
+      "overallStatus": "FAIL",
+      "duration": 2583
+    }
+  ],
+  "summary": {
+    "totalTests": 2,
+    "preCheckPassed": 2,
+    "preCheckBlocked": 0,
+    "preCheckWarned": 0,
+    "postCheckPassed": 0,
+    "postCheckViolations": 2,
+    "averagePreCheckTime": 157,
+    "averagePostCheckTime": 2291
+  },
+  "lastUpdate": "2025-10-31T22:32:12.874Z"
+}

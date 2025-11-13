@@ -1,0 +1,195 @@
+{
+  "orders": [
+    {
+      "id": "d4fc8c22-c2ed-459c-97e2-26580f41031c",
+      "sessionId": "test_session_77a7368e-689b-4b96-be44-5b8f945ae22a",
+      "products": [
+        {
+          "product": {
+            "id": "prod_2",
+            "name": "Enterprise Plan",
+            "description": "Advanced features for teams",
+            "price": 99.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 1
+        }
+      ],
+      "total": 99.99,
+      "currency": "EUR",
+      "status": "pending",
+      "customerEmail": "alviniomolina@gmail.com",
+      "customerName": "test",
+      "createdAt": "2025-11-11T00:24:13.959Z",
+      "updatedAt": "2025-11-11T00:24:13.969Z"
+    },
+    {
+      "id": "ccd984ae-de71-4d30-b349-cf4a00b6c008",
+      "sessionId": "test_session_301feb47-d88d-419f-8fcd-ec91ca26ac82",
+      "products": [
+        {
+          "product": {
+            "id": "prod_1",
+            "name": "Premium Subscription",
+            "description": "Full access to all features for 1 month",
+            "price": 29.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 2
+        }
+      ],
+      "total": 59.98,
+      "currency": "EUR",
+      "status": "pending",
+      "createdAt": "2025-11-11T00:43:49.048Z",
+      "updatedAt": "2025-11-11T00:43:49.060Z"
+    },
+    {
+      "id": "5aab6b6c-3450-4ca3-bc69-861713c571d0",
+      "sessionId": "test_session_a1204e55-b587-45dd-be38-e10d84e3f3fa",
+      "products": [
+        {
+          "product": {
+            "id": "prod_1",
+            "name": "Premium Subscription",
+            "description": "Full access to all features for 1 month",
+            "price": 29.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 1
+        }
+      ],
+      "total": 29.99,
+      "currency": "EUR",
+      "status": "pending",
+      "createdAt": "2025-11-11T00:46:02.100Z",
+      "updatedAt": "2025-11-11T00:46:02.110Z"
+    },
+    {
+      "id": "6d3c24f6-65ff-46df-98eb-30010f71b9f6",
+      "sessionId": "test_session_739cd663-ad60-487f-8610-c749052fb932",
+      "products": [
+        {
+          "product": {
+            "id": "prod_2",
+            "name": "Enterprise Plan",
+            "description": "Advanced features for teams",
+            "price": 99.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 1
+        }
+      ],
+      "total": 99.99,
+      "currency": "EUR",
+      "status": "pending",
+      "createdAt": "2025-11-11T00:49:05.010Z",
+      "updatedAt": "2025-11-11T00:49:05.024Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "test_session_77a7368e-689b-4b96-be44-5b8f945ae22a",
+      "orderId": "d4fc8c22-c2ed-459c-97e2-26580f41031c",
+      "amount": 99.99,
+      "currency": "EUR",
+      "status": "pending",
+      "createdAt": "2025-11-11T00:24:13.964Z",
+      "updatedAt": "2025-11-11T00:24:13.964Z",
+      "products": [
+        {
+          "product": {
+            "id": "prod_2",
+            "name": "Enterprise Plan",
+            "description": "Advanced features for teams",
+            "price": 99.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 1
+        }
+      ],
+      "customerEmail": "alviniomolina@gmail.com",
+      "customerName": "test"
+    },
+    {
+      "id": "test_session_301feb47-d88d-419f-8fcd-ec91ca26ac82",
+      "orderId": "ccd984ae-de71-4d30-b349-cf4a00b6c008",
+      "amount": 59.98,
+      "currency": "EUR",
+      "status": "pending",
+      "createdAt": "2025-11-11T00:43:49.054Z",
+      "updatedAt": "2025-11-11T00:43:49.054Z",
+      "products": [
+        {
+          "product": {
+            "id": "prod_1",
+            "name": "Premium Subscription",
+            "description": "Full access to all features for 1 month",
+            "price": 29.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "test_session_a1204e55-b587-45dd-be38-e10d84e3f3fa",
+      "orderId": "5aab6b6c-3450-4ca3-bc69-861713c571d0",
+      "amount": 29.99,
+      "currency": "EUR",
+      "status": "pending",
+      "createdAt": "2025-11-11T00:46:02.104Z",
+      "updatedAt": "2025-11-11T00:46:02.104Z",
+      "products": [
+        {
+          "product": {
+            "id": "prod_1",
+            "name": "Premium Subscription",
+            "description": "Full access to all features for 1 month",
+            "price": 29.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "test_session_739cd663-ad60-487f-8610-c749052fb932",
+      "orderId": "6d3c24f6-65ff-46df-98eb-30010f71b9f6",
+      "amount": 99.99,
+      "currency": "EUR",
+      "status": "pending",
+      "createdAt": "2025-11-11T00:49:05.016Z",
+      "updatedAt": "2025-11-11T00:49:05.016Z",
+      "products": [
+        {
+          "product": {
+            "id": "prod_2",
+            "name": "Enterprise Plan",
+            "description": "Advanced features for teams",
+            "price": 99.99,
+            "currency": "EUR",
+            "image": "/api/placeholder/300/200",
+            "category": "subscription"
+          },
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}
+

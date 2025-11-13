@@ -1,0 +1,50 @@
+---
+alwaysApply: true
+---
+
+# 🎯 CODE REUSE (MANDATORY)
+
+## 🔍 SEARCH BEFORE CREATING
+
+**Before creating ANY new code, search for existing implementations in:**
+
+- `src/lib/` - Utility functions
+- `src/hooks/` - Custom React hooks  
+- `src/components/` - Reusable components
+- `src/types/` - Type definitions
+
+---
+
+## 📦 PROJECT UTILITIES
+
+**This project has extensive existing utilities:**
+
+### API Integration:
+- `src/lib/supabase/` - Supabase clients (server/browser/middleware)
+- `src/lib/eitje/` - Eitje API integration utilities
+- `src/lib/bork/` - Bork API integration utilities
+
+### Business Logic:
+- `src/lib/finance/` - Finance calculation utilities
+- `src/lib/utils.ts` - General utilities
+
+### UI Components:
+- `src/components/ui/` - 30+ shadcn/ui components
+- `src/components/finance/` - Finance-specific components
+
+### Hooks:
+- `src/hooks/` - Custom React hooks
+
+---
+
+## ✅ PRIORITY ORDER
+
+1. **Reuse existing** - Use what's already there
+2. **Extend existing** - Add to existing utilities if related
+3. **Build new** - Only if nothing exists
+
+**ALWAYS check before creating. Ask user if uncertain about existing code.**
+
+---
+
+**Creating duplicate functionality = compliance violation**

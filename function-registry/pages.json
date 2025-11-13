@@ -1,0 +1,547 @@
+{
+  "type": "pages",
+  "functions": [
+    {
+      "file": "src/app/(dashboard)/page.tsx",
+      "name": "(dashboard) Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "784af360164e185b",
+      "updated": "2025-11-04T01:51:09.036Z"
+    },
+    {
+      "file": "src/app/(dashboard)/docs/finance/[slug]/page.tsx",
+      "name": "[slug] Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "5c1852eafcbc6ccc",
+      "updated": "2025-11-03T15:54:20.843Z"
+    },
+    {
+      "file": "src/app/(dashboard)/daily-ops/ai/page.tsx",
+      "name": "Ai Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b7ed5d33e7595baf",
+      "updated": "2025-11-04T01:56:15.461Z"
+    },
+    {
+      "file": "src/app/page.tsx",
+      "name": "App Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "a273f27f959946f1",
+      "updated": "2025-11-03T15:54:20.942Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/pnl/balance/page.tsx",
+      "name": "Balance Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "600c569494235e27",
+      "updated": "2025-11-03T15:54:20.880Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/bork-api/page.tsx",
+      "name": "Bork Api Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a531d511a3dae099",
+      "updated": "2025-11-03T15:54:20.856Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/bork-api/bork-api/page.tsx",
+      "name": "Bork Api Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "583d4945f27d4673",
+      "updated": "2025-11-04T02:01:28.246Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/page.tsx",
+      "name": "Bork Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9e0f91a8f524774b",
+      "updated": "2025-11-04T01:56:15.465Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/company/page.tsx",
+      "name": "Company Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1f97b146cc0bd8db",
+      "updated": "2025-11-04T01:56:15.494Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/labor/costs/page.tsx",
+      "name": "Costs Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1a7df31d3678001f",
+      "updated": "2025-11-04T01:56:15.464Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/daily-ops/page.tsx",
+      "name": "Daily Ops Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "78f223339cf6f709",
+      "updated": "2025-11-03T15:54:20.865Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/data-import/page.tsx",
+      "name": "Data Import Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d34e5e3eec8686cb",
+      "updated": "2025-11-04T01:56:15.495Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/connections/data-import/page.tsx",
+      "name": "Data Import Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3590144e3fe221e4",
+      "updated": "2025-11-04T02:01:28.247Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/data-imported/page.tsx",
+      "name": "Data Imported Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "5d8e23f27a940f79",
+      "updated": "2025-11-03T15:54:20.870Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/page.tsx",
+      "name": "Data Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "30e765bae240eefc",
+      "updated": "2025-11-03T15:54:20.874Z"
+    },
+    {
+      "file": "src/app/(dashboard)/design-systems/page.tsx",
+      "name": "Design Systems Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e2ae8edf7e771e89",
+      "updated": "2025-11-03T15:54:20.841Z"
+    },
+    {
+      "file": "src/app/(dashboard)/docs/page.tsx",
+      "name": "Docs Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1631701f580d3ad1",
+      "updated": "2025-11-03T15:54:20.851Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/eitje-api/page.tsx",
+      "name": "Eitje Api Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "02309d0ad6163185",
+      "updated": "2025-11-03T15:54:20.876Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/eitje-api/eitje-api/page.tsx",
+      "name": "Eitje Api Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ffecdacd45955c52",
+      "updated": "2025-11-04T02:01:28.249Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/eitje-api/page.tsx",
+      "name": "Eitje Api Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4b3754fdc1cca7b0",
+      "updated": "2025-11-07T01:11:29.793Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/page.tsx",
+      "name": "Eitje Data Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "2941aab9b7f1fd19",
+      "updated": "2025-11-03T15:54:20.874Z"
+    },
+    {
+      "file": "src/app/(dashboard)/view-data/eitje-data/page.tsx",
+      "name": "Eitje Data Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "7fafafce5358b33a",
+      "updated": "2025-11-03T15:54:20.891Z"
+    },
+    {
+      "file": "src/app/(dashboard)/docs/finance/page.tsx",
+      "name": "Finance Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "1e49a36794cbb2d0",
+      "updated": "2025-11-03T15:54:20.847Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/finance/page.tsx",
+      "name": "Finance Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "48d4aa4b5e55ae9f",
+      "updated": "2025-11-03T15:54:20.871Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "name": "Finance Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8d47312765ec1f5e",
+      "updated": "2025-11-03T15:54:20.879Z"
+    },
+    {
+      "file": "src/app/(dashboard)/view-data/eitje-data/finance/page.tsx",
+      "name": "Finance Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "dfd13008fe2f7c8b",
+      "updated": "2025-11-03T15:54:20.884Z"
+    },
+    {
+      "file": "src/app/(dashboard)/daily-ops/finance/page.tsx",
+      "name": "Finance Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3c7bb952aefcb29e",
+      "updated": "2025-11-04T01:56:15.462Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/hours/page.tsx",
+      "name": "Hours Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "60211e207a885d2f",
+      "updated": "2025-11-03T15:54:20.872Z"
+    },
+    {
+      "file": "src/app/(dashboard)/view-data/eitje-data/hours/page.tsx",
+      "name": "Hours Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "5d33103caf8021bc",
+      "updated": "2025-11-03T15:54:20.884Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/labor/hours/page.tsx",
+      "name": "Hours Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "aa8ce436edd04833",
+      "updated": "2025-11-04T01:56:15.464Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/imports/page.tsx",
+      "name": "Imports Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3590144e3fe221e4",
+      "updated": "2025-11-03T15:54:20.877Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/daily-ops/insights/page.tsx",
+      "name": "Insights Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7c3fa23b16fb6c63",
+      "updated": "2025-11-03T15:54:20.863Z"
+    },
+    {
+      "file": "src/app/(dashboard)/daily-ops/inventory/page.tsx",
+      "name": "Inventory Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7ff059d49f3ec22e",
+      "updated": "2025-11-04T01:56:15.462Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/inventory/page.tsx",
+      "name": "Inventory Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7c61338a13da2a64",
+      "updated": "2025-11-04T01:56:15.464Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/daily-ops/kpis/page.tsx",
+      "name": "Kpis Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d7c47fd3d81f52fe",
+      "updated": "2025-11-03T15:54:20.864Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/labor-costs/page.tsx",
+      "name": "Labor Costs Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f316de1a713825e5",
+      "updated": "2025-11-03T15:54:20.872Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/labor/page.tsx",
+      "name": "Labor Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "99ef3dd942fe0d97",
+      "updated": "2025-11-03T15:54:20.878Z"
+    },
+    {
+      "file": "src/app/(dashboard)/daily-ops/labor/page.tsx",
+      "name": "Labor Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "754ba3d9409942d4",
+      "updated": "2025-11-04T01:56:15.463Z"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/locations/page.tsx",
+      "name": "Locations Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9146eb0663e4f394",
+      "updated": "2025-11-04T01:56:15.489Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/locations-teams/page.tsx",
+      "name": "Locations Teams Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a8b2a90bb7d3b47b",
+      "updated": "2025-11-03T15:54:20.873Z"
+    },
+    {
+      "file": "src/app/(dashboard)/view-data/eitje-data/locations-teams/page.tsx",
+      "name": "Locations Teams Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2732e728216740bd",
+      "updated": "2025-11-03T15:54:20.891Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/labor/locations-teams/page.tsx",
+      "name": "Locations Teams Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "aabe1195776aede5",
+      "updated": "2025-11-04T01:56:15.465Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/pnl/page.tsx",
+      "name": "Pnl Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "cdebff2c04e9426d",
+      "updated": "2025-11-03T15:54:20.880Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/finance/powerbi/page.tsx",
+      "name": "Powerbi Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d296cd4a1dfc78d7",
+      "updated": "2025-11-04T01:56:15.463Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/daily-ops/productivity/page.tsx",
+      "name": "Productivity Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "970a00d2e8247d18",
+      "updated": "2025-11-03T15:54:20.866Z"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/products/page.tsx",
+      "name": "Products Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "20bd0b07159a72dc",
+      "updated": "2025-11-04T01:56:15.489Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/real-sync/page.tsx",
+      "name": "Real Sync Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6508afdccc36b69f",
+      "updated": "2025-11-03T15:54:20.881Z"
+    },
+    {
+      "file": "src/app/(dashboard)/daily-ops/reports/page.tsx",
+      "name": "Reports Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "92cb1cd0b8328703",
+      "updated": "2025-11-04T01:56:15.463Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/reservations/page.tsx",
+      "name": "Reservations Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "56f550e6c5c4af5c",
+      "updated": "2025-11-04T01:56:15.465Z"
+    },
+    {
+      "file": "src/app/(dashboard)/roadmap/page.tsx",
+      "name": "Roadmap Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": true,
+      "checksum": "afcb4dba35143b01",
+      "updated": "2025-11-03T15:54:20.883Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/sales/page.tsx",
+      "name": "Sales Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "50e3d691e2efa559",
+      "updated": "2025-11-03T15:54:20.882Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/simple-import/page.tsx",
+      "name": "Simple Import Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "53371b020a09a227",
+      "updated": "2025-11-03T15:54:20.882Z"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/suppliers/page.tsx",
+      "name": "Suppliers Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f62523dd65705b0f",
+      "updated": "2025-11-04T01:56:15.490Z"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/teams/page.tsx",
+      "name": "Teams Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e6abec73dc008b14",
+      "updated": "2025-11-04T01:56:15.490Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/themes/page.tsx",
+      "name": "Themes Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "125bc8f28744e051",
+      "updated": "2025-11-04T01:56:15.495Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/daily-ops/trends/page.tsx",
+      "name": "Trends Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "fd43c9a1de9a77db",
+      "updated": "2025-11-03T15:54:20.866Z"
+    },
+    {
+      "file": "src/app/(dashboard)/view-data/page.tsx",
+      "name": "View Data Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "30e765bae240eefc",
+      "updated": "2025-11-03T15:54:20.892Z"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/data/eitje-data/workers/page.tsx",
+      "name": "Workers Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8d2da00b17dd8fd1",
+      "updated": "2025-11-03T15:54:20.874Z"
+    },
+    {
+      "file": "src/app/(dashboard)/view-data/eitje-data/workers/page.tsx",
+      "name": "Workers Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a81f1ffb7392ec23",
+      "updated": "2025-11-03T15:54:20.892Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/labor/workers/page.tsx",
+      "name": "Workers Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e29454a25c5ce0fe",
+      "updated": "2025-11-04T01:56:15.465Z"
+    }
+  ],
+  "count": 60,
+  "last_updated": "2025-11-08T01:16:18.671Z"
+}

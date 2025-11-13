@@ -1,0 +1,43 @@
+{
+  "type": "services",
+  "functions": [
+    {
+      "file": "src/lib/eitje/_backup_complex/api-service-old.ts",
+      "name": "Api Service Old",
+      "type": "service",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "906bc2a038d705a6",
+      "updated": "2025-11-03T15:54:21.122Z"
+    },
+    {
+      "file": "src/lib/eitje/_backup_complex/mappers.ts",
+      "name": "Mappers",
+      "type": "service",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "72c5832ed65567d6",
+      "updated": "2025-11-03T15:54:21.123Z"
+    },
+    {
+      "file": "src/lib/eitje/_backup_complex/types.ts",
+      "name": "Types",
+      "type": "service",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6f1cb91ca0ef619e",
+      "updated": "2025-11-03T15:54:21.124Z"
+    },
+    {
+      "file": "src/lib/finance/universal/types.ts",
+      "name": "Types",
+      "type": "service",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8b8e01a84d8a648a",
+      "updated": "2025-11-03T15:54:21.156Z"
+    }
+  ],
+  "count": 4,
+  "last_updated": "2025-11-08T01:16:18.671Z"
+}

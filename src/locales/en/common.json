@@ -1,0 +1,70 @@
+{
+  "navigation": {
+    "finance": "Finance",
+    "pnl": "P&L",
+    "balance": "Balance",
+    "dailyOps": "Daily Operations",
+    "kpis": "KPIs",
+    "trends": "Trends",
+    "productivity": "Productivity",
+    "insights": "We Never Knew This"
+  },
+  "pnl": {
+    "title": "P&L Balance",
+    "description": "Profit & Loss statement with detailed cost breakdown",
+    "filters": {
+      "year": "Year",
+      "location": "Location",
+      "clear": "Clear"
+    },
+    "locations": {
+      "all": "All Locations",
+      "kinsbergen": "Van Kinsbergen",
+      "barbea": "Bar Bea",
+      "lamour": "L'Amour Toujours"
+    },
+    "table": {
+      "category": "Category",
+      "total": "Total",
+      "january": "Jan",
+      "february": "Feb",
+      "march": "Mar",
+      "april": "Apr",
+      "may": "May",
+      "june": "Jun",
+      "july": "Jul",
+      "august": "Aug",
+      "september": "Sep",
+      "october": "Oct",
+      "november": "Nov",
+      "december": "Dec"
+    },
+    "alerts": {
+      "noData": "No P&L data available for the selected criteria.",
+      "loading": "Loading P&L data...",
+      "error": "Failed to load P&L data. Please try again.",
+      "databaseWarning": "Database temporarily unavailable. Showing mock data for testing."
+    },
+    "categories": {
+      "revenue": "Revenue Groups",
+      "costOfSales": "Cost of Sales",
+      "labor": "Labor Costs",
+      "otherCosts": "Other Business Costs",
+      "depreciation": "Depreciation",
+      "financial": "Financial Income and Expenses",
+      "result": "Result (Profit/Loss)"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  }
+}
