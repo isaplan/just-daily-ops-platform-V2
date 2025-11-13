@@ -55,3 +55,6 @@ next-env.d.ts
 # Function registry backups (keep current registry, ignore backups)
 function-registry.json.backup-*
 function-registry-v2-backup.json
+
+# V1 source code (Supabase-based, kept locally but not deployed)
+src-v1/
