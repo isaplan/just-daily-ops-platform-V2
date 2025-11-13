@@ -7,7 +7,7 @@
     "predev": "npm run compliance:pre",
     "dev": "next dev --turbopack",
     "postdev": "npm run compliance:post",
-    "build": "next build --turbopack",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "compliance:check": "node tools/compliance/ai-compliance-checker.js",
