@@ -8,6 +8,7 @@ build-docs-scripts-sql/**
 
 # Local scripts/tools not required at runtime
 scripts/**
+!scripts/create-apollo-stub.js
 tools/**
 old-ai-docs/**
 .ai-compliance-functions/**
