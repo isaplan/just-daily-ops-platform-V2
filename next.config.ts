@@ -11,17 +11,6 @@ const nextConfig: NextConfig = {
     // your project has type errors.
     ignoreBuildErrors: true,
   },
-  // Webpack configuration to handle optional Apollo Server dependencies
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Ignore optional @yaacovcr/transform dependency for Apollo Server
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        '@yaacovcr/transform': false,
-      };
-    }
-    return config;
-  },
   // Prevent search engine indexing
   async headers() {
     return [
