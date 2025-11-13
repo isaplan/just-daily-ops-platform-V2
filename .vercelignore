@@ -22,6 +22,42 @@ supabase-export/**
 .idea/**
 *.code-workspace
 
+# V1 Supabase-dependent pages (will be replaced with V2 GraphQL)
+src/app/(dashboard)/data/finance/pnl/**
+src/app/(dashboard)/finance/imports/powerbi-import.tsx
+
+# V1 Supabase-dependent components (will be replaced with V2 GraphQL)
+src/components/finance/EnhancedManualSync.tsx
+src/components/finance/FlexibleMetricChart.tsx
+src/components/finance/ImportHistory.tsx
+src/components/finance/UniversalFileUpload.tsx
+src/components/finance/SimpleDataImport.tsx
+src/components/finance/SimpleDataImportFixed.tsx
+src/components/finance/RawDataStorage.tsx
+src/components/finance/CategoryBreakdown.tsx
+src/components/finance/RevenueChart.tsx
+src/components/finance/BorkMasterSync.tsx
+src/components/finance/FinanceKpiCards.tsx
+src/components/finance/DataAccessTest.tsx
+src/components/finance/SimpleApiTest.tsx
+src/components/finance/SimpleApiTestV2.tsx
+src/components/finance/DataFilters.tsx
+src/components/finance/BorkApiConnectionTest.tsx
+src/components/finance/DataValidation.tsx
+src/components/finance/COGSBreakdown.tsx
+src/components/finance/FinanceRevenueTrendChart.tsx
+src/components/finance/FinancialChatSidepanel.tsx
+src/components/finance/PaginatedDataDisplay.tsx
+src/components/finance/DataMapping.tsx
+src/components/finance/DatabaseStorage.tsx
+src/components/finance/FinanceAIChatbot.tsx
+src/components/finance/CalculationSheet.tsx
+src/components/finance/FinanceLocationComparisonChart.tsx
+src/components/roadmap/CategoryAutocomplete.tsx
+src/components/roadmap/RoadmapFormSheet.tsx
+src/components/roadmap/RoadmapItemCard.tsx
+src/components/sales/MasterDataUpdateNotification.tsx
+
 
 
 
