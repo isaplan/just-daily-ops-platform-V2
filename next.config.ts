@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   eslint: {
@@ -24,6 +25,41 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  // Webpack configuration to handle optional Apollo Server dependency
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Resolve @yaacovcr/transform to our stub module
+      const fs = require('fs');
+      const stubPath = path.resolve(__dirname, 'node_modules', '@yaacovcr', 'transform', 'index.js');
+      
+      // Ensure stub exists, create if it doesn't
+      if (!fs.existsSync(stubPath)) {
+        try {
+          require('./scripts/create-apollo-stub.js');
+        } catch (e) {
+          console.warn('Could not create Apollo stub automatically:', e);
+        }
+      }
+      
+      if (fs.existsSync(stubPath)) {
+        config.resolve.alias = {
+          ...config.resolve.alias,
+          '@yaacovcr/transform': stubPath,
+        };
+      }
+    }
+    return config;
+  },
+  // Turbopack configuration (for Next.js 15+ with Turbopack)
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        '@yaacovcr/transform': './node_modules/@yaacovcr/transform/index.mjs',
+      },
+    },
+    // Enable instrumentation hook for cron job initialization
+    instrumentationHook: true,
   },
 };
 

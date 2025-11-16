@@ -1,0 +1,201 @@
+---
+alwaysApply: true
+---
+
+# 🛑 RULE #0: UNDERSTAND → CLARIFY → CONFIRM → BUILD
+
+**Before ANY action:**
+1. Understand EXACTLY what user wants (read carefully, don't skim)
+2. **SHOW FULL PLAN FIRST** - List ALL files you'll touch (create/modify/delete)
+3. Identify protected files (`"touch_again": false` in `function-registry.json`)
+4. Ask for permission if touching protected files (see C1 workflow below)
+5. Get explicit approval ("Go ahead" / "Confirm")
+6. THEN execute (no more, no less)
+
+**IF IN DOUBT → ASK. IF ASSUMING → ASK. IF UNCLEAR → ASK.**
+
+---
+
+## 🔒 BRANCH-AWARE REGISTRY PROTECTION
+
+### Before Starting Work:
+
+**1. Check Current Branch:**
+```bash
+git branch --show-current
+```
+
+**2. Analyze & Show Full Plan:**
+```
+"Here's what I need to do:
+
+Files to CREATE:
+- [list new files]
+
+Files to MODIFY:
+- [list files to modify]
+  ⚠️  [mark protected files with warning]
+  
+Files to DELETE:
+- [list files to delete]
+
+Protected files requiring permission: [count]"
+```
+
+---
+
+### Protection Rules by Branch:
+
+#### 🔴 ON MAIN BRANCH:
+**HARD BLOCK - ZERO EXCEPTIONS**
+
+Files with `"touch_again": false` in `function-registry.json` = **NEVER TOUCH**
+
+**Exception:** If you followed C1 questioning and user said "Go ahead/Confirm" → Allowed
+
+**If you need to modify protected file on main:**
+1. STOP immediately
+2. Tell user: "⚠️  This file is protected on main. Please create a feature branch for this change."
+3. Do NOT proceed
+
+---
+
+#### 🟡 ON FEATURE BRANCH:
+**ASK PERMISSION BEFORE TOUCHING (C1 WORKFLOW)**
+
+**For EACH protected file, show this exact permission request:**
+
+```
+⚠️  PERMISSION REQUIRED
+
+File: [full/path/to/file.ts]
+Status: Marked as "completed" on main branch
+Registry: "touch_again": false
+Current branch: [branch-name]
+
+What I want to do:
+- [Specific change 1]
+- [Specific change 2]
+- ~[X] lines of code
+- Type: [Additive/Modification/Deletion]
+
+Reason: [Why this change is needed for your feature]
+
+Do you want me to:
+A) Go ahead / Confirm - Proceed with changes
+B) Find alternative (don't touch this file)
+C) Show alternatives first, then decide
+
+Your choice?
+```
+
+**Then:**
+1. WAIT for user response
+2. If "Go ahead" or "Confirm" → Log permission (see below) → Proceed
+3. If "Find alternative" → Don't touch file, find different approach
+4. If unclear answer → ASK AGAIN clearly
+
+---
+
+## 📝 PERMISSION LOGGING (MANDATORY)
+
+**When user says "Go ahead/Confirm", YOU MUST log permission in BOTH places:**
+
+### A) Git Commit Message:
+Include this in your commit:
+```
+Modified protected file(s):
+- [file path]
+  Permission: Granted by user
+  Session: [ISO timestamp]
+  Reason: [reason]
+  Changes: +[X] lines / -[Y] lines
+```
+
+### B) Permission Log File:
+Update `.ai-compliance-permissions.json`:
+```json
+{
+  "permissions": [
+    {
+      "timestamp": "[ISO 8601 timestamp]",
+      "branch": "[branch-name]",
+      "file": "[full/path/to/file]",
+      "reason": "[detailed reason]",
+      "approved_by": "user",
+      "session_id": "[unique-session-id]",
+      "changes": "+X lines / -Y lines",
+      "type": "additive|modification|deletion"
+    }
+  ]
+}
+```
+
+**If file doesn't exist, create it. If exists, append to the array.**
+
+---
+
+## 🚫 ABSOLUTE PROHIBITIONS (All Branches)
+
+### Size Limits:
+- **Max 100 lines changed per file** per task
+- **Max 20 lines deleted per file**
+- **No full file replacements** (>80% of lines changed)
+
+If >100 lines needed → STOP → Break into smaller tasks → Ask user to approve each
+
+### No Bypass Flags:
+**NEVER use:**
+- `git commit --no-verify` (bypasses pre-commit hooks)
+- `git push --force` (bypasses branch protection)
+- `git push --no-verify` (bypasses compliance checks)
+- Modify `.git/hooks/` or compliance scripts
+
+**If compliance check fails:**
+1. STOP immediately
+2. Report all violations to user
+3. Wait for explicit user decision
+4. NEVER assume permission to bypass
+
+---
+
+## 🔄 LOOP PREVENTION (HARDCODED)
+
+After 2 failed attempts at same fix, on 3rd attempt:
+1. **STOP** and reconsider the solution
+2. **ANALYZE** what didn't work in previous attempts
+3. **IDENTIFY** the root cause of failure
+4. **PROPOSE** a completely different approach
+5. **ASK** user for permission to try new approach
+6. **MOVE ON** if no clear solution after 3 attempts
+
+---
+
+## 🔍 MANDATORY POST-CHECK (YOU MUST RUN THIS)
+
+**AFTER making ANY code changes:**
+
+1. **Run post-check:**
+```bash
+node tools/compliance/post-execution-check.js [modified_files]
+```
+
+2. **Show full output to user**
+
+3. **If violations found:**
+   - Report ALL violations with severity levels
+   - Explain what was violated and why
+   - Offer to fix or revert changes
+   - WAIT for user decision
+
+4. **Example:**
+```bash
+# After modifying src/components/Button.tsx
+node tools/compliance/post-execution-check.js src/components/Button.tsx
+```
+
+**You CANNOT skip this. Extension also runs as backup verification.**
+
+---
+
+**Status**: 🛡️ UNBREAKABLE RULES ACTIVE | Mode: BRANCH-AWARE | Protected: 284+ files | Max Lines: 100

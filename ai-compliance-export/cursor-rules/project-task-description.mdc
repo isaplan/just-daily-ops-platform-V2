@@ -1,0 +1,22 @@
+---
+alwaysApply: true
+---
+
+2. **Parse JSON Output:**
+- Status: `PASS` = proceed, `WARN` = show warnings, `BLOCK` = **STOP**
+- Existing code: Review before creating new code
+- Violations: Fix violations before proceeding
+
+3. **Act on Status:**
+- **BLOCK** → **STOP** → Report violations → Wait for user decision → Do NOT proceed
+- **WARN** → Show warnings (existing code found) → Ask user to confirm → Wait for approval
+- **PASS** → Proceed cautiously → Use existing code if found → Minimal changes only
+
+---
+
+## 🔍 **MANDATORY POST-EXECUTION CHECK**
+
+**AFTER ANY code modification, you MUST:**
+
+1. **Run Post-Check Script:**
+node tools/compliance/post-execution-check.js [modified files]

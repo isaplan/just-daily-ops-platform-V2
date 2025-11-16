@@ -66,6 +66,33 @@ export const typeDefs = `#graphql
   }
 
   # ============================================
+  # API CREDENTIALS
+  # ============================================
+
+  type ApiCredential {
+    id: ID!
+    locationId: ID
+    provider: String!
+    apiKey: String
+    apiSecret: String
+    baseUrl: String
+    additionalConfig: JSON
+    isActive: Boolean!
+    createdAt: Date!
+    updatedAt: Date!
+  }
+
+  input ApiCredentialInput {
+    locationId: ID
+    provider: String!
+    apiKey: String
+    apiSecret: String
+    baseUrl: String
+    additionalConfig: JSON
+    isActive: Boolean
+  }
+
+  # ============================================
   # DATA TYPES
   # ============================================
 
@@ -92,7 +119,7 @@ export const typeDefs = `#graphql
     totalRevenue: Float!
     laborCostPercentage: Float!
     revenuePerHour: Float!
-    teamStats: [TeamStats!]!
+    teamStats: [TeamStats!]
     createdAt: Date!
   }
 
@@ -207,6 +234,10 @@ export const typeDefs = `#graphql
       year: Int!
       month: Int
     ): [PnLData!]!
+    
+    # API Credentials
+    apiCredentials(provider: String, locationId: ID): [ApiCredential!]!
+    apiCredential(id: ID!): ApiCredential
   }
 
   # ============================================
@@ -214,8 +245,10 @@ export const typeDefs = `#graphql
   # ============================================
 
   type Mutation {
-    # Placeholder for future mutations
-    _empty: String
+    # API Credentials
+    createApiCredential(input: ApiCredentialInput!): ApiCredential!
+    updateApiCredential(id: ID!, input: ApiCredentialInput!): ApiCredential!
+    deleteApiCredential(id: ID!): Boolean!
   }
 `;
 
