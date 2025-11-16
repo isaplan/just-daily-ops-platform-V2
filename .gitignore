@@ -58,3 +58,7 @@ function-registry-v2-backup.json
 
 # V1 source code (Supabase-based, kept locally but not deployed)
 src-v1/
+
+# Data archives (compressed backup files)
+data-archives/
+*.json.gz

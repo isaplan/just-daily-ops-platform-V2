@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "description": "Logs AI modifications to protected files (touch_again: false) on feature branches",
+  "permissions": []
+}
+
+
+
+

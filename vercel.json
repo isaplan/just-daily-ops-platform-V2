@@ -1,0 +1,26 @@
+{
+  "crons": [
+    {
+      "path": "/api/eitje/v2/cron?jobType=daily-data&action=run-now",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/eitje/v2/cron?jobType=historical-data&action=run-now",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/eitje/v2/cron?jobType=master-data&action=run-now",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/bork/v2/cron?jobType=daily-data&action=run-now",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/bork/v2/cron?jobType=historical-data&action=run-now",
+      "schedule": "0 1 * * *"
+    }
+  ]
+}
+
+
