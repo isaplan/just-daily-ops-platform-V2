@@ -16,6 +16,196 @@ alwaysApply: true
 
 ---
 
+## 🔍 MANDATORY VERIFICATION WITH EVIDENCE (CRITICAL - NO EXCEPTIONS)
+
+### **🚫 ABSOLUTE PROHIBITION: NEVER ASSUME SUCCESS**
+
+**You CANNOT claim something works without providing evidence.**
+
+### **Verification Requirements:**
+
+#### **1. Database Operations (CREATE/UPDATE/DELETE):**
+**MUST verify with actual database query:**
+
+```typescript
+// ❌ FORBIDDEN - Never do this:
+"Data has been saved successfully"
+
+// ✅ REQUIRED - Always do this:
+// Step 1: Execute the operation
+await db.collection('collection').insertOne(data);
+
+// Step 2: VERIFY with actual query
+const verification = await db.collection('collection').findOne({ _id: result.insertedId });
+if (!verification) {
+  throw new Error('Verification failed: Record not found after insert');
+}
+
+// Step 3: Show evidence to user
+console.log('✅ VERIFIED: Record exists in database');
+console.log('Evidence:', JSON.stringify(verification, null, 2));
+```
+
+**For data sync operations:**
+- **MUST** call check-data endpoint: `/api/[provider]/v2/check-data?month=X&year=Y`
+- **MUST** show actual record count: `totalRecords: X`
+- **MUST** show sample records or date range evidence
+- **NEVER** claim "data is synced" without showing query results
+
+#### **2. API Endpoint Creation:**
+**MUST verify endpoint actually responds:**
+
+```bash
+# ❌ FORBIDDEN:
+"API endpoint created successfully"
+
+# ✅ REQUIRED:
+# Step 1: Create endpoint
+# Step 2: Test with actual HTTP request
+curl http://localhost:3000/api/endpoint
+
+# Step 3: Show response evidence
+Response: { "success": true, "data": [...] }
+Status: 200 OK
+```
+
+#### **3. User Questions Requiring Verification:**
+**When user asks "did it work?" or "do we have data?":**
+
+```typescript
+// ❌ FORBIDDEN - Never assume:
+"Yes, the data is there"
+
+// ✅ REQUIRED - Always verify:
+// Step 1: Run actual check
+const checkResponse = await fetch('/api/bork/v2/check-data?month=11&year=2025');
+const checkData = await checkResponse.json();
+
+// Step 2: Show evidence
+if (checkData.success && checkData.data.totalRecords > 0) {
+  console.log(`✅ VERIFIED: ${checkData.data.totalRecords} records found`);
+  console.log('Evidence:', JSON.stringify(checkData.data, null, 2));
+} else {
+  console.log('❌ VERIFIED: No records found');
+  console.log('Evidence:', JSON.stringify(checkData, null, 2));
+}
+```
+
+#### **4. Code Changes:**
+**MUST verify code actually works:**
+
+```bash
+# ❌ FORBIDDEN:
+"Fixed the date parsing issue"
+
+# ✅ REQUIRED:
+# Step 1: Make code change
+# Step 2: Test with actual input
+# Step 3: Show test results
+Test Input: "20251101"
+Test Output: Date object { year: 2025, month: 10, day: 1 }
+✅ VERIFIED: Date parsing works correctly
+```
+
+### **Evidence Format Requirements:**
+
+**Every verification MUST include:**
+1. **Query/Command executed** (exact command or code)
+2. **Response/Result received** (actual output, not description)
+3. **Evidence snippet** (JSON, log output, or data sample)
+4. **Verification status** (✅ VERIFIED or ❌ VERIFICATION FAILED)
+
+**Example Evidence Report:**
+```
+🔍 VERIFICATION REPORT:
+
+Operation: Bork API sync for November 2025
+Location: L'Amour Toujours
+
+Verification Query:
+GET /api/bork/v2/check-data?month=11&year=2025
+
+Evidence:
+{
+  "success": true,
+  "data": {
+    "totalRecords": 30,
+    "byLocation": [
+      {
+        "locationName": "L'Amour Toujours",
+        "count": 30,
+        "minDate": "2025-11-01T00:00:00.000Z",
+        "maxDate": "2025-11-30T00:00:00.000Z"
+      }
+    ]
+  }
+}
+
+Status: ✅ VERIFIED - 30 records found in database
+```
+
+### **When Verification Fails:**
+
+**If verification shows failure:**
+1. **STOP immediately**
+2. **Report failure with evidence**
+3. **Show what was expected vs. what was found**
+4. **DO NOT** claim success or move on
+5. **Ask user** how to proceed
+
+**Example Failure Report:**
+```
+❌ VERIFICATION FAILED:
+
+Operation: Bork API sync for November 2025
+Expected: Records in bork_raw_data collection
+Actual: 0 records found
+
+Evidence:
+{
+  "success": true,
+  "data": {
+    "totalRecords": 0
+  }
+}
+
+Action Required: Investigate why sync did not save data
+```
+
+### **Special Cases Requiring Verification:**
+
+1. **"Did we get data?"** → MUST query database and show record count
+2. **"Is it working?"** → MUST test endpoint/function and show output
+3. **"Did the sync complete?"** → MUST check database and show records
+4. **"Is the fix working?"** → MUST test with actual input/output
+5. **Any success claim** → MUST provide evidence
+
+### **Verification Tools Available:**
+
+- **Database checks:** `/api/[provider]/v2/check-data`
+- **Admin checks:** `/api/admin/check-data`
+- **Direct MongoDB queries:** Use `getDatabase()` and show results
+- **API testing:** Use `fetch()` or `curl` and show response
+- **Code testing:** Run actual test cases and show output
+
+### **🚫 NEVER:**
+
+- ❌ Claim success without evidence
+- ❌ Say "it should work" or "it probably worked"
+- ❌ Assume data is there without checking
+- ❌ Skip verification because "it's obvious"
+- ❌ Provide verification that doesn't show actual data/results
+
+### **✅ ALWAYS:**
+
+- ✅ Verify with actual queries/tests
+- ✅ Show evidence (JSON, logs, data samples)
+- ✅ Report verification status explicitly
+- ✅ Include record counts, timestamps, or data samples
+- ✅ Acknowledge if verification fails
+
+---
+
 ## 🔒 BRANCH-AWARE REGISTRY PROTECTION
 
 ### Before Starting Work:
@@ -198,4 +388,52 @@ node tools/compliance/post-execution-check.js src/components/Button.tsx
 
 ---
 
-**Status**: 🛡️ UNBREAKABLE RULES ACTIVE | Mode: BRANCH-AWARE | Protected: 284+ files | Max Lines: 100
+## 🔍 MANDATORY VERIFICATION AFTER DATA OPERATIONS
+
+**AFTER ANY data sync, insert, update, or delete operation:**
+
+1. **Run verification query:**
+   - For sync operations: Call `/api/[provider]/v2/check-data` with appropriate parameters
+   - For inserts: Query the inserted record by ID
+   - For updates: Query the updated record and show changed fields
+   - For deletes: Verify record no longer exists
+
+2. **Show evidence to user:**
+   - Record count (if applicable)
+   - Sample records or data
+   - Date ranges (if applicable)
+   - Error messages (if verification fails)
+
+3. **Report verification status:**
+   - ✅ VERIFIED: [evidence summary]
+   - ❌ VERIFICATION FAILED: [what was expected vs. what was found]
+
+4. **If verification fails:**
+   - STOP immediately
+   - Report failure with evidence
+   - DO NOT claim success
+   - Ask user how to proceed
+
+**Example Verification After Sync:**
+```bash
+# After syncing Bork data for November 2025
+curl http://localhost:3000/api/bork/v2/check-data?month=11&year=2025
+
+# Show response:
+{
+  "success": true,
+  "data": {
+    "totalRecords": 30,
+    "byLocation": [...]
+  }
+}
+
+# Report:
+✅ VERIFIED: 30 records found in bork_raw_data for November 2025
+```
+
+**You CANNOT skip verification. Every data operation MUST be verified with evidence.**
+
+---
+
+**Status**: 🛡️ UNBREAKABLE RULES ACTIVE | Mode: BRANCH-AWARE | Protected: 284+ files | Max Lines: 100 | Verification: MANDATORY WITH EVIDENCE

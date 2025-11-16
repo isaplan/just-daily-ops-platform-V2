@@ -21,7 +21,9 @@ import {
   Calendar,
   ChevronRight,
   Building2,
+  Plug,
 } from "lucide-react";
+import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -75,7 +77,7 @@ const dataFinanceItems: MenuItem[] = [
 ];
 
 const dataLaborItems: MenuItem[] = [
-  { title: "Hours", icon: Clock, comingSoon: true },
+  { title: "Hours", icon: Clock, url: "/data/labor/hours" },
   { title: "Labor Costs", icon: DollarSign, comingSoon: true },
   { title: "Workers", icon: Users, comingSoon: true },
   { title: "Locations & Teams", icon: Building2, comingSoon: true },
@@ -110,8 +112,9 @@ const dataItems: MenuItem[] = [
 ];
 
 const settingsItems: MenuItem[] = [
-  { title: "API Settings", icon: Settings, comingSoon: true },
-  { title: "Company Settings", icon: Building2, comingSoon: true },
+  { title: "Eitje API Connect", icon: Plug, url: "/settings/eitje-api" },
+  { title: "Bork API Connect", icon: Plug, url: "/settings/bork-api" },
+  { title: "Company Settings", icon: Building2, url: "/settings/company", comingSoon: true },
 ];
 
 interface AppSidebarProps {
@@ -209,41 +212,41 @@ export function AppSidebar({ layoutVersion, onVersionChange }: AppSidebarProps) 
         {/* Header with Logo and Title */}
         <SidebarGroup>
           <SidebarGroupLabel className="flex items-center gap-2 px-2 py-4">
-            <div className="flex items-center gap-2 flex-1">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <LayoutDashboard className="h-4 w-4" />
-              </div>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Image 
+                src="/logo.svg" 
+                alt="Just Daily Ops Logo" 
+                width={30} 
+                height={30}
+                className="flex-shrink-0"
+              />
               {!collapsed && (
-                <div className="flex flex-col">
-                  <span className="font-semibold text-sm">Just Daily Ops</span>
-                  <span className="text-xs text-muted-foreground">V2</span>
-                </div>
+                <span className="font-semibold text-sm whitespace-nowrap truncate">
+                  Just Daily Ops
+                </span>
               )}
             </div>
           </SidebarGroupLabel>
 
           {/* V1/V2 Switch */}
           {!collapsed && (
-            <div className="px-2 pb-4">
-              <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/50">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="version-switch" className="text-xs font-medium">
-                    Version
-                  </Label>
-                  <span className="text-xs text-muted-foreground">
-                    {layoutVersion === "v1" ? "V1 (Supabase)" : "V2 (MongoDB)"}
-                  </span>
-                </div>
+            <div className="px-2 pb-4 mt-4">
+              <div className="bg-white border-2 border-black rounded-lg px-2 py-1 flex items-center gap-1 w-fit">
+                <Label htmlFor="version-switch" className="text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
+                  V1
+                </Label>
                 <Switch
                   id="version-switch"
+                  className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
                   checked={layoutVersion === "v2"}
                   onCheckedChange={(checked) => {
                     const newVersion = checked ? "v2" : "v1";
                     onVersionChange(newVersion);
-                    // TODO: Implement V1/V2 switching logic when V1 is available
-                    // For now, this is a visual indicator
                   }}
                 />
+                <Label htmlFor="version-switch" className="text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
+                  V2
+                </Label>
               </div>
             </div>
           )}

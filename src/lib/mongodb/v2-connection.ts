@@ -22,8 +22,11 @@ const options = {
   maxPoolSize: 10,
   minPoolSize: 1,
   maxIdleTimeMS: 30000,
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: 10000, // Increased from 5000 to 10000 (10 seconds)
   socketTimeoutMS: 45000,
+  connectTimeoutMS: 10000, // Added: Connection timeout
+  retryWrites: true,
+  retryReads: true,
 };
 
 // Global is used here to maintain a cached connection across hot reloads
