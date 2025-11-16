@@ -126,6 +126,89 @@ export const resolvers = {
       }
       return db.collection('powerbi_aggregated').find(query).sort({ month: -1 }).toArray();
     },
+
+    // API Credentials
+    apiCredentials: async (
+      _: any,
+      { provider, locationId }: { provider?: string; locationId?: string }
+    ) => {
+      try {
+        const db = await getDatabase();
+        const query: any = {};
+        if (provider) {
+          query.provider = provider;
+        }
+        if (locationId) {
+          query.locationId = toObjectId(locationId);
+        }
+        return db.collection('api_credentials').find(query).toArray();
+      } catch (error: any) {
+        console.error('[GraphQL Resolver] apiCredentials error:', error);
+        // Re-throw with more context for GraphQL error handling
+        if (error.message?.includes('ETIMEOUT') || error.message?.includes('querySrv')) {
+          throw new Error('MongoDB connection timeout. Please check your MongoDB connection settings or try again later.');
+        }
+        if (error.message?.includes('ENOTFOUND') || error.message?.includes('ECONNREFUSED')) {
+          throw new Error('Cannot connect to MongoDB. Please verify your connection string and network settings.');
+        }
+        throw error;
+      }
+    },
+
+    apiCredential: async (_: any, { id }: { id: string }) => {
+      try {
+        const db = await getDatabase();
+        return db.collection('api_credentials').findOne({ _id: toObjectId(id) });
+      } catch (error: any) {
+        console.error('[GraphQL Resolver] apiCredential error:', error);
+        if (error.message?.includes('ETIMEOUT') || error.message?.includes('querySrv')) {
+          throw new Error('MongoDB connection timeout. Please check your MongoDB connection settings or try again later.');
+        }
+        if (error.message?.includes('ENOTFOUND') || error.message?.includes('ECONNREFUSED')) {
+          throw new Error('Cannot connect to MongoDB. Please verify your connection string and network settings.');
+        }
+        throw error;
+      }
+    },
+  },
+
+  Mutation: {
+    // API Credentials
+    createApiCredential: async (_: any, { input }: { input: any }) => {
+      const db = await getDatabase();
+      const now = new Date();
+      const doc: any = {
+        ...input,
+        locationId: input.locationId ? toObjectId(input.locationId) : null,
+        isActive: input.isActive !== undefined ? input.isActive : true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const result = await db.collection('api_credentials').insertOne(doc);
+      return db.collection('api_credentials').findOne({ _id: result.insertedId });
+    },
+
+    updateApiCredential: async (_: any, { id, input }: { id: string; input: any }) => {
+      const db = await getDatabase();
+      const update: any = {
+        ...input,
+        updatedAt: new Date(),
+      };
+      if (input.locationId) {
+        update.locationId = toObjectId(input.locationId);
+      }
+      await db.collection('api_credentials').updateOne(
+        { _id: toObjectId(id) },
+        { $set: update }
+      );
+      return db.collection('api_credentials').findOne({ _id: toObjectId(id) });
+    },
+
+    deleteApiCredential: async (_: any, { id }: { id: string }) => {
+      const db = await getDatabase();
+      const result = await db.collection('api_credentials').deleteOne({ _id: toObjectId(id) });
+      return result.deletedCount === 1;
+    },
   },
 
   // Field resolvers for relationships
@@ -233,16 +316,66 @@ export const resolvers = {
     teamStats: async (parent: any) => {
       const db = await getDatabase();
       if (!parent.teamStats || parent.teamStats.length === 0) return [];
-      const teamIds = parent.teamStats.map((stat: any) => stat.teamId);
+      
+      // Convert teamIds to ObjectIds, handling both string and ObjectId formats
+      const teamIds = parent.teamStats
+        .map((stat: any) => {
+          try {
+            const teamId = stat.teamId;
+            if (!teamId) return null;
+            // Try to convert to ObjectId if it's a string
+            if (typeof teamId === 'string') {
+              try {
+                return new ObjectId(teamId);
+              } catch {
+                // If it's not a valid ObjectId string, try to find by systemMappings
+                return null;
+              }
+            }
+            return teamId instanceof ObjectId ? teamId : new ObjectId(teamId);
+          } catch {
+            return null;
+          }
+        })
+        .filter((id: any) => id !== null);
+      
+      if (teamIds.length === 0) return [];
+      
       const teams = await db.collection('unified_teams').find({
         _id: { $in: teamIds },
       }).toArray();
+      
       const teamMap = new Map(teams.map((t: any) => [t._id.toString(), t]));
-      return parent.teamStats.map((stat: any) => ({
-        team: teamMap.get(stat.teamId.toString()),
-        hours: stat.hours,
-        cost: stat.cost,
-      }));
+      
+      // Filter out any teamStats where team doesn't exist (to avoid null for non-nullable field)
+      return parent.teamStats
+        .map((stat: any) => {
+          try {
+            const teamId = stat.teamId;
+            if (!teamId) return null;
+            
+            // Try to match by ObjectId string
+            const teamIdStr = teamId instanceof ObjectId ? teamId.toString() : teamId.toString();
+            let team = teamMap.get(teamIdStr);
+            
+            // If not found, try to find by systemMappings (Eitje external ID)
+            if (!team && typeof teamId === 'string' && !ObjectId.isValid(teamId)) {
+              // This might be an Eitje team ID, try to find via systemMappings
+              // For now, skip it - we'd need to query by systemMappings which is more complex
+              return null;
+            }
+            
+            if (!team) return null; // Skip if team not found
+            return {
+              team,
+              hours: stat.hours,
+              cost: stat.cost,
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter((stat: any) => stat !== null);
     },
   },
 
@@ -260,6 +393,11 @@ export const resolvers = {
       const db = await getDatabase();
       return db.collection('locations').findOne({ _id: parent.locationId });
     },
+  },
+
+  ApiCredential: {
+    id: (parent: any) => toId(parent._id),
+    locationId: (parent: any) => parent.locationId ? toId(parent.locationId) : null,
   },
 };
 
