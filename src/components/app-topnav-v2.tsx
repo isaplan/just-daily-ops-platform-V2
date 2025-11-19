@@ -9,6 +9,7 @@ import Link from "next/link";
 import { TopnavBreadcrumb } from "@/components/navigation/topnav-breadcrumb";
 import { TopnavFilterDropdownV2 } from "@/components/navigation/topnav-filter-dropdown-v2";
 import { usePageFilters } from "@/contexts/page-filters-context";
+import { cn } from "@/lib/utils";
 
 interface AppTopnavV2Props {
   layoutVersion: "v1" | "v2";
@@ -64,15 +65,13 @@ export function AppTopnavV2({ layoutVersion, onVersionChange }: AppTopnavV2Props
     <>
       {/* SidebarTrigger and Breadcrumb - fixed left, account for sidebar */}
       <div 
-        className="fixed top-4 z-50 flex items-center gap-2 flex-nowrap transition-all duration-200"
-        style={{
-          left: isCollapsed ? '1rem' : 'calc(var(--sidebar-width) + 1rem)'
-        }}
+        className={cn(
+          "fixed top-4 z-50 flex items-center gap-2 transition-all duration-200",
+          isCollapsed ? "left-4" : "left-[calc(16rem+1rem)]"
+        )}
       >
-        <SidebarTrigger className="-ml-1 flex-shrink-0" />
-        <div className="flex-shrink-0">
-          <TopnavBreadcrumb />
-        </div>
+        <SidebarTrigger className="-ml-1" />
+        <TopnavBreadcrumb />
       </div>
       
       {/* Icons - fixed right with background and border */}

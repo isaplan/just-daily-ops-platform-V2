@@ -30,16 +30,46 @@ const ESSENTIAL_BORK_FIELDS = [
 ] as const;
 
 /**
+ * Essential top-level ticket fields to preserve
+ */
+const ESSENTIAL_TICKET_FIELDS = [
+  'ActualDate',
+  'Key',
+  'TicketNumber',
+  'Date',
+  'PaymentMethod',
+  'Internal',
+  'CenterKey',
+  'CenterName',
+  'CenterNr',
+] as const;
+
+/**
  * Extracts only essential fields from a Bork ticket
- * Reduces storage by ~70-80% compared to full raw response
+ * Preserves Orders and Lines structure for detailed sales data extraction
+ * Reduces storage by ~50-60% compared to full raw response (less aggressive than before)
  */
 export function extractEssentialBorkFields(ticket: any): Record<string, any> {
   const essential: Record<string, any> = {};
   
-  for (const field of ESSENTIAL_BORK_FIELDS) {
+  // Extract essential top-level fields
+  for (const field of ESSENTIAL_TICKET_FIELDS) {
     if (ticket[field] !== undefined && ticket[field] !== null) {
       essential[field] = ticket[field];
     }
+  }
+  
+  // CRITICAL: Preserve Orders array (contains Lines with product details)
+  // This is needed for the sales API to extract line-level sales records
+  if (ticket.Orders && Array.isArray(ticket.Orders)) {
+    essential.Orders = ticket.Orders;
+  } else if (ticket.orders && Array.isArray(ticket.orders)) {
+    essential.Orders = ticket.orders;
+  }
+  
+  // Also preserve TotalPrice if available (for quick aggregation)
+  if (ticket.TotalPrice !== undefined && ticket.TotalPrice !== null) {
+    essential.TotalPrice = ticket.TotalPrice;
   }
   
   return essential;

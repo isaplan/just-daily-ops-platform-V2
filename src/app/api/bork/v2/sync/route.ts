@@ -19,7 +19,18 @@ import { ObjectId } from 'mongodb';
 export const maxDuration = 300; // 5 minutes
 export const runtime = 'nodejs';
 
+type SyncTarget = {
+  location: any;
+  locationObjectId: ObjectId;
+  baseUrl: string;
+  apiKey: string;
+};
+
 export async function POST(request: NextRequest) {
+  let totalRecordsSaved = 0;
+  let totalTicketsProcessed = 0;
+  let totalTicketsSkipped = 0;
+
   try {
     const body = await request.json();
     const { locationId, startDate, endDate, baseUrl, apiKey, locationName } = body;
@@ -39,14 +50,75 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getDatabase();
+    const syncTargets: SyncTarget[] = [];
+    const normalizedLocationId = typeof locationId === 'string' ? locationId.trim() : locationId;
+    const isAllLocations = typeof normalizedLocationId === 'string' && normalizedLocationId.toLowerCase() === 'all';
+    const requestedLocationId = typeof normalizedLocationId === 'string' ? normalizedLocationId : locationId;
 
-    // Get location - try multiple methods
-    let location;
-    let locationObjectId: ObjectId | null = null;
+    if (isAllLocations) {
+      const credentials = await db.collection('api_credentials')
+        .find({ provider: 'bork', isActive: true })
+        .toArray();
+
+      for (const credential of credentials) {
+        if (!credential.locationId) {
+          console.warn(`[Bork API Sync] Skipping credential ${credential._id}: missing locationId`);
+          continue;
+        }
+
+        let credentialLocationId: ObjectId | null = null;
+        if (credential.locationId instanceof ObjectId) {
+          credentialLocationId = credential.locationId;
+        } else if (typeof credential.locationId === 'string') {
+          try {
+            credentialLocationId = new ObjectId(credential.locationId);
+          } catch {
+            console.warn(`[Bork API Sync] Skipping credential ${credential._id}: invalid locationId format`);
+            continue;
+          }
+        }
+
+        if (!credentialLocationId) {
+          console.warn(`[Bork API Sync] Skipping credential ${credential._id}: unresolved locationId`);
+          continue;
+        }
+
+        const credentialBaseUrl = credential.baseUrl || credential.config?.baseUrl;
+        const credentialApiKey = credential.apiKey || credential.config?.apiKey;
+
+        if (!credentialBaseUrl || !credentialApiKey) {
+          console.warn(`[Bork API Sync] Skipping credential ${credential._id}: missing baseUrl/apiKey`);
+          continue;
+        }
+
+        const targetLocation = await db.collection('locations').findOne({ _id: credentialLocationId });
+        if (!targetLocation) {
+          console.warn(`[Bork API Sync] Skipping credential ${credential._id}: location not found`);
+          continue;
+        }
+
+        syncTargets.push({
+          location: targetLocation,
+          locationObjectId: credentialLocationId,
+          baseUrl: credentialBaseUrl,
+          apiKey: credentialApiKey,
+        });
+      }
+
+      if (syncTargets.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'No active Bork credentials found for any location' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Get single location - try multiple methods
+      let location;
+      let locationObjectId: ObjectId | null = null;
     
     // Method 1: Try ObjectId
-    try {
-      locationObjectId = new ObjectId(locationId);
+      try {
+        locationObjectId = new ObjectId(requestedLocationId);
       location = await db.collection('locations').findOne({
         _id: locationObjectId,
       });
@@ -57,7 +129,7 @@ export async function POST(request: NextRequest) {
     // Method 2: Try to find by systemMappings (for UUID locationIds)
     if (!location) {
       location = await db.collection('locations').findOne({
-        'systemMappings.externalId': locationId,
+        'systemMappings.externalId': requestedLocationId,
         'systemMappings.system': 'bork',
       });
       
@@ -86,14 +158,14 @@ export async function POST(request: NextRequest) {
         locationObjectId = location._id;
         
         // Update location with systemMapping if it doesn't have one
-        if (!location.systemMappings || !location.systemMappings.some((m: any) => m.system === 'bork' && m.externalId === locationId)) {
+        if (!location.systemMappings || !location.systemMappings.some((m: any) => m.system === 'bork' && m.externalId === requestedLocationId)) {
           await db.collection('locations').updateOne(
             { _id: locationObjectId },
             {
               $push: {
                 systemMappings: {
                   system: 'bork',
-                  externalId: locationId,
+                  externalId: requestedLocationId,
                 },
               },
             }
@@ -127,9 +199,15 @@ export async function POST(request: NextRequest) {
 
     // Otherwise, try to get from MongoDB
     if (!finalBaseUrl || !finalApiKey) {
+      if (!locationObjectId) {
+        return NextResponse.json(
+          { success: false, error: 'Cannot fetch credentials: location not resolved' },
+          { status: 400 }
+        );
+      }
       const credentials = await db.collection('api_credentials').findOne({
         provider: 'bork',
-        locationId: new ObjectId(locationId),
+        locationId: locationObjectId,
         isActive: true,
       });
 
@@ -159,7 +237,7 @@ export async function POST(request: NextRequest) {
         isActive: true,
         systemMappings: [{
           system: 'bork',
-          externalId: locationId,
+          externalId: requestedLocationId,
         }],
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -217,18 +295,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
-          error: `Unable to resolve location for locationId: ${locationId}. Location: ${locationName || 'unknown'}` 
+          error: `Unable to resolve location for locationId: ${requestedLocationId}. Location: ${locationName || 'unknown'}` 
         },
         { status: 500 }
       );
     }
 
-    const finalLocationName = location?.name || locationName || locationId;
-    console.log(`[Bork API Sync] ✅ Using location: ${finalLocationName} (${locationObjectId})`);
-    console.log(`[Bork API Sync] Syncing ${finalLocationName} from ${startDate} to ${endDate}`);
+    syncTargets.push({
+      location,
+      locationObjectId,
+      baseUrl: finalBaseUrl,
+      apiKey: finalApiKey,
+    });
+  }
+
+    if (syncTargets.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No sync targets resolved for the provided locationId' },
+        { status: 400 }
+      );
+    }
+
+    for (const target of syncTargets) {
+      const { location, locationObjectId, baseUrl, apiKey } = target;
+
+      const finalLocationName = location?.name || locationName || locationId;
+      console.log(`[Bork API Sync] ✅ Using location: ${finalLocationName} (${locationObjectId})`);
+      console.log(`[Bork API Sync] Syncing ${finalLocationName} from ${startDate} to ${endDate}`);
 
     // Fetch data from Bork API
-    const apiData = await fetchBorkDataForDateRange(finalBaseUrl, finalApiKey, startDate, endDate);
+    const apiData = await fetchBorkDataForDateRange(baseUrl, apiKey, startDate, endDate);
 
     if (!Array.isArray(apiData) || apiData.length === 0) {
       return NextResponse.json({
@@ -249,7 +345,7 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    let recordsSaved = 0;
+      let recordsSaved = 0;
 
     // Group tickets by date for efficient storage
     const ticketsByDate = new Map<string, any[]>();
@@ -292,8 +388,9 @@ export async function POST(request: NextRequest) {
         continue;
       }
       
-      // Create Date object
-      const date = new Date(year, month, day);
+      // Create Date object in UTC to avoid timezone shifts
+      // Use UTC date constructor to ensure the date stays as YYYY-MM-DD regardless of server timezone
+      const date = new Date(Date.UTC(year, month, day));
       
       // Validate Date object is valid
       if (isNaN(date.getTime())) {
@@ -303,6 +400,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Convert to ISO string and extract date part (YYYY-MM-DD)
+      // Using UTC ensures the date doesn't shift due to timezone
       const dateKey = date.toISOString().split('T')[0];
 
       if (!ticketsByDate.has(dateKey)) {
@@ -386,12 +484,30 @@ export async function POST(request: NextRequest) {
       console.log(`[Bork API Sync] Note: ${skippedTickets} ticket(s) were skipped due to invalid dates`);
     }
 
+      totalRecordsSaved += recordsSaved;
+      totalTicketsProcessed += apiData.length;
+      totalTicketsSkipped += skippedTickets;
+    }
+
+    // Trigger keuken analyses aggregation after successful sync (non-blocking)
+    const { aggregateKeukenAnalysesOnDataSync } = await import('@/lib/services/daily-ops/keuken-analyses-aggregation.service');
+    aggregateKeukenAnalysesOnDataSync(
+      isAllLocations ? undefined : (typeof requestedLocationId === 'string' ? requestedLocationId : requestedLocationId.toString()),
+      new Date(startDate),
+      new Date(endDate)
+    ).catch((aggError) => {
+      console.warn('[Bork Sync] Keuken analyses aggregation failed (non-blocking):', aggError);
+      // Don't fail the sync if aggregation fails
+    });
+
     return NextResponse.json({
       success: true,
-      recordsSaved,
-      ticketsProcessed: apiData.length,
-      ticketsSkipped: skippedTickets,
-      message: `Successfully synced ${recordsSaved} date record(s) for ${finalLocationNameForResponse}${skippedTickets > 0 ? ` (${skippedTickets} ticket(s) skipped)` : ''}`,
+      recordsSaved: totalRecordsSaved,
+      ticketsProcessed: totalTicketsProcessed,
+      ticketsSkipped: totalTicketsSkipped,
+      message: syncTargets.length > 1
+        ? `Successfully synced ${totalRecordsSaved} date record(s) across ${syncTargets.length} location(s)`
+        : `Successfully synced ${totalRecordsSaved} date record(s)`,
     });
   } catch (error: any) {
     console.error('[Bork API Sync] Error:', error);
@@ -409,7 +525,9 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: errorMessage,
-        recordsSaved: recordsSaved || 0,
+        recordsSaved: totalRecordsSaved,
+        ticketsProcessed: totalTicketsProcessed,
+        ticketsSkipped: totalTicketsSkipped,
       },
       { status: statusCode }
     );

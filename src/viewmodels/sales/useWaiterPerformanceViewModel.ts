@@ -1,0 +1,164 @@
+/**
+ * Waiter Performance ViewModel Layer
+ * Custom hook that manages all business logic, state, and data fetching
+ */
+
+"use client";
+
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { DatePreset, getDateRangeForPreset } from "@/components/view-data/DateFilterPresets";
+import { getWaiterPerformance } from "@/lib/services/graphql/queries";
+import { getLocations } from "@/lib/services/graphql/queries";
+import { LocationOption } from "@/models/sales/bork-sales-v2.model";
+
+export interface UseWaiterPerformanceViewModelReturn {
+  // State
+  selectedYear: number;
+  selectedMonth: number | null;
+  selectedDay: number | null;
+  selectedLocation: string;
+  selectedDatePreset: DatePreset;
+  isCurrentYear: boolean;
+  
+  // Setters
+  setSelectedYear: (year: number) => void;
+  setSelectedMonth: (month: number | null) => void;
+  setSelectedDay: (day: number | null) => void;
+  setSelectedLocation: (location: string) => void;
+  setSelectedDatePreset: (preset: DatePreset) => void;
+  
+  // Data
+  locationOptions: LocationOption[];
+  waiterData: any;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+export function useWaiterPerformanceViewModel(): UseWaiterPerformanceViewModelReturn {
+  // State management
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [selectedDatePreset, setSelectedDatePreset] = useState<DatePreset>("this-year");
+
+  // Get date range from preset
+  const dateRange = useMemo(() => {
+    return getDateRangeForPreset(selectedDatePreset);
+  }, [selectedDatePreset]);
+
+  // Fetch locations via GraphQL
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations"],
+    queryFn: getLocations,
+    staleTime: 60 * 60 * 1000, // 60 minutes
+  });
+
+  // Build location options
+  const locationOptions = useMemo<LocationOption[]>(() => {
+    const validLocations = locations.filter(
+      (loc: any) => 
+        loc.name !== "All HNHG Locations" && 
+        loc.name !== "All HNG Locations" &&
+        loc.name !== "Default Location"
+    );
+    return [
+      { value: "all", label: "All Locations" },
+      ...validLocations.map((loc: any) => ({ value: loc.id, label: loc.name })),
+    ];
+  }, [locations]);
+
+  // Check if selected year is current year
+  const isCurrentYear = useMemo(() => {
+    return selectedYear === new Date().getFullYear();
+  }, [selectedYear]);
+
+  // Build date range
+  const { startDate, endDate } = useMemo(() => {
+    if (selectedDatePreset !== "custom" && dateRange) {
+      // Convert Date objects to YYYY-MM-DD strings
+      const startYear = dateRange.start.getUTCFullYear();
+      const startMonth = String(dateRange.start.getUTCMonth() + 1).padStart(2, '0');
+      const startDay = String(dateRange.start.getUTCDate()).padStart(2, '0');
+      const startDateStr = `${startYear}-${startMonth}-${startDay}`;
+      
+      const endYear = dateRange.end.getUTCFullYear();
+      const endMonth = String(dateRange.end.getUTCMonth() + 1).padStart(2, '0');
+      const endDay = String(dateRange.end.getUTCDate()).padStart(2, '0');
+      const endDateStr = `${endYear}-${endMonth}-${endDay}`;
+      
+      return {
+        startDate: startDateStr,
+        endDate: endDateStr,
+      };
+    }
+
+    // Custom date range based on year/month/day selection
+    let start: Date;
+    let end: Date;
+
+    if (selectedDay !== null && selectedMonth !== null) {
+      // Specific day
+      start = new Date(Date.UTC(selectedYear, selectedMonth, selectedDay, 0, 0, 0));
+      end = new Date(Date.UTC(selectedYear, selectedMonth, selectedDay, 23, 59, 59));
+    } else if (selectedMonth !== null) {
+      // Specific month
+      start = new Date(Date.UTC(selectedYear, selectedMonth, 1, 0, 0, 0));
+      const lastDay = new Date(Date.UTC(selectedYear, selectedMonth + 1, 0, 23, 59, 59));
+      end = lastDay;
+    } else {
+      // Entire year
+      start = new Date(Date.UTC(selectedYear, 0, 1, 0, 0, 0));
+      end = new Date(Date.UTC(selectedYear, 11, 31, 23, 59, 59));
+    }
+
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+    };
+  }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
+
+  // Fetch waiter performance data for ALL locations (no location filter)
+  // This allows us to cache the full dataset and filter client-side
+  const { data: allWaiterData, isLoading, error } = useQuery({
+    queryKey: ["waiter-performance", startDate, endDate], // No location in key - fetch all
+    queryFn: () => getWaiterPerformance(startDate, endDate, {}), // No filters - get all locations
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    enabled: !!startDate && !!endDate,
+  });
+
+  // Filter data client-side based on selected location
+  const waiterData = useMemo(() => {
+    if (!allWaiterData?.records) return [];
+    
+    // If "all" is selected, return all data
+    if (selectedLocation === "all") {
+      return allWaiterData.records;
+    }
+    
+    // Filter by location
+    return allWaiterData.records.filter((waiter: any) => 
+      waiter.location_id === selectedLocation
+    );
+  }, [allWaiterData?.records, selectedLocation]);
+
+  return {
+    selectedYear,
+    selectedMonth,
+    selectedDay,
+    selectedLocation,
+    selectedDatePreset,
+    isCurrentYear,
+    setSelectedYear,
+    setSelectedMonth,
+    setSelectedDay,
+    setSelectedLocation,
+    setSelectedDatePreset,
+    locationOptions,
+    waiterData,
+    isLoading,
+    error: error as Error | null,
+  };
+}
+

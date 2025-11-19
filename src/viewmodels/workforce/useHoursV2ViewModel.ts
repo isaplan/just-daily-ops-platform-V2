@@ -63,14 +63,14 @@ export interface UseHoursV2ViewModelReturn {
   error: Error | null;
 }
 
-export function useHoursV2ViewModel(): UseHoursV2ViewModelReturn {
+export function useHoursV2ViewModel(initialData?: { processedData?: any; locations?: any[]; teams?: any[] }): UseHoursV2ViewModelReturn {
   // State management
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [selectedShiftType, setSelectedShiftType] = useState<string>("Gewerkte Uren");
+  const [selectedShiftType, setSelectedShiftType] = useState<string>("worked");
   const [selectedDatePreset, setSelectedDatePreset] = useState<DatePreset>("this-year");
   const [currentPage, setCurrentPage] = useState(1);
   const [showAllColumns, setShowAllColumns] = useState(false);
@@ -86,11 +86,12 @@ export function useHoursV2ViewModel(): UseHoursV2ViewModelReturn {
     return getDateRangeForPreset(selectedDatePreset);
   }, [selectedDatePreset]);
 
-  // Fetch locations via GraphQL
-  const { data: locations = [] } = useQuery({
+  // Fetch locations via GraphQL - use initialData if provided
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    initialData: initialData?.locations,
+    staleTime: 60 * 60 * 1000, // 60 minutes - locations rarely change
   });
 
   // Build location options - filter out invalid locations
@@ -129,10 +130,10 @@ export function useHoursV2ViewModel(): UseHoursV2ViewModelReturn {
   // Build shift type options (based on type_name field)
   const shiftTypeOptions = useMemo(() => {
     return [
-      { value: "Gewerkte Uren", label: "Gewerkte Uren" },
+      { value: "worked", label: "Gewerkte Uren" },
       { value: "verlof", label: "Verlof" },
       { value: "ziek", label: "Ziek" },
-      { value: "Bijzonder Verlof", label: "Bijzonder Verlof" },
+      { value: "bijzonder", label: "Bijzonder Verlof" },
     ];
   }, []);
 
@@ -182,12 +183,14 @@ export function useHoursV2ViewModel(): UseHoursV2ViewModelReturn {
     }
 
     // Shift type filter (by type_name)
-    if (selectedShiftType !== "all") {
-      if (selectedShiftType === "Gewerkte Uren") {
-        filters.typeName = null; // Special marker for "worked hours"
-      } else {
-        filters.typeName = selectedShiftType;
-      }
+    // "worked" = actual worked hours (type_name is null or empty)
+    // "verlof" = leave/vacation shifts
+    // "ziek" = sick leave shifts  
+    // "bijzonder" = special leave shifts
+    if (selectedShiftType === "worked") {
+      filters.typeName = null; // Show only worked hours (no type_name)
+    } else {
+      filters.typeName = selectedShiftType; // Show only this specific type
     }
 
     return filters;
@@ -202,7 +205,7 @@ export function useHoursV2ViewModel(): UseHoursV2ViewModelReturn {
     };
   }, [queryFilters, currentPage]);
 
-  // Fetch processed hours data
+  // Fetch processed hours data - use initialData if provided
   const { 
     data: processedData, 
     isLoading: isLoadingProcessed, 
@@ -210,7 +213,9 @@ export function useHoursV2ViewModel(): UseHoursV2ViewModelReturn {
   } = useQuery({
     queryKey: ["eitje-v2-processed-hours", queryParams, selectedTeam, selectedShiftType],
     queryFn: () => fetchProcessedHours(queryParams),
+    initialData: initialData?.processedData,
     enabled: activeTab === "processed" && !!queryParams.startDate && !!queryParams.endDate,
+    staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
   // Fetch aggregated hours data

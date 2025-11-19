@@ -328,11 +328,11 @@ Update `.ai-compliance-permissions.json`:
 ## 🚫 ABSOLUTE PROHIBITIONS (All Branches)
 
 ### Size Limits:
-- **Max 100 lines changed per file** per task
+- **Max 120 lines changed per file** per task
 - **Max 20 lines deleted per file**
 - **No full file replacements** (>80% of lines changed)
 
-If >100 lines needed → STOP → Break into smaller tasks → Ask user to approve each
+If >120 lines needed → STOP → Break into smaller tasks → Ask user to approve each
 
 ### No Bypass Flags:
 **NEVER use:**
@@ -436,4 +436,4 @@ curl http://localhost:3000/api/bork/v2/check-data?month=11&year=2025
 
 ---
 
-**Status**: 🛡️ UNBREAKABLE RULES ACTIVE | Mode: BRANCH-AWARE | Protected: 284+ files | Max Lines: 100 | Verification: MANDATORY WITH EVIDENCE
+**Status**: 🛡️ UNBREAKABLE RULES ACTIVE | Mode: BRANCH-AWARE | Protected: 284+ files | Max Lines: 120 | Verification: MANDATORY WITH EVIDENCE

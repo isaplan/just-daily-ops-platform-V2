@@ -8,7 +8,10 @@ import { ApolloServer } from '@apollo/server';
 import { startServerAndCreateNextHandler } from '@as-integrations/next';
 import { typeDefs } from '@/lib/graphql/v2-schema';
 import { resolvers } from '@/lib/graphql/v2-resolvers';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const server = new ApolloServer({
   typeDefs,
@@ -23,5 +26,27 @@ const handler = startServerAndCreateNextHandler<NextRequest>(server, {
   },
 });
 
-export { handler as GET, handler as POST };
+export async function GET(request: NextRequest) {
+  try {
+    return await handler(request);
+  } catch (error: any) {
+    console.error('[GraphQL Route] GET Error:', error);
+    return NextResponse.json(
+      { errors: [{ message: error.message || 'Internal server error' }] },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    return await handler(request);
+  } catch (error: any) {
+    console.error('[GraphQL Route] POST Error:', error);
+    return NextResponse.json(
+      { errors: [{ message: error.message || 'Internal server error' }] },
+      { status: 500 }
+    );
+  }
+}
 

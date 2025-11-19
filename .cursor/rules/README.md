@@ -6,8 +6,23 @@ This directory contains optimized, branch-aware compliance rules that guide Curs
 
 ## 📂 Files
 
-### **00-critical-rules.mdc** (~140 lines)
+### **00-0-project-goals.mdc** (~150 lines)
 **Priority:** HIGHEST (loaded first)
+
+**Contains:**
+- 🎯 **Project Goals** - V2 Migration context (MongoDB + GraphQL + MVVM)
+- 📁 **Project Structure** - Explanation of `src/`, `src-v1/`, `old-pages-sql-scripts/`
+- 🔄 **Migration Process** - How to migrate pages from Supabase to MongoDB/GraphQL
+- ⚠️ **CRITICAL: UI/UX must be EXACT** - Visual appearance must remain identical
+- 📝 **Migration Example** - Before/after code examples
+- ✅ **Migration Checklist** - Step-by-step process
+
+**Note:** Temporary file - remove once migration is complete
+
+---
+
+### **00-critical-rules.mdc** (~440 lines)
+**Priority:** HIGHEST (loaded second)
 
 **Contains:**
 - 🛑 **RULE #0**: Understand → Clarify → Confirm → Build
@@ -18,8 +33,9 @@ This directory contains optimized, branch-aware compliance rules that guide Curs
 - 🚫 **Absolute Prohibitions** (size limits, no bypass flags)
 - 🔄 **Loop Prevention** (after 2 failures, try different approach)
 - 🔍 **Mandatory Post-Check** (run after every change)
+- 🔍 **Mandatory Verification** - Never assume success, always provide evidence
 
-### **01-development-standards.mdc** (~50 lines)
+### **01-development-standards.mdc** (~98 lines)
 **Priority:** HIGH
 
 **Contains:**
@@ -29,13 +45,14 @@ This directory contains optimized, branch-aware compliance rules that guide Curs
 - 🏗️ MVVM pattern (Model-View-ViewModel architecture)
 - 🎨 shadcn/ui standards (always use when available)
 
-### **02-code-reuse.mdc** (~30 lines)
+### **02-code-reuse.mdc** (~85 lines)
 **Priority:** MEDIUM
 
 **Contains:**
 - 🔍 Search before creating (existing utilities, hooks, components)
 - 📦 Project utility locations (lib, hooks, components)
 - ✅ Priority order (Reuse > Extend > Build)
+- 🔄 Migration source of truth (`src-v1/` only)
 
 ---
 
@@ -142,7 +159,7 @@ Modified protected file(s):
 | Approach | Files | Lines | Tokens | Savings |
 |----------|-------|-------|--------|---------|
 | **Old (single file)** | 1 file | 342 lines | ~1,950 tokens | - |
-| **New (3 files)** | 3 files | ~220 lines | ~1,300 tokens | **~650 tokens (33%)** |
+| **New (4 files)** | 4 files | ~770 lines | ~1,600 tokens | **~350 tokens (18%)** |
 
 **Benefits:**
 - ✅ Faster AI loading

@@ -21,34 +21,47 @@ export function UITable({ children, stickyHeader = false, stickyFirstColumn = fa
     <>
       {(stickyHeader || stickyFirstColumn) && (
         <style>{`
+          #${uniqueId} .table-wrapper {
+            ${stickyHeader || stickyFirstColumn ? "position: relative;" : ""}
+          }
+          /* Override Table component's wrapper div - remove its overflow so sticky works */
+          #${uniqueId} .table-wrapper > div {
+            ${stickyHeader || stickyFirstColumn ? "overflow: visible !important; position: static !important; width: 100% !important;" : ""}
+          }
+          #${uniqueId} .table-wrapper table {
+            ${stickyHeader || stickyFirstColumn ? "position: relative; width: 100%;" : ""}
+          }
           #${uniqueId} thead {
             ${stickyHeader ? `
-              position: sticky;
-              top: 0;
-              z-index: 20;
-              background-color: white;
+              position: sticky !important;
+              top: 0 !important;
+              z-index: 20 !important;
+              background-color: white !important;
             ` : ""}
           }
           #${uniqueId} thead th {
-            ${stickyHeader ? "background-color: white;" : ""}
+            ${stickyHeader ? "background-color: white !important;" : ""}
           }
           #${uniqueId} tbody tr td:first-child,
           #${uniqueId} thead tr th:first-child {
             ${stickyFirstColumn ? `
-              position: sticky;
-              left: 0;
-              z-index: 10;
-              background-color: white;
-              border-right: 2px solid #e5e7eb;
+              position: sticky !important;
+              left: 0 !important;
+              z-index: 10 !important;
+              background-color: white !important;
+              border-right: 2px solid #e5e7eb !important;
             ` : ""}
           }
           #${uniqueId} thead tr th:first-child {
-            ${stickyFirstColumn ? "z-index: 30;" : ""}
+            ${stickyFirstColumn ? "z-index: 30 !important;" : ""}
+          }
+          #${uniqueId} tbody tr td:first-child {
+            ${stickyFirstColumn ? "z-index: 5 !important;" : ""}
           }
         `}</style>
       )}
       <div className="bg-white rounded-sm border border-black px-4" id={uniqueId}>
-        <div className={tableWrapperClass}>
+        <div className={`table-wrapper ${tableWrapperClass}`}>
           <Table className={tableClass}>
             {children}
           </Table>

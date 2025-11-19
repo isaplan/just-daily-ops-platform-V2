@@ -49,6 +49,25 @@ const nextConfig: NextConfig = {
         };
       }
     }
+    
+    // Exclude large directories from file watching for faster dev server
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/.next/**',
+        '**/ai-compliance-export/**',
+        '**/old-supabase-pages-sql-scripts-readonly-dont-use-code-in-rebuild-unless-specifcly-asked-by-me/**',
+        '**/build-docs-scripts-sql-ai/**',
+        '**/scripts/**',
+        '**/tools/**',
+        '**/data-archives/**',
+        '**/dev-docs/**',
+        '**/docs/**',
+      ],
+    };
+    
     return config;
   },
   // Turbopack configuration (for Next.js 15+ with Turbopack)

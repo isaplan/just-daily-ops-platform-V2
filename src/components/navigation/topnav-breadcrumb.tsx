@@ -39,7 +39,7 @@ export function TopnavBreadcrumb() {
   }
 
   return (
-    <nav className="bg-white border-2 border-black rounded-lg px-4 py-2 flex items-center gap-2 whitespace-nowrap">
+    <nav className="bg-white border-2 border-black rounded-lg px-4 h-10 flex items-center gap-2 whitespace-nowrap w-fit max-w-xl">
         {breadcrumbItems.map((item, index) => (
           <React.Fragment key={item.path}>
             {index > 0 && (

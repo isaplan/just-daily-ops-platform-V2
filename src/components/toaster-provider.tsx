@@ -1,10 +1,11 @@
 "use client";
 
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 
 export function ToasterProvider() {
   return <Toaster />;
 }
+
 
 
 

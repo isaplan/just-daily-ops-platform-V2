@@ -80,6 +80,93 @@ src/
 
 ---
 
+## 🚀 MVVM + SSR HYBRID PATTERN (CRITICAL - PERFORMANCE)
+
+### **Pattern: Server Component Wrapper + Client Component UI**
+
+**For data-heavy pages, use this 2-file pattern:**
+
+#### **File 1: `page.tsx` - Server Component (NO "use client")**
+```typescript
+// src/app/(dashboard)/finance/page.tsx
+// ✅ NO "use client" directive - This is a Server Component
+
+import { FinancePageClient } from './FinancePageClient';
+import { fetchFinanceData } from '@/lib/services/finance/finance.service';
+
+// ✅ Add ISR revalidation
+export const revalidate = 1800; // 30 minutes
+
+export default async function FinancePage() {
+  // ✅ Fetch data on server (fast, SSR)
+  const initialData = await fetchFinanceData();
+  
+  // ✅ Pass server data to client component
+  return <FinancePageClient initialData={initialData} />;
+}
+```
+
+#### **File 2: `FinancePageClient.tsx` - Client Component**
+```typescript
+// src/app/(dashboard)/finance/FinancePageClient.tsx
+'use client';
+
+import { useFinanceViewModel } from '@/viewmodels/finance/useFinanceViewModel';
+
+export function FinancePageClient({ initialData }) {
+  // ✅ ViewModel uses server data as initial, updates client-side
+  const { data, isLoading, error } = useFinanceViewModel(initialData);
+  
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Finance Dashboard</h1>
+      {/* Interactive UI here */}
+    </div>
+  );
+}
+```
+
+### **When to Use Which Pattern:**
+
+| Page Type | Pattern | Reason |
+|-----------|---------|--------|
+| **Data-heavy dashboards** | Server Component wrapper + Client UI | Fast initial load, SEO, cacheable |
+| **Highly interactive forms** | Client Component only | Needs lots of state management |
+| **Static content** | Server Component only | No interactivity needed |
+
+### **ViewModel Adaptation for SSR:**
+
+ViewModels should accept `initialData` to support SSR:
+
+```typescript
+// src/viewmodels/finance/useFinanceViewModel.ts
+export function useFinanceViewModel(initialData?: FinanceData) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['finance-data'],
+    queryFn: fetchFinanceData,
+    initialData, // ✅ Use server data if provided
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+  
+  return { data, isLoading, /* ... */ };
+}
+```
+
+### **Benefits:**
+- ⚡ **80-90% faster initial page load**
+- 📦 **CDN cacheable** - Pages can be cached at edge
+- 🔍 **SEO-friendly** - Fully rendered HTML
+- 💾 **Reduced database load** - ISR caching
+- 🎯 **Still interactive** - Client Component handles UI
+
+### **Rules:**
+- ✅ **ALWAYS** use Server Component wrapper for dashboard pages
+- ✅ **ALWAYS** add `export const revalidate = 1800` for ISR
+- ✅ **ALWAYS** pass `initialData` to ViewModels
+- ❌ **NEVER** use `'use client'` on main `page.tsx` for data-heavy pages
+
+---
+
 ## 🎨 SHADCN/UI (CRITICAL - UI CONSISTENCY)
 ✅ **DO:**
 - **ALWAYS** use shadcn/ui components when available
