@@ -22,6 +22,10 @@ import {
   ChevronRight,
   Building2,
   Plug,
+  Zap,
+  Grid,
+  Receipt,
+  ChefHat,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -54,17 +58,31 @@ type MenuItem = {
 };
 
 // Navigation structure (routes will be added per feature)
+const dailyOpsLaborItems: MenuItem[] = [
+  { title: "Dashboard", icon: LayoutDashboard, url: "/daily-ops/labor" },
+  { title: "Products", icon: Package, url: "/daily-ops/labor/products" },
+  { title: "Time Analysis", icon: Clock, url: "/daily-ops/labor/time-analysis" },
+  { title: "Table Analysis", icon: Grid, url: "/daily-ops/labor/tables" },
+  { title: "Transactions", icon: Receipt, url: "/daily-ops/labor/transactions" },
+];
+
 const dailyOpsItems: MenuItem[] = [
   { title: "Dashboard", icon: LayoutDashboard, comingSoon: true },
   { title: "Finance", icon: DollarSign, comingSoon: true },
-  { title: "Labor", icon: Users, comingSoon: true },
+  {
+    title: "Labor",
+    icon: Users,
+    isCollapsible: true,
+    children: dailyOpsLaborItems,
+  },
+  { title: "Keuken Analyses", icon: ChefHat, url: "/daily-ops/keuken-analyses" },
   { title: "Inventory", icon: Package, comingSoon: true },
   { title: "AI & Analytics", icon: Sparkles, comingSoon: true },
   { title: "Reports", icon: FileText, comingSoon: true },
 ];
 
 const operationsItems: MenuItem[] = [
-  { title: "Products", icon: Box, comingSoon: true },
+  { title: "Products", icon: Box, url: "/products" },
   { title: "Suppliers", icon: Truck, comingSoon: true },
   { title: "Locations", icon: MapPin, comingSoon: true },
   { title: "Teams", icon: UserCheck, comingSoon: true },
@@ -78,14 +96,17 @@ const dataFinanceItems: MenuItem[] = [
 
 const dataLaborItems: MenuItem[] = [
   { title: "Hours", icon: Clock, url: "/data/labor/hours" },
-  { title: "Labor Costs", icon: DollarSign, comingSoon: true },
-  { title: "Workers", icon: Users, comingSoon: true },
-  { title: "Locations & Teams", icon: Building2, comingSoon: true },
+  { title: "Labor Costs", icon: DollarSign, url: "/data/labor/labor-cost" },
+  { title: "Workers", icon: Users, url: "/data/labor/workers" },
+  { title: "Labor Productivity", icon: TrendingUp, url: "/data/labor/productivity" },
+  // { title: "Locations & Teams", icon: Building2, url: "/data/labor/locations-teams" }, // Merged into Workers page
 ];
 
 const dataSalesItems: MenuItem[] = [
-  { title: "Sales Data", icon: TrendingUp, comingSoon: true },
-  { title: "Categories", icon: BarChart3, comingSoon: true },
+  { title: "Daily Sales", icon: TrendingUp, url: "/data/sales/bork" },
+  { title: "Waiters", icon: Users, url: "/data/sales/bork/waiters" },
+  { title: "Revenue", icon: DollarSign, url: "/data/sales/bork/revenue" },
+  { title: "Payment Methods", icon: FileText, url: "/data/sales/bork/payment-methods" },
 ];
 
 const dataItems: MenuItem[] = [
@@ -114,7 +135,10 @@ const dataItems: MenuItem[] = [
 const settingsItems: MenuItem[] = [
   { title: "Eitje API Connect", icon: Plug, url: "/settings/eitje-api" },
   { title: "Bork API Connect", icon: Plug, url: "/settings/bork-api" },
+  { title: "Product Catalog", icon: Package, url: "/settings/products" },
+  { title: "Manage Menus", icon: Calendar, url: "/settings/menus" },
   { title: "Company Settings", icon: Building2, url: "/settings/company", comingSoon: true },
+  { title: "SSR Demo", icon: Zap, url: "/demo-ssr" },
 ];
 
 interface AppSidebarProps {

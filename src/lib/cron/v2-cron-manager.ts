@@ -12,22 +12,27 @@ import { EITJE_DATE_LIMITS } from '@/lib/eitje/v2-types';
 
 export interface CronJobConfig {
   _id?: ObjectId;
-  jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'data-archival';
+  jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'bork-master-data' | 'data-archival' | 'kitchen-daily-dashboard';
   isActive: boolean;
   schedule: string; // Cron expression
-  syncInterval?: number; // For daily data (minutes)
+  syncInterval?: number; // For daily data (minutes) or master data (seconds)
   enabledEndpoints?: {
     hours?: boolean;
     revenue?: boolean;
     planning?: boolean;
     sales?: boolean; // For Bork
-    products?: boolean; // For Bork
   };
   enabledMasterEndpoints?: {
+    // Eitje master endpoints
     environments?: boolean;
     teams?: boolean;
     users?: boolean;
     shiftTypes?: boolean;
+    // Bork master endpoints
+    product_groups?: boolean;
+    payment_methods?: boolean;
+    cost_centers?: boolean;
+    users?: boolean; // Bork users/employees
   };
   quietHours?: {
     start: string; // HH:mm format
@@ -302,15 +307,64 @@ class CronJobManager {
           console.log(`[Cron Job] Historical sync ${endpoint} completed: ${totalRecords} total records`);
         }
       }
+    } else if (config.jobType === 'bork-master-data') {
+      // Execute Bork master data sync (product groups, payment methods, cost centers, users)
+      const enabledEndpoints = config.enabledMasterEndpoints || {};
+      
+      // Get all active Bork connections
+      const connections = await this.db.collection('api_credentials').find({
+        provider: 'bork',
+        isActive: true,
+      }).toArray();
+
+      if (connections.length === 0) {
+        console.log('[Cron Job] No active Bork connections found for master data sync');
+        return;
+      }
+
+      // Master data endpoints mapping
+      const endpointMap: Record<string, string> = {
+        product_groups: 'product_groups',
+        payment_methods: 'payment_methods',
+        cost_centers: 'cost_centers',
+        users: 'users', // Map users to 'users' endpoint
+      };
+
+      // Sync each enabled master endpoint for each location
+      for (const connection of connections) {
+        for (const [key, enabled] of Object.entries(enabledEndpoints)) {
+          if (enabled && endpointMap[key]) {
+            try {
+              const response = await fetch(`${baseUrl}/api/bork/v2/master-sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  locationId: connection.locationId,
+                  endpoint: endpointMap[key],
+                  baseUrl: connection.baseUrl || connection.config?.baseUrl,
+                  apiKey: connection.apiKey || connection.config?.apiKey,
+                }),
+              });
+              
+              const result = await response.json();
+              console.log(`[Cron Job] Bork master data sync ${endpointMap[key]} for location ${connection.locationId}: ${result.recordsSaved || 0} records`);
+            } catch (error: any) {
+              console.error(`[Cron Job] Error syncing Bork master data ${endpointMap[key]} for location ${connection.locationId}:`, error.message);
+            }
+          }
+        }
+      }
     } else if (config.jobType === 'bork-daily-data') {
       // Execute Bork daily data sync (incremental - sync today's data hourly, same as Eitje)
       const enabledEndpoints = config.enabledEndpoints || {};
       
-      // Get today's date for sync (to include partial data from today for hourly updates)
+      // Get today's date for sync in Amsterdam timezone (to include partial data from today for hourly updates)
       // This is incremental because we sync today's date every hour, updating as new data comes in
-      const today = new Date();
-      const startDate = today.toISOString().split('T')[0];
-      const endDate = today.toISOString().split('T')[0];
+      // Use Amsterdam timezone to ensure we sync the correct "today" date
+      const now = new Date();
+      const amsterdamDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' }));
+      const startDate = amsterdamDate.toISOString().split('T')[0];
+      const endDate = amsterdamDate.toISOString().split('T')[0];
 
       // Check quiet hours
       if (config.quietHours) {
@@ -430,13 +484,44 @@ class CronJobManager {
       } catch (error: any) {
         console.error(`[Cron Job] Error executing data archival:`, error.message);
       }
+    } else if (config.jobType === 'kitchen-daily-dashboard') {
+      // Execute daily dashboard kitchen aggregation (hourly)
+      // Aggregates kitchen workload, product production, and worker activity
+      console.log('[Cron Job] Starting daily_dashboard_kitchen aggregation...');
+      
+      try {
+        // Get today's date (for incremental hourly updates)
+        const today = new Date();
+        const startDate = today.toISOString().split('T')[0];
+        const endDate = today.toISOString().split('T')[0];
+        
+        const response = await fetch(`${baseUrl}/api/admin/keuken-analyses/aggregate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startDate,
+            endDate,
+            locationId: 'all', // Aggregate for all locations
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log(`[Cron Job] daily_dashboard_kitchen aggregation completed: ${result.aggregated} day(s) aggregated`);
+        } else {
+          console.error(`[Cron Job] daily_dashboard_kitchen aggregation failed: ${result.error}`);
+        }
+      } catch (error: any) {
+        console.error(`[Cron Job] Error executing daily_dashboard_kitchen aggregation:`, error.message);
+      }
     }
   }
 
   /**
    * Start a cron job
    */
-  async startJob(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'data-archival'): Promise<void> {
+  async startJob(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'bork-master-data' | 'data-archival' | 'kitchen-daily-dashboard'): Promise<void> {
     if (!this.db) {
       this.db = await getDatabase();
     }
@@ -464,7 +549,7 @@ class CronJobManager {
   /**
    * Stop a cron job
    */
-  async stopJob(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'data-archival'): Promise<void> {
+  async stopJob(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'bork-master-data' | 'data-archival' | 'kitchen-daily-dashboard'): Promise<void> {
     if (!this.db) {
       this.db = await getDatabase();
     }
@@ -496,7 +581,7 @@ class CronJobManager {
   /**
    * Update cron job configuration
    */
-  async updateJob(config: Partial<CronJobConfig> & { jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'data-archival' }): Promise<void> {
+  async updateJob(config: Partial<CronJobConfig> & { jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'bork-master-data' | 'data-archival' | 'kitchen-daily-dashboard' }): Promise<void> {
     if (!this.db) {
       this.db = await getDatabase();
     }
@@ -530,7 +615,9 @@ class CronJobManager {
           config.jobType === 'master-data' ? '0 0 * * *' : 
           config.jobType === 'historical-data' ? '0 1 * * *' : 
           config.jobType === 'bork-historical-data' ? '0 1 * * *' :
+          config.jobType === 'bork-master-data' ? '0 2 * * *' : // Daily at 2 AM
           config.jobType === 'data-archival' ? '0 2 * * 0' : // Weekly on Sunday at 02:00
+          config.jobType === 'kitchen-daily-dashboard' ? '0 * * * *' : // Hourly
           '0 * * * *'
         ),
         syncInterval: config.syncInterval,
@@ -553,7 +640,7 @@ class CronJobManager {
   /**
    * Get cron job status
    */
-  async getJobStatus(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'data-archival'): Promise<CronJobConfig | null> {
+  async getJobStatus(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'bork-master-data' | 'data-archival' | 'kitchen-daily-dashboard'): Promise<CronJobConfig | null> {
     if (!this.db) {
       this.db = await getDatabase();
     }
@@ -575,7 +662,7 @@ class CronJobManager {
   /**
    * Manually execute a cron job immediately (for testing)
    */
-  async runJobNow(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'data-archival'): Promise<void> {
+  async runJobNow(jobType: 'daily-data' | 'master-data' | 'historical-data' | 'bork-daily-data' | 'bork-historical-data' | 'bork-master-data' | 'data-archival' | 'kitchen-daily-dashboard'): Promise<void> {
     if (!this.db) {
       this.db = await getDatabase();
     }

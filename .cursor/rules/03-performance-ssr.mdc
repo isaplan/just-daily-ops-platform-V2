@@ -1,0 +1,264 @@
+---
+alwaysApply: true
+---
+
+# 🚀 PERFORMANCE & SSR OPTIMIZATION
+
+## 📊 DATABASE PAGINATION (MANDATORY)
+
+**NEVER fetch all data from database:**
+
+```typescript
+// ❌ WRONG - Fetches all records (100k+)
+const data = await db.collection('records').find({}).toArray();
+
+// ✅ CORRECT - Paginate at database level
+const data = await db.collection('records')
+  .find({})
+  .skip((page - 1) * limit)
+  .limit(limit)
+  .toArray();
+```
+
+**ALL GraphQL list resolvers MUST support pagination:**
+
+```typescript
+salesAggregated: async (
+  _: any,
+  { page = 1, limit = 50 }: { page?: number; limit?: number }
+) => {
+  const db = await getDatabase();
+  const skip = (page - 1) * limit;
+  
+  // ✅ Parallel queries for performance
+  const [records, total] = await Promise.all([
+    db.collection('bork_aggregated')
+      .find({})
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.collection('bork_aggregated').countDocuments({}),
+  ]);
+  
+  return {
+    records,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+  };
+}
+```
+
+---
+
+## ⚡ CACHING STRATEGY (MANDATORY)
+
+### **Next.js ISR (Server Components):**
+
+Add to every Server Component page for automatic CDN caching:
+
+```typescript
+// Add at top of page.tsx (Server Component)
+export const revalidate = 1800; // 30 minutes (adjust per page needs)
+
+// Static data (locations, products, categories)
+export const revalidate = 3600; // 60 minutes
+
+// User data (worker profiles, teams)
+export const revalidate = 1800; // 30 minutes
+
+// Sales/Labor data (updated frequently)
+export const revalidate = 300; // 5 minutes
+```
+
+### **React Query Stale Times (Client Components):**
+
+```typescript
+// Static data (locations, products)
+staleTime: 60 * 60 * 1000, // 60 minutes
+
+// User data (worker profiles)
+staleTime: 30 * 60 * 1000, // 30 minutes
+
+// Sales data (updated frequently)
+staleTime: 5 * 60 * 1000, // 5 minutes
+
+// Real-time data
+staleTime: 1 * 60 * 1000, // 1 minute
+```
+
+**Current Problem:** Most ViewModels use 2-5 minute stale times, which is too short and causes unnecessary refetches.
+
+---
+
+## 🎯 SERVER COMPONENT DECISION TREE
+
+### **Use Server Component (NO "use client") when:**
+
+- ✅ Page fetches data from database/API
+- ✅ Data is needed for initial render
+- ✅ Page is mostly static/read-only
+- ✅ SEO matters
+- ✅ First paint performance critical
+
+**Example:** Dashboard pages, data tables, reports
+
+### **Use Client Component ("use client") when:**
+
+- ✅ Page has lots of interactivity (forms, modals, drag-drop)
+- ✅ Uses browser APIs (localStorage, geolocation)
+- ✅ Heavy state management throughout
+- ✅ Real-time updates (websockets)
+
+**Example:** Settings pages, complex forms
+
+### **Use Hybrid Pattern when:**
+
+- ✅ Data-heavy page with some interactivity (**MOST DASHBOARD PAGES**)
+- ✅ Need fast initial load + interactive UI
+- ✅ Want CDN caching + client-side updates
+
+**Example:** Sales tables, worker lists, finance dashboards
+
+---
+
+## 🔍 MONGODB INDEX VERIFICATION
+
+**Before deploying, verify all queries use indexes:**
+
+```bash
+# Check indexes exist
+node -e "require('./src/lib/mongodb/v2-indexes').initializeDatabase()"
+
+# View existing indexes
+node -e "require('./src/lib/mongodb/v2-connection').getDatabase().then(db => db.collection('bork_aggregated').indexes().then(console.log))"
+```
+
+### **Index Rules:**
+
+**Every `.find()` query MUST use indexed fields:**
+
+```typescript
+// ✅ GOOD - Uses compound index (locationId + date)
+db.collection('bork_aggregated').find({
+  locationId: id,      // Indexed
+  date: { $gte: start, $lte: end }  // Indexed
+})
+
+// ❌ BAD - Queries non-indexed field (SLOW!)
+db.collection('bork_aggregated').find({
+  productName: "Pizza"  // NOT indexed = full collection scan
+})
+```
+
+**Current Indexes (from v2-indexes.ts):**
+
+```typescript
+bork_aggregated:
+  - { locationId: 1, date: -1 } // Compound index
+  - { date: -1 }
+
+eitje_aggregated:
+  - { locationId: 1, date: -1 } // Compound index
+  - { date: -1 }
+
+bork_raw_data:
+  - { locationId: 1, date: -1 } // Compound index
+  - { date: -1 }
+  - { importId: 1 }
+  - { createdAt: -1 }
+```
+
+---
+
+## 📈 PERFORMANCE TARGETS
+
+### **First Paint:**
+- ✅ Target: < 1 second
+- ❌ Current: 3-5 seconds (Client Components)
+- ✅ With SSR: 0.5-1 second
+
+### **Data Fetch:**
+- ✅ Target: < 500ms
+- ❌ Current: 2-4 seconds (no pagination)
+- ✅ With pagination: 300-800ms
+
+### **Memory Usage:**
+- ✅ Target: < 100MB per page
+- ❌ Current: ~500MB (fetches all data)
+- ✅ With pagination: ~50MB
+
+---
+
+## 🚨 COMMON PERFORMANCE MISTAKES
+
+### **1. Fetching All Data (Most Common)**
+
+```typescript
+// ❌ BAD - Fetches 100k+ records
+const allSales = await db.collection('bork_raw_data').find({}).toArray();
+
+// ✅ GOOD - Paginate at DB level
+const sales = await db.collection('bork_raw_data')
+  .find({})
+  .skip((page - 1) * 50)
+  .limit(50)
+  .toArray();
+```
+
+### **2. Client-Side Pagination**
+
+```typescript
+// ❌ BAD - Fetches all, paginates in memory
+const allData = await fetchAllData();
+const page1 = allData.slice(0, 50);
+
+// ✅ GOOD - Database-level pagination
+const page1 = await fetchData({ page: 1, limit: 50 });
+```
+
+### **3. N+1 Queries**
+
+```typescript
+// ❌ BAD - Makes 100 queries
+for (const sale of sales) {
+  const location = await db.collection('locations').findOne({ _id: sale.locationId });
+}
+
+// ✅ GOOD - Single query with $in
+const locationIds = sales.map(s => s.locationId);
+const locations = await db.collection('locations').find({
+  _id: { $in: locationIds }
+}).toArray();
+```
+
+### **4. Short Stale Times**
+
+```typescript
+// ❌ BAD - Refetches every 2 minutes
+staleTime: 2 * 60 * 1000,
+
+// ✅ GOOD - Cache for 30 minutes (data doesn't change often)
+staleTime: 30 * 60 * 1000,
+```
+
+---
+
+## ✅ IMPLEMENTATION CHECKLIST
+
+For every new page or optimization:
+
+- [ ] Server Component wrapper (page.tsx without "use client")
+- [ ] Client Component for UI (PageClient.tsx with "use client")
+- [ ] ISR revalidation added (export const revalidate = 1800)
+- [ ] ViewModel accepts initialData parameter
+- [ ] Service can be called server-side (no browser APIs)
+- [ ] Database queries use pagination (skip/limit)
+- [ ] Database queries use indexed fields only
+- [ ] React Query stale time >= 30 minutes for static data
+- [ ] GraphQL resolver returns totalPages for pagination
+
+---
+
+**Performance is a FEATURE, not an afterthought!**

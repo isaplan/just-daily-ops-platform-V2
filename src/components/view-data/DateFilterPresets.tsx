@@ -45,9 +45,21 @@ export function getDateRangeForPreset(preset: DatePreset): DateRange | null {
     
     case "yesterday":
       const yesterday = subDays(now, 1);
+      // Use UTC to ensure consistent date calculation across timezones
+      const yesterdayUTC = new Date(Date.UTC(
+        yesterday.getUTCFullYear(),
+        yesterday.getUTCMonth(),
+        yesterday.getUTCDate()
+      ));
+      const yesterdayEndUTC = new Date(Date.UTC(
+        yesterday.getUTCFullYear(),
+        yesterday.getUTCMonth(),
+        yesterday.getUTCDate(),
+        23, 59, 59, 999
+      ));
       return {
-        start: startOfDay(yesterday),
-        end: endOfDay(yesterday)
+        start: yesterdayUTC,
+        end: yesterdayEndUTC
       };
     
     case "this-week":
@@ -124,7 +136,7 @@ export function DateFilterPresets({
 }: DateFilterPresetsProps) {
   return (
     <div className={cn("space-y-2", className)}>
-      <span className="text-sm font-bold text-foreground">Filters</span>
+      <span className="text-sm font-bold text-foreground">Period Filter</span>
       <div className="flex gap-2 flex-wrap">
         {PRESETS.map((preset) => {
           const isActive = selectedPreset === preset.value;

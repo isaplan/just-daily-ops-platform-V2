@@ -3,8 +3,8 @@
  * Manage Bork cron jobs
  * 
  * Body:
- * - action: 'start' | 'stop' | 'update' | 'status'
- * - jobType: 'daily-data' | 'historical-data'
+ * - action: 'start' | 'stop' | 'update' | 'status' | 'run-now'
+ * - jobType: 'daily-data' | 'historical-data' | 'master-data'
  * - config?: CronJobConfig (for update action)
  */
 
@@ -43,7 +43,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Map UI job types to actual cron manager job types
-    const jobType = jobTypeParam === 'daily-data' ? 'bork-daily-data' : 'bork-historical-data';
+    const jobTypeMap: Record<string, string> = {
+      'daily-data': 'bork-daily-data',
+      'historical-data': 'bork-historical-data',
+      'master-data': 'bork-master-data',
+    };
+    const jobType = jobTypeMap[jobTypeParam] || jobTypeParam;
 
     const cronManager = getCronManager();
 
@@ -110,11 +115,16 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const jobTypeParam = searchParams.get('jobType') as 'daily-data' | 'historical-data' | null;
+    const jobTypeParam = searchParams.get('jobType') as 'daily-data' | 'historical-data' | 'master-data' | null;
     const action = searchParams.get('action'); // For Vercel cron jobs
 
     // Map UI job types to actual cron manager job types
-    const jobType = jobTypeParam === 'daily-data' ? 'bork-daily-data' : jobTypeParam === 'historical-data' ? 'bork-historical-data' : null;
+    const jobTypeMap: Record<string, string> = {
+      'daily-data': 'bork-daily-data',
+      'historical-data': 'bork-historical-data',
+      'master-data': 'bork-master-data',
+    };
+    const jobType = jobTypeParam ? (jobTypeMap[jobTypeParam] || jobTypeParam) : null;
 
     // If action is 'run-now', execute the job (Vercel cron calls)
     if (action === 'run-now' && jobType) {
@@ -133,14 +143,41 @@ export async function GET(request: NextRequest) {
       
       // Return default config if job doesn't exist yet
       if (!status) {
-        return NextResponse.json({
-          success: true,
-          data: {
+        // Default configs based on job type
+        const defaultConfigs: Record<string, any> = {
+          'daily-data': {
             jobType: jobTypeParam,
             isActive: false,
             syncInterval: 60,
-            enabledEndpoints: { sales: true, products: false },
+            enabledEndpoints: { sales: true },
             quietHours: { start: '02:00', end: '06:00' },
+            lastRun: null,
+          },
+          'historical-data': {
+            jobType: jobTypeParam,
+            isActive: false,
+            enabledEndpoints: { sales: true },
+            lastRun: null,
+          },
+          'master-data': {
+            jobType: jobTypeParam,
+            isActive: false,
+            syncInterval: 86400, // 24 hours default
+            enabledMasterEndpoints: {
+              product_groups: true,
+              payment_methods: true,
+              cost_centers: true,
+              users: true,
+            },
+            lastRun: null,
+          },
+        };
+        
+        return NextResponse.json({
+          success: true,
+          data: defaultConfigs[jobTypeParam || 'daily-data'] || {
+            jobType: jobTypeParam,
+            isActive: false,
             lastRun: null,
           },
         });
@@ -153,7 +190,11 @@ export async function GET(request: NextRequest) {
     } else {
       const allJobs = await cronManager.getAllJobs();
       // Filter to only Bork jobs
-      const borkJobs = allJobs.filter(job => job.jobType === 'bork-daily-data' || job.jobType === 'bork-historical-data');
+      const borkJobs = allJobs.filter(job => 
+        job.jobType === 'bork-daily-data' || 
+        job.jobType === 'bork-historical-data' ||
+        job.jobType === 'bork-master-data'
+      );
       return NextResponse.json({
         success: true,
         data: borkJobs,

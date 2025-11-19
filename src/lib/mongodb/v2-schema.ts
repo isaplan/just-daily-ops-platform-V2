@@ -19,6 +19,8 @@ export interface Location {
   city?: string;
   country?: string;
   isActive: boolean;
+  // System mappings for multi-system support (e.g., Bork cost centers)
+  systemMappings?: SystemMapping[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -235,6 +237,90 @@ export interface DailyDashboard {
     costs: number;
     profit: number;
   };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// DAILY DASHBOARD - KITCHEN
+// ============================================
+
+export interface DailyDashboardKitchen {
+  _id?: ObjectId;
+  locationId: ObjectId;
+  date: Date;
+  hour?: number; // Optional: for hourly breakdowns
+  timeRange: "lunch" | "dinner" | "afternoon-drinks" | "after-drinks" | "all";
+  
+  // Product Production (from bork_raw_data aggregated by product)
+  productProduction: Array<{
+    productName: string;
+    category?: string;
+    totalQuantity: number;
+    workloadLevel: "low" | "mid" | "high";
+    workloadMinutes: number;
+    totalWorkloadMinutes: number;
+  }>;
+  
+  // Worker Activity (from eitje_raw_data + unified_users)
+  workerActivity: Array<{
+    unifiedUserId: ObjectId; // Reference to unified_users
+    workerName: string;
+    teamName?: string;
+    hours: number[]; // [11, 12, 13, ...] - hours active
+    isKitchenWorker: boolean;
+  }>;
+  
+  // Workload Metrics (pre-calculated)
+  workloadByHour: Array<{
+    hour: number; // 0-23
+    totalWorkloadMinutes: number;
+    productCount: number;
+    activeWorkers: number;
+  }>;
+  
+  workloadByWorker: Array<{
+    unifiedUserId: ObjectId;
+    workerName: string;
+    teamName?: string;
+    totalWorkloadMinutes: number;
+    productCount: number;
+  }>;
+  
+  workloadByRange: Array<{
+    timeRange: "lunch" | "dinner" | "afternoon-drinks" | "after-drinks";
+    totalWorkloadMinutes: number;
+    productCount: number;
+    activeWorkers: number;
+  }>;
+  
+  // KPIs (pre-calculated)
+  kpis: {
+    totalOrders: number;
+    totalProductsProduced: number;
+    totalWorkloadMinutes: number;
+    averageWorkloadPerHour: number;
+    peakHour: string; // "14:00"
+    peakTimeRange: "lunch" | "dinner";
+    averageWorkersPerHour: number;
+  };
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// MENUS
+// ============================================
+
+export interface Menu {
+  _id?: ObjectId;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  productIds: string[]; // Product names assigned to this menu
+  isActive: boolean;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }

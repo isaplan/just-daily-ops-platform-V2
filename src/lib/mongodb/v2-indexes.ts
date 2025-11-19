@@ -101,6 +101,32 @@ export async function createAllIndexes(): Promise<void> {
     { key: { createdAt: -1 } },
   ]);
 
+  // Products catalog indexes
+  await db.collection('products').createIndexes([
+    { key: { productName: 1 } }, // Unique product names
+    { key: { category: 1 } },
+    { key: { workloadLevel: 1 } },
+    { key: { mepLevel: 1 } },
+    { key: { isActive: 1 } },
+    { key: { productName: 1, category: 1 } }, // Compound for lookups
+  ]);
+
+  // Menus indexes
+  await db.collection('menus').createIndexes([
+    { key: { title: 1 } },
+    { key: { startDate: -1 } }, // Sort by start date
+    { key: { endDate: -1 } },
+    { key: { isActive: 1 } },
+    { key: { startDate: 1, endDate: 1 } }, // Compound for date range queries
+  ]);
+
+  // Daily Dashboard - Kitchen indexes
+  await db.collection('daily_dashboard_kitchen').createIndexes([
+    { key: { locationId: 1, date: -1, timeRange: 1 } }, // Compound index for queries
+    { key: { date: -1 } },
+    { key: { locationId: 1, date: -1 } }, // Alternative compound
+  ]);
+
   console.log('✅ All MongoDB indexes created successfully');
 }
 

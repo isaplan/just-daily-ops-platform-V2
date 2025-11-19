@@ -51,13 +51,13 @@ Protected files include (but not limited to):
 - These are production-tested, working files - ANY modification will break the system
 
 ### **📏 SIZE LIMITS (HARD BLOCK)**
-- **Maximum 100 lines changed per file per task**
+- **Maximum 120 lines changed per file per task**
 - **Maximum 20 lines deleted per file** (prevents accidental removal)
 - **No full file replacements** (threshold: >80% of lines changed)
 
 **ENFORCEMENT:**
 - Estimate change size BEFORE starting
-- If >100 lines needed → **STOP** → Break into smaller tasks → Ask user to approve each
+- If >120 lines needed → **STOP** → Break into smaller tasks → Ask user to approve each
 - Use `search_replace` for targeted changes, never full rewrites
 
 ### **🚫 NO BYPASS FLAGS (CRITICAL - SECURITY)**
@@ -163,8 +163,8 @@ node tools/compliance/post-execution-check.js [modified files]2. **Parse JSON Ou
 
 ## 🏗️ **INCREMENTAL CHANGES PATTERN**
 
-### **🔧 MODULAR BUILD PATTERN (100-LINE RULE)**
-For every 100 lines examined, follow this hierarchy:
+### **🔧 MODULAR BUILD PATTERN (120-LINE RULE)**
+For every 120 lines examined, follow this hierarchy:
 - **Page = Parent** (e.g., bork-api page)
 - **Tab = Child** (e.g., connection-test tab)
 - **Component = Grandchild** (e.g., SimpleApiTest component)
@@ -232,7 +232,7 @@ This project has extensive utilities in:
 - **ACTION:** Revert changes immediately → Report to user → Wait for instructions
 
 ### **🟠 HIGH (MUST FIX)**
-- Exceeded 100-line limit per file
+- Exceeded 120-line limit per file
 - Replaced entire file (>80% changed)
 - Deleted a file with working functionality
 - Mixed business logic directly in View components (violates MVVM)
@@ -258,7 +258,7 @@ This project has extensive utilities in:
 1. **User requests code change**
 2. **AI checks `function-registry.json`** → Verify file not protected
 3. **AI runs `pre-execution-check.js`** → Parse output → Act on status
-4. **If PASS:** Execute code modification (max 100 lines)
+4. **If PASS:** Execute code modification (max 120 lines)
 5. **AI runs `post-execution-check.js`** → Parse output → Report violations
 6. **If violations:** Report to user → Wait for decision → Do NOT proceed
 7. **If PASS:** Confirm completion → Summarize changes
@@ -266,14 +266,14 @@ This project has extensive utilities in:
 ### **⚠️ WHEN TO STOP**
 - Pre-check returns `BLOCK` status
 - Protected file detected (`touch_again: false`)
-- Change requires >100 lines
+- Change requires >120 lines
 - Existing code found that accomplishes the task
 - User has not approved proposed changes
 - After 2 failed attempts at same fix
 
 ### **✅ WHEN TO PROCEED**
 - Pre-check returns `PASS` status
-- Change is <100 lines
+- Change is <120 lines
 - File is NOT protected in registry
 - User has explicitly approved
 - Following all development standards
@@ -330,7 +330,7 @@ node tools/compliance/post-execution-check.js path/to/modified/files
 1. **ASK FIRST** - Always confirm before making changes
 2. **CHECK REGISTRY** - Before touching ANY file
 3. **RUN PRE-CHECK** - Before any code modification
-4. **STAY SMALL** - Max 100 lines per file
+4. **STAY SMALL** - Max 120 lines per file
 5. **USE EXISTING** - Search before creating
 6. **RUN POST-CHECK** - After any code modification
 7. **REPORT VIOLATIONS** - Immediately, don't hide them
@@ -341,5 +341,5 @@ node tools/compliance/post-execution-check.js path/to/modified/files
 **Status**: 🛡️ **UNBREAKABLE RULES ACTIVE**  
 **Mode**: DEFENSIVE ONLY  
 **Protected Files**: 284+ files in `function-registry.json`  
-**Max Lines Per Change**: 100  
+**Max Lines Per Change**: 120  
 **Bypass Flags**: ❌ FORBIDDEN

@@ -62,3 +62,15 @@ src-v1/
 # Data archives (compressed backup files)
 data-archives/
 *.json.gz
+
+# Large directories that shouldn't be in git/Vercel (performance optimization)
+ai-compliance-export/
+old-supabase-pages-sql-scripts-readonly-dont-use-code-in-rebuild-unless-specifcly-asked-by-me/
+build-docs-scripts-sql-ai/
+scripts/
+tools/
+
+# Keep only essential scripts
+!scripts/create-apollo-stub.js
+!tools/compliance/post-execution-check.js
+!tools/compliance/pre-execution-check.js

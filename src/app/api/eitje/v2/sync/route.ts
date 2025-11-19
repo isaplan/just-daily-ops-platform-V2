@@ -280,6 +280,28 @@ export async function POST(request: NextRequest) {
         recordsSaved = result.upsertedCount + result.modifiedCount;
       }
 
+      // Trigger keuken analyses aggregation after successful sync (non-blocking)
+      // Only aggregate for time_registration_shifts endpoint (labor data)
+      if (endpoint === 'time_registration_shifts' && startDate && endDate) {
+        const { aggregateKeukenAnalysesOnDataSync } = await import('@/lib/services/daily-ops/keuken-analyses-aggregation.service');
+        
+        // Get locationId from environmentId if available
+        let locationId: ObjectId | undefined = undefined;
+        if (envToLocationMap.size > 0) {
+          // Use first location found (or could aggregate for all)
+          locationId = Array.from(envToLocationMap.values())[0];
+        }
+        
+        aggregateKeukenAnalysesOnDataSync(
+          locationId,
+          new Date(startDate),
+          new Date(endDate)
+        ).catch((aggError) => {
+          console.warn('[Eitje Sync] Keuken analyses aggregation failed (non-blocking):', aggError);
+          // Don't fail the sync if aggregation fails
+        });
+      }
+
       return NextResponse.json({
         success: true,
         recordsSaved,

@@ -4,111 +4,108 @@
  */
 
 import { HoursV2QueryParams, HoursV2Response, ProcessedHoursRecord, AggregatedHoursRecord } from '@/models/workforce/hours-v2.model';
+import { getProcessedHours, getAggregatedHours, HoursFilters } from '@/lib/services/graphql/queries';
 
 /**
- * Fetch processed hours data from API
- * TODO: Migrate to GraphQL when query is available
+ * Fetch processed hours data from GraphQL API
  */
 export async function fetchProcessedHours(
   params: HoursV2QueryParams
 ): Promise<HoursV2Response> {
-  const urlParams = new URLSearchParams({
-    startDate: params.startDate || '',
-    endDate: params.endDate || '',
-    page: params.page.toString(),
-    limit: params.limit.toString(),
-  });
+  if (!params.startDate || !params.endDate) {
+    throw new Error('startDate and endDate are required');
+  }
 
+  const filters: HoursFilters = {};
+  
   if (params.locationId && params.locationId !== 'all') {
-    urlParams.append('locationId', params.locationId);
+    filters.locationId = params.locationId;
   }
   if (params.environmentId) {
-    urlParams.append('environmentId', params.environmentId.toString());
-  }
-  if (params.teamId) {
-    urlParams.append('teamId', params.teamId.toString());
+    filters.environmentId = params.environmentId;
   }
   if (params.teamName) {
-    urlParams.append('teamName', params.teamName);
+    filters.teamName = params.teamName;
   }
   if (params.typeName !== undefined) {
-    if (params.typeName === null) {
-      // Special case: "Gewerkte Uren" - send as empty string to indicate null filter
-      urlParams.append('typeName', '');
-    } else {
-      urlParams.append('typeName', params.typeName);
-    }
+    // Use a special marker for "worked hours" instead of empty string
+    // This ensures GraphQL always receives a value and can filter correctly
+    filters.typeName = params.typeName === null ? 'WORKED' : params.typeName;
   }
   if (params.userId) {
-    urlParams.append('userId', params.userId.toString());
+    filters.userId = params.userId;
   }
 
-  const url = `/api/eitje/v2/processed-hours?${urlParams}`;
-  const response = await fetch(url);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch processed hours: ${response.statusText}`);
-  }
-  
-  const data = await response.json();
+  const result = await getProcessedHours(
+    params.startDate,
+    params.endDate,
+    params.page,
+    params.limit,
+    Object.keys(filters).length > 0 ? filters : undefined
+  );
 
-  if (!data.success) {
-    throw new Error(data.error || 'Failed to fetch processed hours');
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to fetch processed hours');
   }
 
-  return data;
+  return {
+    success: result.success,
+    records: result.records as ProcessedHoursRecord[],
+    total: result.total,
+    page: result.page,
+    totalPages: result.totalPages,
+  };
 }
 
 /**
- * Fetch aggregated hours data from API
- * TODO: Migrate to GraphQL when query is available
+ * Fetch aggregated hours data from GraphQL API
  */
 export async function fetchAggregatedHours(
   params: HoursV2QueryParams
 ): Promise<HoursV2Response> {
-  const urlParams = new URLSearchParams({
-    startDate: params.startDate || '',
-    endDate: params.endDate || '',
-    page: params.page.toString(),
-    limit: params.limit.toString(),
-  });
+  if (!params.startDate || !params.endDate) {
+    throw new Error('startDate and endDate are required');
+  }
 
+  const filters: HoursFilters = {};
+  
   if (params.locationId && params.locationId !== 'all') {
-    urlParams.append('locationId', params.locationId);
+    filters.locationId = params.locationId;
   }
   if (params.environmentId) {
-    urlParams.append('environmentId', params.environmentId.toString());
-  }
-  if (params.teamId) {
-    urlParams.append('teamId', params.teamId.toString());
+    filters.environmentId = params.environmentId;
   }
   if (params.teamName) {
-    urlParams.append('teamName', params.teamName);
+    filters.teamName = params.teamName;
   }
   if (params.typeName !== undefined) {
-    if (params.typeName === null) {
-      urlParams.append('typeName', '');
-    } else {
-      urlParams.append('typeName', params.typeName);
-    }
+    // Use a special marker for "worked hours" instead of empty string
+    // This ensures GraphQL always receives a value and can filter correctly
+    filters.typeName = params.typeName === null ? 'WORKED' : params.typeName;
   }
   if (params.userId) {
-    urlParams.append('userId', params.userId.toString());
+    filters.userId = params.userId;
   }
 
-  const response = await fetch(`/api/eitje/v2/aggregated-hours?${urlParams}`);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch aggregated hours: ${response.statusText}`);
-  }
-  
-  const data = await response.json();
+  const result = await getAggregatedHours(
+    params.startDate,
+    params.endDate,
+    params.page,
+    params.limit,
+    Object.keys(filters).length > 0 ? filters : undefined
+  );
 
-  if (!data.success) {
-    throw new Error(data.error || 'Failed to fetch aggregated hours');
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to fetch aggregated hours');
   }
 
-  return data;
+  return {
+    success: result.success,
+    records: result.records as AggregatedHoursRecord[],
+    total: result.total,
+    page: result.page,
+    totalPages: result.totalPages,
+  };
 }
 
 

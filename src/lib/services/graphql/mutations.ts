@@ -110,8 +110,142 @@ export async function deleteApiCredential(id: string): Promise<boolean> {
   return result.data.deleteApiCredential;
 }
 
+// ============================================
+// WORKER PROFILE MUTATIONS
+// ============================================
 
+export interface WorkerProfileInput {
+  eitjeUserId: number;
+  locationId?: string | null;
+  contractType?: string | null;
+  contractHours?: number | null;
+  hourlyWage?: number | null;
+  wageOverride?: boolean;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  notes?: string | null;
+}
 
+export interface WorkerProfile {
+  id: string;
+  eitjeUserId: number;
+  userName?: string | null;
+  locationId?: string | null;
+  locationName?: string | null;
+  contractType?: string | null;
+  contractHours?: number | null;
+  hourlyWage?: number | null;
+  wageOverride: boolean;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+/**
+ * Create a new worker profile
+ */
+export async function createWorkerProfile(
+  input: WorkerProfileInput
+): Promise<WorkerProfile> {
+  const mutation = `
+    mutation CreateWorkerProfile($input: WorkerProfileInput!) {
+      createWorkerProfile(input: $input) {
+        id
+        eitjeUserId
+        userName
+        locationId
+        locationName
+        contractType
+        contractHours
+        hourlyWage
+        wageOverride
+        effectiveFrom
+        effectiveTo
+        notes
+        isActive
+        createdAt
+        updatedAt
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ createWorkerProfile: WorkerProfile }>(
+    mutation,
+    { input }
+  );
+
+  if (!result.data?.createWorkerProfile) {
+    throw new Error('Failed to create worker profile');
+  }
+
+  return result.data.createWorkerProfile;
+}
+
+/**
+ * Update an existing worker profile
+ */
+export async function updateWorkerProfile(
+  id: string,
+  input: WorkerProfileInput
+): Promise<WorkerProfile> {
+  const mutation = `
+    mutation UpdateWorkerProfile($id: ID!, $input: WorkerProfileInput!) {
+      updateWorkerProfile(id: $id, input: $input) {
+        id
+        eitjeUserId
+        userName
+        locationId
+        locationName
+        contractType
+        contractHours
+        hourlyWage
+        wageOverride
+        effectiveFrom
+        effectiveTo
+        notes
+        isActive
+        createdAt
+        updatedAt
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ updateWorkerProfile: WorkerProfile }>(
+    mutation,
+    { id, input }
+  );
+
+  if (!result.data?.updateWorkerProfile) {
+    throw new Error('Failed to update worker profile');
+  }
+
+  return result.data.updateWorkerProfile;
+}
+
+/**
+ * Delete a worker profile
+ */
+export async function deleteWorkerProfile(id: string): Promise<boolean> {
+  const mutation = `
+    mutation DeleteWorkerProfile($id: ID!) {
+      deleteWorkerProfile(id: $id)
+    }
+  `;
+
+  const result = await executeGraphQL<{ deleteWorkerProfile: boolean }>(
+    mutation,
+    { id }
+  );
+
+  if (!result.data?.deleteWorkerProfile) {
+    throw new Error('Failed to delete worker profile');
+  }
+
+  return result.data.deleteWorkerProfile;
+}
 
 
 

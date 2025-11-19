@@ -94,6 +94,12 @@ export function initializeBreadcrumbRegistry(): void {
     parentPath: '/data/labor',
     parentLabel: 'Labor',
   });
+  registerBreadcrumb('/data/labor/labor-cost', {
+    label: 'Labor Cost',
+    subtitle: 'Calculate and view labor costs per year, month, week, day, and hour',
+    parentPath: '/data/labor',
+    parentLabel: 'Labor',
+  });
   registerBreadcrumb('/data/labor/workers', {
     label: 'Workers',
     subtitle: 'Manage editable hourly wages, contract types, and contract hours',
@@ -102,10 +108,101 @@ export function initializeBreadcrumbRegistry(): void {
   });
   registerBreadcrumb('/data/labor/locations-teams', {
     label: 'Locations & Teams',
-    subtitle: 'Manage locations and teams',
+    subtitle: 'View workers by location, team, and contract type',
     parentPath: '/data/labor',
     parentLabel: 'Labor',
   });
+  registerBreadcrumb('/data/labor/productivity', {
+    label: 'Labor Productivity',
+    subtitle: 'Calculate labor productivity per day, week, and month per team and total',
+    parentPath: '/data/labor',
+    parentLabel: 'Labor',
+  });
+
+  // Daily Ops
+  registerBreadcrumb('/daily-ops', {
+    label: 'Daily Ops',
+    subtitle: 'Daily operations dashboard and analytics',
+  });
+  registerBreadcrumb('/daily-ops/labor', {
+    label: 'Labor',
+    subtitle: 'Labor operations dashboard with KPIs and analytics',
+    parentPath: '/daily-ops',
+    parentLabel: 'Daily Ops',
+  });
+  registerBreadcrumb('/daily-ops/keuken-analyses', {
+    label: 'Keuken Analyses',
+    subtitle: 'Kitchen analysis and performance metrics',
+    parentPath: '/daily-ops',
+    parentLabel: 'Daily Ops',
+  });
+
+  // Data Sales
+  registerBreadcrumb('/data/sales', {
+    label: 'Sales',
+    subtitle: 'View and manage sales data',
+  });
+registerBreadcrumb('/data/sales/bork', {
+  label: 'Daily Sales',
+  subtitle: 'View sales data from Bork POS system',
+  parentPath: '/data/sales',
+  parentLabel: 'Sales',
+});
+
+registerBreadcrumb('/data/sales/bork/waiters', {
+  label: 'Waiter Performance',
+  subtitle: 'Sales performance metrics per waiter',
+  parentPath: '/data/sales',
+  parentLabel: 'Sales',
+});
+
+registerBreadcrumb('/data/sales/bork/revenue', {
+  label: 'Revenue Analysis',
+  subtitle: 'Revenue breakdown by date and location',
+  parentPath: '/data/sales',
+  parentLabel: 'Sales',
+});
+
+registerBreadcrumb('/data/sales/bork/payment-methods', {
+  label: 'Payment Methods',
+  subtitle: 'Payment method statistics and breakdown',
+  parentPath: '/data/sales',
+  parentLabel: 'Sales',
+});
+
+registerBreadcrumb('/daily-ops/labor/products', {
+  label: 'Product Performance',
+  subtitle: 'Product sales performance and metrics',
+  parentPath: '/daily-ops/labor',
+  parentLabel: 'Labor',
+});
+
+registerBreadcrumb('/daily-ops/labor/time-analysis', {
+  label: 'Time-Based Analysis',
+  subtitle: 'Sales patterns by hour of day',
+  parentPath: '/daily-ops/labor',
+  parentLabel: 'Labor',
+});
+
+registerBreadcrumb('/daily-ops/labor/tables', {
+  label: 'Table Analysis',
+  subtitle: 'Table performance and metrics',
+  parentPath: '/daily-ops/labor',
+  parentLabel: 'Labor',
+});
+
+registerBreadcrumb('/daily-ops/labor/transactions', {
+  label: 'Transaction Analysis',
+  subtitle: 'Transaction-level analysis and insights',
+  parentPath: '/daily-ops/labor',
+  parentLabel: 'Labor',
+});
+
+// Products Management (Operations)
+registerBreadcrumb('/products', {
+  label: 'Products',
+  subtitle: 'Manage products, workload, MEP time, and course types',
+});
 
   // Workforce V2 (for backwards compatibility)
   registerBreadcrumb('/data/workforce', {
@@ -147,6 +244,21 @@ export function initializeBreadcrumbRegistry(): void {
     subtitle: 'View sales and revenue data from Bork (via Eitje integration)',
     parentPath: '/finance/data/eitje-data',
     parentLabel: 'Eitje Data',
+  });
+
+  // Settings
+  registerBreadcrumb('/settings/products', {
+    label: 'Product Catalog',
+    subtitle: 'Manage products with workload and MEP (prep) time metrics',
+    parentPath: '/settings',
+    parentLabel: 'Settings',
+  });
+  
+  registerBreadcrumb('/settings/menus', {
+    label: 'Manage Menus',
+    subtitle: 'Create and manage menu cards with products and date ranges',
+    parentPath: '/settings',
+    parentLabel: 'Settings',
   });
 }
 

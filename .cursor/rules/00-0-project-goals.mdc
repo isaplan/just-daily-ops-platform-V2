@@ -1,0 +1,217 @@
+---
+alwaysApply: true
+---
+
+# 🎯 PROJECT GOALS & MIGRATION CONTEXT
+
+**⚠️ TEMPORARY: Remove this file once migration is complete**
+
+---
+
+## 🏗️ TECHNICAL ARCHITECTURE (V2 MIGRATION)
+
+### **Current Goal:**
+Migrate from Supabase (PostgreSQL) to MongoDB Atlas + GraphQL + MVVM pattern
+
+### **Target Architecture:**
+- **Database**: MongoDB Atlas (migrated from Supabase/PostgreSQL)
+- **API**: GraphQL (Apollo Server) - migrated from REST/Supabase client
+- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **Pattern**: MVVM (Model-View-ViewModel) - separation of concerns
+
+---
+
+## 📁 PROJECT STRUCTURE EXPLANATION
+
+### **`src/` - Active Code (Clean Slate)**
+- **Purpose**: Current active codebase with MongoDB + GraphQL + MVVM
+- **Status**: Minimal structure, ready for new implementations
+- **Contains**: 
+  - New pages migrated to MongoDB/GraphQL/MVVM
+  - MongoDB connection (`src/lib/mongodb/`)
+  - GraphQL API (`src/lib/graphql/`, `src/app/api/graphql/`)
+  - MVVM structure (`src/models/`, `src/viewmodels/`, `src/lib/services/`)
+
+### **`src-v1/` - Backup of Completed Supabase Pages**
+- **Purpose**: Backup of completed, working pages that use Supabase
+- **Why moved**: Next.js couldn't build them after removing Supabase dependencies
+- **Status**: Reference only - cannot build with current MongoDB setup
+- **Contains**: 
+  - All completed Supabase pages (`src-v1/app/`)
+  - Supabase components (`src-v1/components/`)
+  - Supabase services (`src-v1/lib/`, `src-v1/integrations/supabase/`)
+  - V1 ViewModels (may need updates for MVVM)
+
+### **`old-pages-sql-scripts/pages/` - Old Reference Pages**
+- **Purpose**: Historical reference - old Supabase pages
+- **Status**: Archived, reference only - DO NOT COPY DIRECTLY
+- **Contains**: Old pages not in active sidebar
+
+---
+
+## 🔄 MIGRATION PROCESS
+
+### **⚠️ CRITICAL: UI/UX MUST BE EXACT**
+
+**When migrating from `src-v1/` to `src/`:**
+- ✅ **UI/UX must be EXACT** - Visual appearance and user experience must remain identical
+- ✅ **Only architecture changes** - Database, API, and code patterns change
+- ✅ **Same components, same layout, same interactions** - User should not notice any difference
+- ❌ **NO UI changes** - Do not redesign, improve, or modify the UI during migration
+- ❌ **NO UX changes** - Do not change workflows, interactions, or user flows
+
+**Migration = Same UI/UX, Different Architecture**
+
+### **When Migrating a Page:**
+
+1. **Reference Source**: Look at completed page in `src-v1/app/[path]/page.tsx`
+2. **Preserve UI/UX Exactly**:
+   - Copy exact component structure
+   - Use same Tailwind classes
+   - Keep same layout and styling
+   - Maintain same user interactions
+   - Preserve all visual elements
+3. **Create MVVM Structure** (under the hood):
+   ```
+   src/models/[domain]/[feature].model.ts        # TypeScript interfaces
+   src/lib/services/[domain]/[feature].service.ts # GraphQL/MongoDB data fetching
+   src/viewmodels/[domain]/use[Feature]ViewModel.ts # Business logic & state
+   src/app/[path]/page.tsx                        # Pure presentation View (EXACT UI)
+   ```
+4. **Use New Stack** (invisible to user):
+   - ✅ MongoDB Atlas (via `src/lib/mongodb/v2-connection.ts`)
+   - ✅ GraphQL API (via `src/lib/services/graphql/client.ts`)
+   - ✅ MVVM pattern (separate Model/Service/ViewModel/View)
+   - ❌ NO Supabase client calls
+   - ❌ NO direct REST API calls (use GraphQL instead)
+   - ❌ NO business logic in View components
+
+---
+
+## 📝 MIGRATION EXAMPLE
+
+### **Example: Migrating Finance Dashboard (with SSR)**
+
+**Source (Supabase - in `src-v1/app/(dashboard)/finance/page.tsx`):**
+```typescript
+// ❌ OLD: Direct Supabase calls, business logic in component
+export default function FinancePage() {
+  const [data, setData] = useState();
+  useEffect(() => {
+    supabase.from('pnl_data').select('*').then(res => {
+      // Business logic here
+      const processed = res.data.map(/* calculations */);
+      setData(processed);
+    });
+  }, []);
+  
+  // ✅ PRESERVE THIS EXACT UI/UX STRUCTURE
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Finance Dashboard</h1>
+      <div className="grid grid-cols-3 gap-4">
+        {/* Exact same UI components */}
+      </div>
+    </div>
+  );
+}
+```
+
+**Destination (MongoDB + GraphQL + MVVM + SSR):**
+
+**File 1: `src/app/(dashboard)/finance/page.tsx` (Server Component)**
+```typescript
+// ✅ NO "use client" - Server Component for SSR
+import { FinancePageClient } from './FinancePageClient';
+import { fetchFinanceData } from '@/lib/services/finance/finance.service';
+
+export const revalidate = 1800; // 30 minutes ISR
+
+export default async function FinancePage() {
+  // ✅ Fetch data on server (fast, SSR)
+  const initialData = await fetchFinanceData();
+  
+  // ✅ Pass server data to client component
+  return <FinancePageClient initialData={initialData} />;
+}
+```
+
+**File 2: `src/app/(dashboard)/finance/FinancePageClient.tsx` (Client Component)**
+```typescript
+'use client';
+import { useFinanceViewModel } from '@/viewmodels/finance/useFinanceViewModel';
+
+export function FinancePageClient({ initialData }) {
+  // ✅ ViewModel uses server data as initial, updates client-side
+  const { data, isLoading, error } = useFinanceViewModel(initialData);
+  
+  // ✅ EXACT SAME UI/UX AS src-v1 VERSION
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Finance Dashboard</h1>
+      <div className="grid grid-cols-3 gap-4">
+        {/* Exact same UI components - no changes */}
+      </div>
+    </div>
+  );
+}
+```
+
+**Supporting Files:**
+```typescript
+// src/models/finance/finance.model.ts
+export interface FinanceData { /* types */ }
+
+// src/lib/services/finance/finance.service.ts
+export async function fetchFinanceData() {
+  // Can be called from Server Component OR Client Component
+  // GraphQL query via src/lib/services/graphql/client.ts
+}
+
+// src/viewmodels/finance/useFinanceViewModel.ts
+export function useFinanceViewModel(initialData?: FinanceData) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['finance-data'],
+    queryFn: fetchFinanceData,
+    initialData, // ✅ SSR support
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+  
+  return { data, isLoading, /* ... */ };
+}
+```
+
+---
+
+## ✅ MIGRATION CHECKLIST
+
+For each page migration:
+
+- [ ] Reference completed page in `src-v1/app/`
+- [ ] **Preserve UI/UX exactly** - Copy exact component structure, classes, layout
+- [ ] Create Model (`src/models/[domain]/[feature].model.ts`)
+- [ ] Create Service (`src/lib/services/[domain]/[feature].service.ts`)
+- [ ] Create ViewModel (`src/viewmodels/[domain]/use[Feature]ViewModel.ts`)
+- [ ] Create View (`src/app/[path]/page.tsx`) - **EXACT same UI/UX as src-v1**
+- [ ] Use MongoDB (via GraphQL) instead of Supabase
+- [ ] Follow MVVM pattern (no business logic in View)
+- [ ] **Verify UI/UX matches src-v1 exactly** - Side-by-side comparison
+- [ ] Test thoroughly
+- [ ] Update sidebar navigation if needed
+
+---
+
+## 🎯 REMEMBER
+
+1. **`src-v1/`** = Backup of completed Supabase pages (reference for rebuilding)
+2. **`src/`** = Active codebase (rebuild with MongoDB + GraphQL + MVVM)
+3. **`old-pages-sql-scripts/`** = Old reference pages (historical only)
+4. **Goal**: Migrate all pages from `src-v1/` to `src/` using new architecture
+5. **UI/UX MUST BE EXACT** - Only architecture changes, not visual appearance
+6. **Remove this file** once migration is complete
+
+---
+
+**Last Updated**: 2025-01-XX  
+**Status**: Active Migration  
+**Remove When**: All pages migrated from `src-v1/` to `src/`

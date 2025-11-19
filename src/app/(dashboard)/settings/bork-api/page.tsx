@@ -9,10 +9,11 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Save, TestTube, CheckCircle, XCircle, Settings, BarChart3, RefreshCw, Clock, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { Loader2, Save, TestTube, CheckCircle, XCircle, Settings, BarChart3, RefreshCw, Clock, ChevronDown, ChevronUp, Plus, Trash2, Database } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ApiConnection {
   id: string;
@@ -64,7 +65,6 @@ export default function BorkApiSettingsPage() {
   const [syncInterval, setSyncInterval] = useState(60);
   const [enabledEndpoints, setEnabledEndpoints] = useState({
     sales: true,
-    products: false,
   });
   const [quietHours, setQuietHours] = useState({ start: '02:00', end: '06:00' });
   const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -76,13 +76,28 @@ export default function BorkApiSettingsPage() {
   const [isTogglingHistoricalCronjob, setIsTogglingHistoricalCronjob] = useState(false);
   const [enabledHistoricalEndpoints, setEnabledHistoricalEndpoints] = useState({
     sales: true,
-    products: false,
   });
   const [isSavingHistoricalConfig, setIsSavingHistoricalConfig] = useState(false);
   const [isTestingHistoricalSync, setIsTestingHistoricalSync] = useState(false);
   const [lastRunHistorical, setLastRunHistorical] = useState<Date | null>(null);
   const [isRunningNowDaily, setIsRunningNowDaily] = useState(false);
   const [isRunningNowHistorical, setIsRunningNowHistorical] = useState(false);
+
+  // Master Data Sync state
+  const [isMasterDataCronjobActive, setIsMasterDataCronjobActive] = useState(false);
+  const [isTogglingMasterDataCronjob, setIsTogglingMasterDataCronjob] = useState(false);
+  const [enabledMasterDataEndpoints, setEnabledMasterDataEndpoints] = useState({
+    product_groups: true,
+    payment_methods: true,
+    cost_centers: true,
+    users: true,
+  });
+  const [masterDataSyncInterval, setMasterDataSyncInterval] = useState(86400); // 24 hours in seconds
+  const [isSavingMasterDataConfig, setIsSavingMasterDataConfig] = useState(false);
+  const [isTestingMasterDataSync, setIsTestingMasterDataSync] = useState(false);
+  const [isRunningNowMasterData, setIsRunningNowMasterData] = useState(false);
+  const [lastRunMasterData, setLastRunMasterData] = useState<Date | null>(null);
+  const [masterDataSyncResults, setMasterDataSyncResults] = useState<any>(null);
 
   // Backward Sync state (no functionality)
   const [monthlyProgressV2, setMonthlyProgressV2] = useState<Record<string, any>>({});
@@ -142,7 +157,7 @@ export default function BorkApiSettingsPage() {
               if (dailyData.success && dailyData.data) {
                 setIsCronjobActive(dailyData.data.isActive || false);
                 setSyncInterval(dailyData.data.syncInterval || 60);
-                setEnabledEndpoints(dailyData.data.enabledEndpoints || { sales: true, products: false });
+                setEnabledEndpoints(dailyData.data.enabledEndpoints || { sales: true });
                 setQuietHours(dailyData.data.quietHours || { start: '02:00', end: '06:00' });
                 if (dailyData.data.lastRun) {
                   setLastRunDaily(new Date(dailyData.data.lastRun));
@@ -163,13 +178,39 @@ export default function BorkApiSettingsPage() {
               const historicalData = JSON.parse(text);
               if (historicalData.success && historicalData.data) {
                 setIsHistoricalCronjobActive(historicalData.data.isActive || false);
-                setEnabledHistoricalEndpoints(historicalData.data.enabledEndpoints || { sales: true, products: false });
+                setEnabledHistoricalEndpoints(historicalData.data.enabledEndpoints || { sales: true });
                 if (historicalData.data.lastRun) {
                   setLastRunHistorical(new Date(historicalData.data.lastRun));
                 }
               }
             } catch (parseError) {
               console.warn('[Bork API] Failed to parse historical cron status:', parseError);
+            }
+          }
+        }
+
+        // Load master data cron status
+        const masterDataResponse = await fetch('/api/bork/v2/cron?jobType=master-data');
+        if (masterDataResponse.ok) {
+          const text = await masterDataResponse.text();
+          if (text) {
+            try {
+              const masterDataData = JSON.parse(text);
+              if (masterDataData.success && masterDataData.data) {
+                setIsMasterDataCronjobActive(masterDataData.data.isActive || false);
+                setMasterDataSyncInterval(masterDataData.data.syncInterval || 86400);
+                setEnabledMasterDataEndpoints(masterDataData.data.enabledMasterEndpoints || {
+                  product_groups: true,
+                  payment_methods: true,
+                  cost_centers: true,
+                  users: true,
+                });
+                if (masterDataData.data.lastRun) {
+                  setLastRunMasterData(new Date(masterDataData.data.lastRun));
+                }
+              }
+            } catch (parseError) {
+              console.warn('[Bork API] Failed to parse master data cron status:', parseError);
             }
           }
         }
@@ -439,6 +480,195 @@ export default function BorkApiSettingsPage() {
     }
   };
 
+  // Master Data cron handlers
+  const handleSaveMasterDataConfig = async () => {
+    setIsSavingMasterDataConfig(true);
+    try {
+      // Convert sync interval to cron schedule (86400 seconds = daily)
+      let schedule = '0 2 * * *'; // Default: Daily at 2 AM
+      if (masterDataSyncInterval === 86400) {
+        schedule = '0 2 * * *'; // Daily
+      } else if (masterDataSyncInterval === 604800) {
+        schedule = '0 2 * * 0'; // Weekly (Sunday)
+      } else if (masterDataSyncInterval === 2592000) {
+        schedule = '0 2 1 * *'; // Monthly (1st of month)
+      }
+
+      const response = await fetch('/api/bork/v2/cron', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          jobType: 'master-data',
+          config: {
+            isActive: isMasterDataCronjobActive,
+            syncInterval: masterDataSyncInterval,
+            enabledMasterEndpoints: enabledMasterDataEndpoints,
+            schedule,
+          },
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to save master data config');
+      }
+
+      toast.success('Master data cron configuration saved successfully');
+    } catch (error: any) {
+      console.error('[Bork API] Error saving master data config:', error);
+      toast.error(error.message || 'Failed to save master data config');
+    } finally {
+      setIsSavingMasterDataConfig(false);
+    }
+  };
+
+  const handleToggleMasterDataCronjob = async () => {
+    setIsTogglingMasterDataCronjob(true);
+    try {
+      const action = isMasterDataCronjobActive ? 'stop' : 'start';
+      const response = await fetch('/api/bork/v2/cron', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          jobType: 'master-data',
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `Failed to ${action} cronjob`);
+      }
+
+      setIsMasterDataCronjobActive(!isMasterDataCronjobActive);
+      toast.success(`Master data cronjob ${action === 'start' ? 'started' : 'stopped'} successfully`);
+    } catch (error: any) {
+      console.error('[Bork API] Error toggling master data cronjob:', error);
+      toast.error(error.message || 'Failed to toggle master data cronjob');
+    } finally {
+      setIsTogglingMasterDataCronjob(false);
+    }
+  };
+
+  const handleTestMasterDataSync = async () => {
+    setIsTestingMasterDataSync(true);
+    setMasterDataSyncResults(null);
+    try {
+      const activeConnections = connections.filter(c => c.isActive);
+      if (activeConnections.length === 0) {
+        toast.error('No active connections found');
+        return;
+      }
+
+      const results: any = {};
+      let totalRecords = 0;
+
+      for (const connection of activeConnections) {
+        results[connection.locationId] = {};
+        
+        for (const [endpointKey, enabled] of Object.entries(enabledMasterDataEndpoints)) {
+          if (!enabled) continue;
+          
+          const endpointMap: Record<string, string> = {
+            product_groups: 'product_groups',
+            payment_methods: 'payment_methods',
+            cost_centers: 'cost_centers',
+            users: 'users',
+          };
+          
+          const endpoint = endpointMap[endpointKey];
+          if (!endpoint) continue;
+
+          try {
+            const response = await fetch('/api/bork/v2/master-sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                locationId: connection.locationId,
+                endpoint,
+                baseUrl: connection.baseUrl,
+                apiKey: connection.apiKey,
+              }),
+            });
+
+            const result = await response.json();
+            if (result.success) {
+              results[connection.locationId][endpoint] = {
+                success: true,
+                recordsSaved: result.recordsSaved || 0,
+              };
+              totalRecords += result.recordsSaved || 0;
+            } else {
+              results[connection.locationId][endpoint] = {
+                success: false,
+                error: result.error || 'Unknown error',
+              };
+            }
+          } catch (error: any) {
+            results[connection.locationId][endpoint] = {
+              success: false,
+              error: error.message || 'Request failed',
+            };
+          }
+        }
+      }
+
+      setMasterDataSyncResults(results);
+      toast.success(`Test sync completed: ${totalRecords} total records synced`);
+    } catch (error: any) {
+      console.error('[Bork API] Error testing master data sync:', error);
+      toast.error(error.message || 'Failed to test master data sync');
+    } finally {
+      setIsTestingMasterDataSync(false);
+    }
+  };
+
+  const handleRunNowMasterData = async () => {
+    setIsRunningNowMasterData(true);
+    setMasterDataSyncResults(null);
+    try {
+      const response = await fetch('/api/bork/v2/cron', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'run-now',
+          jobType: 'master-data',
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to run master data cron job');
+      }
+
+      toast.success('Master data cron job executed successfully');
+      
+      // Reload status
+      const statusResponse = await fetch('/api/bork/v2/cron?jobType=master-data');
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        if (statusData.success && statusData.data?.lastRun) {
+          setLastRunMasterData(new Date(statusData.data.lastRun));
+        }
+      }
+
+      // Also reload master data status
+      const masterDataStatusResponse = await fetch('/api/bork/v2/master-sync');
+      if (masterDataStatusResponse.ok) {
+        const masterDataStatus = await masterDataStatusResponse.json();
+        if (masterDataStatus.success) {
+          setMasterDataSyncResults(masterDataStatus.status);
+        }
+      }
+    } catch (error: any) {
+      console.error('[Bork API] Error running master data cron job:', error);
+      toast.error(error.message || 'Failed to run master data cron job');
+    } finally {
+      setIsRunningNowMasterData(false);
+    }
+  };
+
   const handleProcessV2Month = async (month: number, year: number) => {
     const monthKey = `${year}-${month}`;
     setProcessingV2Months(prev => new Set(prev).add(monthKey));
@@ -580,6 +810,7 @@ export default function BorkApiSettingsPage() {
           <TabsTrigger value="credentials">Credentials</TabsTrigger>
           <TabsTrigger value="daily-data-cron">Daily Data Cron</TabsTrigger>
           <TabsTrigger value="historical-data-cron">Historical Data Cron</TabsTrigger>
+          <TabsTrigger value="master-data-sync">Master Sync Data</TabsTrigger>
           <TabsTrigger value="backward-sync">Backward Sync</TabsTrigger>
         </TabsList>
 
@@ -1003,18 +1234,6 @@ export default function BorkApiSettingsPage() {
                         Sales
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="endpoint-products" 
-                        checked={enabledEndpoints.products}
-                        onCheckedChange={(checked) => 
-                          setEnabledEndpoints({ ...enabledEndpoints, products: checked === true })
-                        }
-                      />
-                      <Label htmlFor="endpoint-products" className="cursor-pointer font-normal">
-                        Products
-                      </Label>
-                    </div>
                   </div>
                 </div>
 
@@ -1219,18 +1438,6 @@ export default function BorkApiSettingsPage() {
                         Sales
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="historical-endpoint-products" 
-                        checked={enabledHistoricalEndpoints.products}
-                        onCheckedChange={(checked) => 
-                          setEnabledHistoricalEndpoints({ ...enabledHistoricalEndpoints, products: checked === true })
-                        }
-                      />
-                      <Label htmlFor="historical-endpoint-products" className="cursor-pointer font-normal">
-                        Products
-                      </Label>
-                    </div>
                   </div>
                 </div>
 
@@ -1351,6 +1558,245 @@ export default function BorkApiSettingsPage() {
                   disabled={isRunningNowHistorical || !isHistoricalCronjobActive}
                 >
                   {isRunningNowHistorical ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Run Now
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="master-data-sync">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Database className="h-5 w-5" />
+                <span>Master Sync Data Configuration</span>
+              </CardTitle>
+              <CardDescription>
+                Configure automated sync for master data (product groups, payment methods, cost centers, users)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Master Data Endpoints</Label>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Select which master data endpoints to sync. These contain reference data like product hierarchies, payment methods, and user information.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="master-endpoint-product-groups" 
+                        checked={enabledMasterDataEndpoints.product_groups}
+                        onCheckedChange={(checked) => 
+                          setEnabledMasterDataEndpoints({ ...enabledMasterDataEndpoints, product_groups: checked === true })
+                        }
+                      />
+                      <Label htmlFor="master-endpoint-product-groups" className="cursor-pointer font-normal">
+                        Product Groups (includes hierarchy with parentGroupId)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="master-endpoint-payment-methods" 
+                        checked={enabledMasterDataEndpoints.payment_methods}
+                        onCheckedChange={(checked) => 
+                          setEnabledMasterDataEndpoints({ ...enabledMasterDataEndpoints, payment_methods: checked === true })
+                        }
+                      />
+                      <Label htmlFor="master-endpoint-payment-methods" className="cursor-pointer font-normal">
+                        Payment Methods
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="master-endpoint-cost-centers" 
+                        checked={enabledMasterDataEndpoints.cost_centers}
+                        onCheckedChange={(checked) => 
+                          setEnabledMasterDataEndpoints({ ...enabledMasterDataEndpoints, cost_centers: checked === true })
+                        }
+                      />
+                      <Label htmlFor="master-endpoint-cost-centers" className="cursor-pointer font-normal">
+                        Cost Centers
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="master-endpoint-users" 
+                        checked={enabledMasterDataEndpoints.users}
+                        onCheckedChange={(checked) => 
+                          setEnabledMasterDataEndpoints({ ...enabledMasterDataEndpoints, users: checked === true })
+                        }
+                      />
+                      <Label htmlFor="master-endpoint-users" className="cursor-pointer font-normal">
+                        Users/Employees
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Sync Interval</Label>
+                  <Select
+                    value={masterDataSyncInterval.toString()}
+                    onValueChange={(value) => setMasterDataSyncInterval(Number(value))}
+                  >
+                    <SelectTrigger className="w-full max-w-md">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="86400">Daily (24 hours)</SelectItem>
+                      <SelectItem value="604800">Weekly (7 days)</SelectItem>
+                      <SelectItem value="2592000">Monthly (30 days)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Master data changes infrequently, so daily sync is usually sufficient
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold">Cron Job Status</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Current status of automated master data sync jobs
+                      </p>
+                    </div>
+                    <Badge 
+                      variant="outline" 
+                      className={isMasterDataCronjobActive 
+                        ? "bg-green-50 text-green-700 border-green-200" 
+                        : "bg-gray-50 text-gray-700 border-gray-200"
+                      }
+                    >
+                      {isMasterDataCronjobActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Schedule:</span>
+                      <span className="font-mono">
+                        {masterDataSyncInterval === 86400 ? '0 2 * * *' :
+                         masterDataSyncInterval === 604800 ? '0 2 * * 0' :
+                         '0 2 1 * *'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Frequency:</span>
+                      <span>
+                        {masterDataSyncInterval === 86400 ? 'Daily at 02:00' :
+                         masterDataSyncInterval === 604800 ? 'Weekly on Sunday at 02:00' :
+                         'Monthly on 1st at 02:00'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Last Run:</span>
+                      <span>
+                        {lastRunMasterData 
+                          ? new Date(lastRunMasterData).toLocaleString('en-GB', { 
+                              timeZone: 'Europe/Amsterdam',
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit', 
+                              minute: '2-digit',
+                            })
+                          : 'Never'}
+                      </span>
+                    </div>
+                    {masterDataSyncResults && (
+                      <div className="mt-4 pt-4 border-t">
+                        <h5 className="font-semibold mb-2">Last Sync Results:</h5>
+                        <div className="space-y-1 text-xs">
+                          {Object.entries(masterDataSyncResults).map(([endpoint, data]: [string, any]) => (
+                            <div key={endpoint} className="flex justify-between">
+                              <span className="text-muted-foreground capitalize">{endpoint.replace('_', ' ')}:</span>
+                              <span>{data.count || 0} records</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4 border-t">
+                <Button
+                  onClick={handleToggleMasterDataCronjob}
+                  disabled={isTogglingMasterDataCronjob}
+                  variant={isMasterDataCronjobActive ? "destructive" : "default"}
+                >
+                  {isTogglingMasterDataCronjob ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isMasterDataCronjobActive ? 'Stopping...' : 'Starting...'}
+                    </>
+                  ) : (
+                    <>
+                      {isMasterDataCronjobActive ? (
+                        <>
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Stop Cronjob
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Start Cronjob
+                        </>
+                      )}
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleSaveMasterDataConfig}
+                  disabled={isSavingMasterDataConfig}
+                >
+                  {isSavingMasterDataConfig ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Configuration
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleTestMasterDataSync}
+                  disabled={isTestingMasterDataSync}
+                >
+                  {isTestingMasterDataSync ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Test Sync Now
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleRunNowMasterData}
+                  disabled={isRunningNowMasterData || !isMasterDataCronjobActive}
+                >
+                  {isRunningNowMasterData ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Running...

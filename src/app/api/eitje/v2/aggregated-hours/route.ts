@@ -1,8 +1,15 @@
 /**
  * GET /api/eitje/v2/aggregated-hours
  * Fetch aggregated hours from eitje_aggregated collection
+ * 
+ * ⚠️ REST API - COMMENTED OUT - DELETE WHEN GRAPHQL IS WORKING PROPERLY
+ * This endpoint is no longer used. The application now uses GraphQL via:
+ * - GraphQL Query: aggregatedHours
+ * - Service: src/lib/services/workforce/hours-v2.service.ts
+ * - GraphQL Resolver: src/lib/graphql/v2-resolvers.ts
  */
 
+/*
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb/v2-connection';
 import { ObjectId } from 'mongodb';
@@ -118,4 +125,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+*/
 

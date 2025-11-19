@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateFilterPresets, DatePreset } from "./DateFilterPresets";
 import { useMemo, memo } from "react";
+import { format } from "date-fns";
 
 interface EitjeDataFiltersProps {
   selectedYear: number;
@@ -18,6 +19,7 @@ interface EitjeDataFiltersProps {
   onDatePresetChange: (preset: DatePreset) => void;
   locations?: Array<{ value: string; label: string }>;
   onResetToDefault?: () => void;
+  disabled?: boolean; // Disable all filters except year
 }
 
 const MONTHS = [
@@ -56,6 +58,7 @@ export const EitjeDataFilters = memo(function EitjeDataFilters({
   onDatePresetChange,
   locations = [{ value: "all", label: "All Locations" }],
   onResetToDefault,
+  disabled = false,
 }: EitjeDataFiltersProps) {
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 1, currentYear, currentYear + 1];
@@ -66,6 +69,14 @@ export const EitjeDataFilters = memo(function EitjeDataFilters({
     const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
     return Array.from({ length: lastDay }, (_, i) => i + 1);
   }, [selectedYear, selectedMonth]);
+
+  // Get day of week abbreviation for a specific day
+  const getDayLabel = (day: number) => {
+    if (!selectedMonth) return String(day).padStart(2, "0");
+    const date = new Date(selectedYear, selectedMonth - 1, day);
+    const dayAbbr = format(date, "EEEEEE"); // Mo, Tu, We, Th, Fr, Sa, Su
+    return `${dayAbbr} ${String(day).padStart(2, "0")}`;
+  };
 
   // Filter out invalid locations and ensure "all" is only added once
   const validLocations = useMemo(() => {
@@ -174,7 +185,7 @@ export const EitjeDataFilters = memo(function EitjeDataFilters({
               <SelectItem value="all">Day</SelectItem>
               {availableDays.map((day) => (
                 <SelectItem key={day} value={String(day)}>
-                  {String(day).padStart(2, "0")}
+                  {getDayLabel(day)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -196,25 +207,11 @@ export const EitjeDataFilters = memo(function EitjeDataFilters({
               onDayChange(null);
             }
           }}
-          disabled={selectedMonth !== null}
+          disabled={selectedMonth !== null || disabled}
         />
       </div>
       
-      {/* Reset to Default Button */}
-      {onResetToDefault && (
-        <div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border border-black rounded-sm bg-white hover:bg-gray-100"
-            onClick={onResetToDefault}
-          >
-            Reset to Default
-          </Button>
-        </div>
-      )}
-
-      {/* Location - Single Select */}
+      {/* Location - Single Select - Always active when year is selected */}
       <div className="space-y-2">
         <span className="text-sm font-bold text-foreground">Location</span>
         <div className="flex gap-2 flex-wrap">
@@ -238,6 +235,20 @@ export const EitjeDataFilters = memo(function EitjeDataFilters({
           })}
         </div>
       </div>
+      
+      {/* Reset to Default Button */}
+      {onResetToDefault && (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border border-black rounded-sm bg-white hover:bg-gray-100"
+            onClick={onResetToDefault}
+          >
+            Reset to Default
+          </Button>
+        </div>
+      )}
     </div>
   );
 });

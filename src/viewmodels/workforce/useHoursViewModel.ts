@@ -72,7 +72,7 @@ export function useHoursViewModel() {
   const { data: locations = [], isLoading: isLoadingLocations } = useQuery({
     queryKey: ['locations'],
     queryFn: getLocations,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 60 * 60 * 1000, // 60 minutes - locations rarely change
   });
 
   const locationOptions = useMemo(() => {
@@ -99,7 +99,7 @@ export function useHoursViewModel() {
       }
     },
     enabled: locations.length > 0 && !!dateRange.start && !!dateRange.end,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes - labor data doesn't change frequently
   });
 
   // Paginate data

@@ -1,8 +1,15 @@
 /**
  * GET /api/eitje/v2/processed-hours
  * Fetch processed hours (individual shift records) from eitje_raw_data
+ * 
+ * ⚠️ REST API - COMMENTED OUT - DELETE WHEN GRAPHQL IS WORKING PROPERLY
+ * This endpoint is no longer used. The application now uses GraphQL via:
+ * - GraphQL Query: processedHours
+ * - Service: src/lib/services/workforce/hours-v2.service.ts
+ * - GraphQL Resolver: src/lib/graphql/v2-resolvers.ts
  */
 
+/*
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb/v2-connection';
 import { ObjectId } from 'mongodb';
@@ -276,4 +283,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+*/
 
