@@ -65,6 +65,15 @@
       "updated": "2025-11-04T02:01:28.246Z"
     },
     {
+      "file": "src/app/(dashboard)/settings/bork-api/page.tsx",
+      "name": "Bork Api Page",
+      "type": "page",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "529c7bba6c7aad54",
+      "updated": "2025-11-20T15:53:58.495Z"
+    },
+    {
       "file": "src/app/(dashboard)/data/sales/bork/page.tsx",
       "name": "Bork Page",
       "type": "page",
@@ -72,6 +81,15 @@
       "touch_again": false,
       "checksum": "9e0f91a8f524774b",
       "updated": "2025-11-04T01:56:15.465Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/categories-products/page.tsx",
+      "name": "Categories Products Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "eef023a911610403",
+      "updated": "2025-11-20T15:53:58.482Z"
     },
     {
       "file": "src/app/(dashboard)/settings/company/page.tsx",
@@ -99,6 +117,15 @@
       "touch_again": true,
       "checksum": "78f223339cf6f709",
       "updated": "2025-11-03T15:54:20.865Z"
+    },
+    {
+      "file": "src/app/dashboard/page.tsx",
+      "name": "Dashboard Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "70bcdc39682dc808",
+      "updated": "2025-11-20T15:53:58.555Z"
     },
     {
       "file": "src/app/(dashboard)/settings/data-import/page.tsx",
@@ -135,6 +162,15 @@
       "touch_again": false,
       "checksum": "30e765bae240eefc",
       "updated": "2025-11-03T15:54:20.874Z"
+    },
+    {
+      "file": "src/app/(dashboard)/demo-ssr/page.tsx",
+      "name": "Demo Ssr Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8102251dd5fa59a3",
+      "updated": "2025-11-20T15:53:58.484Z"
     },
     {
       "file": "src/app/(dashboard)/design-systems/page.tsx",
@@ -308,6 +344,15 @@
       "updated": "2025-11-04T01:56:15.464Z"
     },
     {
+      "file": "src/app/(dashboard)/daily-ops/keuken-analyses/page.tsx",
+      "name": "Keuken Analyses Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "c4d519bd33e77a8e",
+      "updated": "2025-11-20T15:53:58.457Z"
+    },
+    {
       "file": "src/app/(dashboard)/finance/daily-ops/kpis/page.tsx",
       "name": "Kpis Page",
       "type": "page",
@@ -315,6 +360,15 @@
       "touch_again": false,
       "checksum": "d7c47fd3d81f52fe",
       "updated": "2025-11-03T15:54:20.864Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/labor/labor-cost/page.tsx",
+      "name": "Labor Cost Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "4d17f710c2c09913",
+      "updated": "2025-11-20T15:53:58.466Z"
     },
     {
       "file": "src/app/(dashboard)/finance/data/eitje-data/labor-costs/page.tsx",
@@ -380,6 +434,33 @@
       "updated": "2025-11-04T01:56:15.465Z"
     },
     {
+      "file": "src/app/(dashboard)/operations/menus/page.tsx",
+      "name": "Menus Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f7f995af538e452c",
+      "updated": "2025-11-20T15:53:58.487Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/menus/page.tsx",
+      "name": "Menus Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f7f995af538e452c",
+      "updated": "2025-11-20T15:53:58.498Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/payment-methods/page.tsx",
+      "name": "Payment Methods Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "54d5f060d22c83d8",
+      "updated": "2025-11-20T15:53:58.475Z"
+    },
+    {
       "file": "src/app/(dashboard)/finance/pnl/page.tsx",
       "name": "Pnl Page",
       "type": "page",
@@ -407,6 +488,15 @@
       "updated": "2025-11-03T15:54:20.866Z"
     },
     {
+      "file": "src/app/(dashboard)/data/labor/productivity/page.tsx",
+      "name": "Productivity Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ef9adec79f5bc5c2",
+      "updated": "2025-11-20T15:53:58.469Z"
+    },
+    {
       "file": "src/app/(dashboard)/operations/products/page.tsx",
       "name": "Products Page",
       "type": "page",
@@ -414,6 +504,42 @@
       "touch_again": false,
       "checksum": "20bd0b07159a72dc",
       "updated": "2025-11-04T01:56:15.489Z"
+    },
+    {
+      "file": "src/app/(dashboard)/daily-ops/labor/products/page.tsx",
+      "name": "Products Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "122b7fb94ce3eaa9",
+      "updated": "2025-11-20T15:53:58.460Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/products/page.tsx",
+      "name": "Products Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "122b7fb94ce3eaa9",
+      "updated": "2025-11-20T15:53:58.476Z"
+    },
+    {
+      "file": "src/app/(dashboard)/products/page.tsx",
+      "name": "Products Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "0a49faa96c205a4b",
+      "updated": "2025-11-20T15:53:58.492Z"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/products/page.tsx",
+      "name": "Products Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "792012fa336e3bb8",
+      "updated": "2025-11-20T15:53:58.499Z"
     },
     {
       "file": "src/app/(dashboard)/finance/real-sync/page.tsx",
@@ -441,6 +567,15 @@
       "touch_again": false,
       "checksum": "56f550e6c5c4af5c",
       "updated": "2025-11-04T01:56:15.465Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/revenue/page.tsx",
+      "name": "Revenue Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ad9117451720b1e5",
+      "updated": "2025-11-20T15:53:58.477Z"
     },
     {
       "file": "src/app/(dashboard)/roadmap/page.tsx",
@@ -479,6 +614,24 @@
       "updated": "2025-11-04T01:56:15.490Z"
     },
     {
+      "file": "src/app/(dashboard)/daily-ops/labor/tables/page.tsx",
+      "name": "Tables Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "bff8b2f42652aa60",
+      "updated": "2025-11-20T15:53:58.461Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/tables/page.tsx",
+      "name": "Tables Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "bff8b2f42652aa60",
+      "updated": "2025-11-20T15:53:58.478Z"
+    },
+    {
       "file": "src/app/(dashboard)/operations/teams/page.tsx",
       "name": "Teams Page",
       "type": "page",
@@ -497,6 +650,42 @@
       "updated": "2025-11-04T01:56:15.495Z"
     },
     {
+      "file": "src/app/(dashboard)/daily-ops/labor/time-analysis/page.tsx",
+      "name": "Time Analysis Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b55db57fb12e7c40",
+      "updated": "2025-11-20T15:53:58.462Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/time-analysis/page.tsx",
+      "name": "Time Analysis Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b55db57fb12e7c40",
+      "updated": "2025-11-20T15:53:58.479Z"
+    },
+    {
+      "file": "src/app/(dashboard)/daily-ops/labor/transactions/page.tsx",
+      "name": "Transactions Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b9199f69e7861ba9",
+      "updated": "2025-11-20T15:53:58.462Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/transactions/page.tsx",
+      "name": "Transactions Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b9199f69e7861ba9",
+      "updated": "2025-11-20T15:53:58.479Z"
+    },
+    {
       "file": "src/app/(dashboard)/finance/daily-ops/trends/page.tsx",
       "name": "Trends Page",
       "type": "page",
@@ -513,6 +702,15 @@
       "touch_again": false,
       "checksum": "30e765bae240eefc",
       "updated": "2025-11-03T15:54:20.892Z"
+    },
+    {
+      "file": "src/app/(dashboard)/data/sales/bork/waiters/page.tsx",
+      "name": "Waiters Page",
+      "type": "page",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "a7aeb08279d7855d",
+      "updated": "2025-11-20T15:53:58.480Z"
     },
     {
       "file": "src/app/(dashboard)/finance/data/eitje-data/workers/page.tsx",
@@ -542,6 +740,6 @@
       "updated": "2025-11-04T01:56:15.465Z"
     }
   ],
-  "count": 60,
-  "last_updated": "2025-11-08T01:16:18.671Z"
+  "count": 82,
+  "last_updated": "2025-11-20T16:28:30.932Z"
 }

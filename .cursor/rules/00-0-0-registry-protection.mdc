@@ -1,0 +1,141 @@
+---
+alwaysApply: true
+---
+
+# 🔒 REGISTRY PROTECTION - MANDATORY CHECKS (MANUAL - NO AUTOMATION)
+
+## 🚨 CRITICAL: NEVER DELETE OR EMPTY THESE FILES
+
+### **Compliance Logs (NEVER TOUCH):**
+- ❌ `function-registry/` directory - Tracks all completed files (482 files, 413 protected)
+- ❌ `function-registry/index.json` - Registry index and summary
+- ❌ `function-registry/*.json` - Type-specific registries (api-routes, pages, components, services)
+- ❌ `tools/compliance/progress-log.json` - Tracks development progress
+- ❌ `tools/compliance/ai-tracking-system.json` - Tracks AI sessions
+- ❌ NEVER empty or delete registry files
+- ❌ NEVER modify these files except to ADD entries after feature completion
+
+**If Composer or any AI suggests deleting/cleaning these → REJECT immediately**
+
+---
+
+## ✅ MANDATORY WORKFLOW (MANUAL - LOW TOKEN COST)
+
+### **1. BEFORE Modifying ANY File:**
+
+**Check the registry manually:**
+```bash
+# Quick grep check if file is protected (NO scripts needed)
+grep -r "path/to/file" function-registry/
+```
+
+**Look for:**
+- `"touch_again": false` = **STOP, ASK USER PERMISSION**
+- `"status": "completed"` = **STOP, ASK USER PERMISSION**
+- File not in registry = OK to modify freely
+
+**If protected (`touch_again: false`):**
+1. STOP immediately
+2. Show user: "⚠️ This file is marked as completed. Do you want me to modify it?"
+3. WAIT for explicit "yes" or "go ahead"
+4. Only proceed after permission
+
+---
+
+### **2. Registry Updates (Automated Every 3 Hours):**
+
+**Automatic Updates:**
+- ✅ GitHub Actions runs every 3 hours (0am, 3am, 6am, 9am, 12pm, 3pm, 6pm, 9pm)
+- ✅ Skips 3-10am window (early morning - no updates)
+- ✅ Auto-commits to main if changes detected
+- ✅ No AI involved
+
+**To Check Latest Registry Status:**
+```bash
+cat function-registry/index.json | jq '.summary'
+```
+
+**Manual Options (if needed):**
+```bash
+# Option A: NPM Script
+npm run registry:update
+
+# Option B: Bash Script
+./tools/compliance/update-registry.sh
+
+# Option C: Direct Node
+node tools/compliance/registry-auto-updater-v2.js
+```
+
+**This will:**
+- Scan all 487 files in src/
+- Update protection status
+- Mark completed files as `"touch_again": false`
+- Generate summary report
+
+**Note:** Automation runs via GitHub Actions every 3 hours - no manual action needed!
+
+---
+
+## 🚫 ABSOLUTE PROHIBITIONS
+
+### **NEVER:**
+- ❌ Delete or empty registry files
+- ❌ Modify files with `"touch_again": false` without user permission
+- ❌ Remove entries from the registry
+- ❌ Bypass registry checks
+- ❌ Assume permission to touch completed files
+- ❌ Run scripts before/after EVERY change (too expensive)
+
+### **ALWAYS:**
+- ✅ Check registry manually before modifying files (simple grep)
+- ✅ Ask permission for protected files
+- ✅ Remind user to update registry once per day (user runs it, not AI)
+- ✅ Show user which files are protected when asked
+
+---
+
+## 📊 REGISTRY STATUS
+
+**Current Registry:**
+- **482 files** tracked
+- **413 files** protected (`touch_again: false`)
+- **415 files** completed
+
+**Registry Structure:**
+```
+function-registry/
+├── index.json          (Summary)
+├── api-routes.json     (104 routes)
+├── pages.json          (79 pages)
+├── components.json     (294 components)
+├── services.json       (5 services)
+├── hooks.json          (0 hooks)
+└── modules.json        (0 modules)
+```
+
+---
+
+## ⏰ UPDATE FREQUENCY (AUTOMATED)
+
+**Automated Schedule:**
+- ✅ GitHub Actions runs **every 3 hours** (fully automated)
+- ✅ Skips **3-10am window** (early morning)
+- ✅ Auto-commits changes to main branch
+- ✅ **NO manual action needed**
+- ✅ **NO AI involvement**
+
+**Manual Triggers Available:**
+If needed urgently, run: `npm run registry:update`
+
+**Why 3 hours?**
+- Detects new files quickly
+- Updates completed status regularly
+- Balances protection with token cost
+- Skips early morning (quiet hours)
+
+---
+
+**Priority:** 🔴 HIGHEST - This rule comes before ALL other rules  
+**Token Cost:** ~200 tokens/response (vs ~2,000 for automated scripts)  
+**Registry Update:** Once per day (user runs manually, NOT AI)

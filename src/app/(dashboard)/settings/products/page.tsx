@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useProductsViewModel } from "@/viewmodels/products/useProductsViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
@@ -20,7 +20,7 @@ import { ErrorState } from "@/components/view-data/ErrorState";
 import { SimplePagination } from "@/components/view-data/SimplePagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Sparkles, RefreshCw } from "lucide-react";
 import { Product, ProductInput, ProductUpdateInput } from "@/lib/services/graphql/queries";
 
 export default function ProductsPage() {
@@ -29,6 +29,75 @@ export default function ProductsPage() {
   const pageMetadata = getBreadcrumb(pathname);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isAggregating, setIsAggregating] = useState(false);
+  const [lastAggregated, setLastAggregated] = useState<Date | null>(null);
+
+  // Load last aggregated timestamp
+  useEffect(() => {
+    const loadLastAggregated = async () => {
+      try {
+        // Get latest aggregation timestamp from products_aggregated collection
+        const response = await fetch('/api/bork/v2/products/aggregate?status=true');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.lastAggregated) {
+            setLastAggregated(new Date(data.lastAggregated));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading last aggregated timestamp:', error);
+      }
+    };
+    loadLastAggregated();
+  }, []);
+
+  const handleAggregateProducts = async () => {
+    if (!confirm('Aggregate products from sales data?\n\nThis will update product prices and statistics from recent sales.')) {
+      return;
+    }
+
+    setIsAggregating(true);
+    try {
+      // Get date range (last 30 days)
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+      const endDate = today.toISOString().split('T')[0];
+
+      const response = await fetch('/api/bork/v2/products/aggregate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        alert(errorData.error || 'Failed to aggregate products');
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.lastAggregated) {
+        setLastAggregated(new Date(data.lastAggregated));
+      }
+      
+      alert(`✅ Successfully aggregated ${data.productsAggregated || 0} products!\n\nProducts updated with latest prices and sales data.`);
+      
+      // Refresh page to show updated data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error aggregating products:', error);
+      alert(`Failed to aggregate products: ${error.message || 'Network error'}`);
+    } finally {
+      setIsAggregating(false);
+    }
+  };
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
@@ -60,24 +129,49 @@ export default function ProductsPage() {
               {pageMetadata.subtitle && (
                 <p className="text-sm text-muted-foreground">{pageMetadata.subtitle}</p>
               )}
+              {lastAggregated && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Last aggregated: {lastAggregated.toLocaleString()}
+                </p>
+              )}
             </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Product
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New Product</DialogTitle>
-                </DialogHeader>
-                <ProductForm
-                  onSubmit={handleSave}
-                  onCancel={() => setIsCreateDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleAggregateProducts}
+                disabled={isAggregating}
+                title="Aggregate products from sales data (updates prices and statistics)"
+              >
+                {isAggregating ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Aggregating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Aggregate Products
+                  </>
+                )}
+              </Button>
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Product
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Add New Product</DialogTitle>
+                  </DialogHeader>
+                  <ProductForm
+                    onSubmit={handleSave}
+                    onCancel={() => setIsCreateDialogOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       )}
@@ -233,6 +327,7 @@ export default function ProductsPage() {
               <SimplePagination
                 currentPage={viewModel.currentPage}
                 totalPages={viewModel.totalPages}
+                totalRecords={viewModel.total}
                 onPageChange={viewModel.setCurrentPage}
               />
             )}
@@ -360,6 +455,7 @@ function ProductForm({ product, onSubmit, onCancel }: ProductFormProps) {
           checked={formData.isActive}
           onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
           className="rounded"
+          aria-label="Active"
         />
         <Label htmlFor="isActive">Active</Label>
       </div>

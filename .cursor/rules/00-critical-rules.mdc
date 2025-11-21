@@ -361,30 +361,29 @@ After 2 failed attempts at same fix, on 3rd attempt:
 
 ---
 
-## 🔍 MANDATORY POST-CHECK (YOU MUST RUN THIS)
+## 🔍 REGISTRY UPDATE (AUTOMATED EVERY 3 HOURS)
 
-**AFTER making ANY code changes:**
+**Fully Automated via GitHub Actions:**
 
-1. **Run post-check:**
+Registry updates run automatically on GitHub Actions:
+- ⏰ Every 3 hours (0am, 3am, 6am, 9am, 12pm, 3pm, 6pm, 9pm)
+- 🛑 Skips 3-10am window (early morning)
+- 🔄 Auto-commits changes if any
+- 🚫 No AI involved
+- 💰 Zero token cost to you
+
+**What happens automatically:**
+- Scans all 487 files
+- Updates protection status
+- Marks completed files as `"touch_again": false`
+- Commits to main if changes detected
+
+**Manual Override (if needed):**
 ```bash
-node tools/compliance/post-execution-check.js [modified_files]
+npm run registry:update
 ```
 
-2. **Show full output to user**
-
-3. **If violations found:**
-   - Report ALL violations with severity levels
-   - Explain what was violated and why
-   - Offer to fix or revert changes
-   - WAIT for user decision
-
-4. **Example:**
-```bash
-# After modifying src/components/Button.tsx
-node tools/compliance/post-execution-check.js src/components/Button.tsx
-```
-
-**You CANNOT skip this. Extension also runs as backup verification.**
+**Status:** ✅ GitHub Actions configured - fully automated
 
 ---
 

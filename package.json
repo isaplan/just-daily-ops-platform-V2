@@ -17,7 +17,9 @@
     "compliance:test": "node tools/compliance/periodic-test-monitor.js",
     "compliance:pre": "node tools/compliance/pre-execution-check.js",
     "compliance:post": "node tools/compliance/post-execution-check.js",
-    "compliance:registry": "node tools/compliance/registry-auto-updater.js",
+    "compliance:registry": "node tools/compliance/registry-auto-updater-v2.js",
+    "registry:update": "node tools/compliance/registry-auto-updater-v2.js",
+    "registry:schedule": "node tools/compliance/registry-cron-scheduler.js",
     "docs:update": "node scripts/docs/update-finance-docs.js",
     "docs:update:finance": "node scripts/docs/update-finance-docs.js",
     "check:missing-months": "tsx scripts/check-missing-months.ts"

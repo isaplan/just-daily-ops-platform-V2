@@ -111,6 +111,18 @@ export async function createAllIndexes(): Promise<void> {
     { key: { productName: 1, category: 1 } }, // Compound for lookups
   ]);
 
+  // Products aggregated indexes (fast product lookups)
+  await db.collection('products_aggregated').createIndexes([
+    { key: { productName: 1, locationId: 1 } }, // Compound for product+location lookups
+    { key: { productName: 1 } }, // Product name lookups
+    { key: { locationId: 1 } }, // Location-specific products
+    { key: { category: 1 } }, // Category filtering
+    { key: { mainCategory: 1 } }, // Main category (Bar/Keuken/Other)
+    { key: { lastSeen: -1 } }, // Sort by most recent
+    { key: { averagePrice: 1 } }, // Price sorting
+    { key: { totalQuantitySold: -1 } }, // Popularity sorting
+  ]);
+
   // Menus indexes
   await db.collection('menus').createIndexes([
     { key: { title: 1 } },

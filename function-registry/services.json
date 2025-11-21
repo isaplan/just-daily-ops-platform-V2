@@ -36,8 +36,17 @@
       "touch_again": false,
       "checksum": "8b8e01a84d8a648a",
       "updated": "2025-11-03T15:54:21.156Z"
+    },
+    {
+      "file": "src/lib/mongodb/v2-schema.ts",
+      "name": "V2 Schema",
+      "type": "service",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "87994dc89e74da40",
+      "updated": "2025-11-20T15:53:58.596Z"
     }
   ],
-  "count": 4,
-  "last_updated": "2025-11-08T01:16:18.671Z"
+  "count": 5,
+  "last_updated": "2025-11-20T16:28:30.932Z"
 }

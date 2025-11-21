@@ -986,6 +986,182 @@ export const resolvers = {
       }
     },
 
+    // Products Aggregated (Unified - sales data + catalog + location + menu)
+    productsAggregated: async (
+      _: any,
+      { page = 1, limit = 50, filters = {} }: { page?: number; limit?: number; filters?: any }
+    ) => {
+      try {
+        const db = await getDatabase();
+        const query: any = {};
+
+        if (filters.locationId) {
+          query.locationId = filters.locationId === 'null' || !filters.locationId 
+            ? null 
+            : toObjectId(filters.locationId);
+        }
+        if (filters.category) {
+          query.category = filters.category;
+        }
+        if (filters.mainCategory) {
+          query.mainCategory = filters.mainCategory;
+        }
+        if (filters.isActive !== undefined) {
+          query.isActive = filters.isActive;
+        }
+        if (filters.search) {
+          query.productName = { $regex: filters.search, $options: 'i' };
+        }
+        if (filters.minPrice !== undefined) {
+          query.latestPrice = { ...query.latestPrice, $gte: filters.minPrice };
+        }
+        if (filters.maxPrice !== undefined) {
+          query.latestPrice = { ...query.latestPrice, $lte: filters.maxPrice };
+        }
+
+        const skip = (page - 1) * limit;
+        const [records, total] = await Promise.all([
+          db.collection('products_aggregated')
+            .find(query)
+            .sort({ lastSeen: -1, productName: 1 })
+            .skip(skip)
+            .limit(limit)
+            .toArray(),
+          db.collection('products_aggregated').countDocuments(query),
+        ]);
+
+        return {
+          success: true,
+          records: records.map((r: any) => ({
+            id: r._id.toString(),
+            productName: r.productName,
+            locationId: r.locationId?.toString() || null,
+            category: r.category || null,
+            mainCategory: r.mainCategory || null,
+            productSku: r.productSku || null,
+            workloadLevel: r.workloadLevel || null,
+            workloadMinutes: r.workloadMinutes || null,
+            mepLevel: r.mepLevel || null,
+            mepMinutes: r.mepMinutes || null,
+            courseType: r.courseType || null,
+            notes: r.notes || null,
+            isActive: r.isActive !== undefined ? r.isActive : true,
+            averagePrice: r.averagePrice || 0,
+            latestPrice: r.latestPrice || 0,
+            minPrice: r.minPrice || 0,
+            maxPrice: r.maxPrice || 0,
+            priceHistory: (r.priceHistory || []).map((ph: any) => ({
+              date: ph.date?.toISOString() || new Date().toISOString(),
+              price: ph.price || 0,
+              quantity: ph.quantity || 0,
+              locationId: ph.locationId?.toString() || null,
+              menuId: ph.menuId?.toString() || null,
+            })),
+            totalQuantitySold: r.totalQuantitySold || 0,
+            totalRevenue: r.totalRevenue || 0,
+            totalTransactions: r.totalTransactions || 0,
+            firstSeen: r.firstSeen?.toISOString() || new Date().toISOString(),
+            lastSeen: r.lastSeen?.toISOString() || new Date().toISOString(),
+            menuIds: (r.menuIds || []).map((id: any) => id?.toString() || id),
+            menuPrices: (r.menuPrices || []).map((mp: any) => ({
+              menuId: mp.menuId?.toString() || mp.menuId,
+              menuTitle: mp.menuTitle || '',
+              price: mp.price || 0,
+              dateAdded: mp.dateAdded?.toISOString() || new Date().toISOString(),
+              dateRemoved: mp.dateRemoved?.toISOString() || null,
+            })),
+            vatRate: r.vatRate || null,
+            costPrice: r.costPrice || null,
+            lastAggregated: r.lastAggregated?.toISOString() || null,
+            createdAt: r.createdAt?.toISOString() || new Date().toISOString(),
+            updatedAt: r.updatedAt?.toISOString() || new Date().toISOString(),
+          })),
+          total,
+          page,
+          totalPages: Math.ceil(total / limit),
+          error: null,
+        };
+      } catch (error: any) {
+        console.error('[GraphQL Resolver] productsAggregated error:', error);
+        return {
+          success: false,
+          records: [],
+          total: 0,
+          page: 1,
+          totalPages: 0,
+          error: error.message || 'Failed to fetch aggregated products',
+        };
+      }
+    },
+
+    productAggregated: async (
+      _: any,
+      { productName, locationId }: { productName: string; locationId?: string }
+    ) => {
+      try {
+        const db = await getDatabase();
+        const query: any = { productName };
+        
+        if (locationId) {
+          query.locationId = toObjectId(locationId);
+        } else {
+          query.locationId = null; // Global product
+        }
+
+        const product = await db.collection('products_aggregated').findOne(query);
+        
+        if (!product) return null;
+
+        return {
+          id: product._id.toString(),
+          productName: product.productName,
+          locationId: product.locationId?.toString() || null,
+          category: product.category || null,
+          mainCategory: product.mainCategory || null,
+          productSku: product.productSku || null,
+          workloadLevel: product.workloadLevel || null,
+          workloadMinutes: product.workloadMinutes || null,
+          mepLevel: product.mepLevel || null,
+          mepMinutes: product.mepMinutes || null,
+          courseType: product.courseType || null,
+          notes: product.notes || null,
+          isActive: product.isActive !== undefined ? product.isActive : true,
+          averagePrice: product.averagePrice || 0,
+          latestPrice: product.latestPrice || 0,
+          minPrice: product.minPrice || 0,
+          maxPrice: product.maxPrice || 0,
+          priceHistory: (product.priceHistory || []).map((ph: any) => ({
+            date: ph.date?.toISOString() || new Date().toISOString(),
+            price: ph.price || 0,
+            quantity: ph.quantity || 0,
+            locationId: ph.locationId?.toString() || null,
+            menuId: ph.menuId?.toString() || null,
+          })),
+          totalQuantitySold: product.totalQuantitySold || 0,
+          totalRevenue: product.totalRevenue || 0,
+          totalTransactions: product.totalTransactions || 0,
+          firstSeen: product.firstSeen?.toISOString() || new Date().toISOString(),
+          lastSeen: product.lastSeen?.toISOString() || new Date().toISOString(),
+          menuIds: (product.menuIds || []).map((id: any) => id?.toString() || id),
+          menuPrices: (product.menuPrices || []).map((mp: any) => ({
+            menuId: mp.menuId?.toString() || mp.menuId,
+            menuTitle: mp.menuTitle || '',
+            price: mp.price || 0,
+            dateAdded: mp.dateAdded?.toISOString() || new Date().toISOString(),
+            dateRemoved: mp.dateRemoved?.toISOString() || null,
+          })),
+          vatRate: product.vatRate || null,
+          costPrice: product.costPrice || null,
+          lastAggregated: product.lastAggregated?.toISOString() || null,
+          createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
+          updatedAt: product.updatedAt?.toISOString() || new Date().toISOString(),
+        };
+      } catch (error: any) {
+        console.error('[GraphQL Resolver] productAggregated error:', error);
+        throw error;
+      }
+    },
+
     // Processed Hours
     processedHours: async (
       _: any,

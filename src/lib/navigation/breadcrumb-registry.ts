@@ -204,6 +204,20 @@ registerBreadcrumb('/products', {
   subtitle: 'Manage products, workload, MEP time, and course types',
 });
 
+// Operations
+registerBreadcrumb('/operations', {
+  label: 'Operations',
+  subtitle: 'Manage products, menus, and operational settings',
+});
+
+// Operations - Menus
+registerBreadcrumb('/operations/menus', {
+  label: 'Manage Menus',
+  subtitle: 'Create and manage menu cards with products and date ranges',
+  parentPath: '/operations',
+  parentLabel: 'Operations',
+});
+
   // Workforce V2 (for backwards compatibility)
   registerBreadcrumb('/data/workforce', {
     label: 'Workforce V2',

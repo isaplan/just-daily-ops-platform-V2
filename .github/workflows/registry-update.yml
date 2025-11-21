@@ -1,0 +1,72 @@
+name: Registry Update - Every 3 Hours
+
+on:
+  schedule:
+    # Run every 3 hours: 0am, 3am, 6am, 9am, 12pm, 3pm, 6pm, 9pm
+    - cron: '0 0,3,6,9,12,15,18,21 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-registry:
+    name: Update Function Registry
+    runs-on: ubuntu-latest
+    
+    # Skip if between 3am-10am UTC
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'schedule' && (
+        github.run_number % 3 == 1 ||
+        github.run_number % 3 == 2
+      ))
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check current hour (skip 3-10am)
+        id: check-hour
+        run: |
+          HOUR=$(date -u +%H)
+          if [ "$HOUR" -ge 3 ] && [ "$HOUR" -lt 10 ]; then
+            echo "::notice::Skipping - Current hour ($HOUR) is in skip window (3-10am UTC)"
+            exit 1
+          fi
+          echo "hour=$HOUR" >> $GITHUB_OUTPUT
+
+      - name: Update registry
+        run: npm run registry:update
+
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action - Registry Updater"
+          
+          # Check if registry files changed
+          if git diff --quiet function-registry/; then
+            echo "✅ No changes to registry"
+          else
+            echo "📝 Registry files changed, committing..."
+            git add function-registry/
+            git commit -m "🔄 chore: update registry (auto-trigger)" || true
+            git push
+          fi
+
+      - name: Log summary
+        run: |
+          echo "📊 Registry Update Summary:"
+          cat function-registry/index.json | jq '.summary'
+          echo ""
+          echo "✅ Registry update completed successfully"
+          echo "⏰ Next run: In 3 hours"
+

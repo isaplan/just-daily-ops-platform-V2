@@ -14,6 +14,16 @@ export type CourseType =
   | "drank"
   | "overig";
 
+export interface ProductMenuHistory {
+  menuId: string;
+  menuTitle: string;
+  startDate: Date;
+  endDate: Date;
+  price: number;
+  dateAdded: Date;
+  dateRemoved?: Date;
+}
+
 export interface Product {
   _id?: string;
   productName: string;

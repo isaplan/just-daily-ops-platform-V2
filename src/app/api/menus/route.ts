@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb/v2-connection';
-import { ObjectId } from 'mongodb';
 
 /**
  * GET /api/menus
@@ -34,10 +33,52 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      menus: menus.map((menu) => ({
-        ...menu,
-        _id: menu._id.toString(),
-      })),
+      menus: menus.map((menu) => {
+        const serialized: any = {
+          ...menu,
+          _id: menu._id.toString(),
+        };
+        
+        // Serialize dates safely
+        if (menu.startDate) {
+          serialized.startDate = menu.startDate instanceof Date 
+            ? menu.startDate.toISOString() 
+            : new Date(menu.startDate).toISOString();
+        }
+        if (menu.endDate) {
+          serialized.endDate = menu.endDate instanceof Date 
+            ? menu.endDate.toISOString() 
+            : new Date(menu.endDate).toISOString();
+        }
+        if (menu.createdAt) {
+          serialized.createdAt = menu.createdAt instanceof Date 
+            ? menu.createdAt.toISOString() 
+            : new Date(menu.createdAt).toISOString();
+        }
+        if (menu.updatedAt) {
+          serialized.updatedAt = menu.updatedAt instanceof Date 
+            ? menu.updatedAt.toISOString() 
+            : new Date(menu.updatedAt).toISOString();
+        }
+        
+        // Ensure productPrices array is properly serialized
+        if (menu.productPrices && Array.isArray(menu.productPrices)) {
+          serialized.productPrices = menu.productPrices.map((pp: any) => ({
+            productName: pp.productName,
+            price: pp.price || 0,
+            dateAdded: pp.dateAdded 
+              ? (pp.dateAdded instanceof Date ? pp.dateAdded.toISOString() : new Date(pp.dateAdded).toISOString())
+              : null,
+            dateRemoved: pp.dateRemoved 
+              ? (pp.dateRemoved instanceof Date ? pp.dateRemoved.toISOString() : new Date(pp.dateRemoved).toISOString())
+              : undefined,
+          }));
+        } else {
+          serialized.productPrices = [];
+        }
+        
+        return serialized;
+      }),
     });
   } catch (error) {
     console.error('[API] Error fetching menus:', error);

@@ -2,6 +2,105 @@
   "type": "api-routes",
   "functions": [
     {
+      "file": "src/app/api/admin/aggregate-worker-teams/route.ts",
+      "name": "Admin Aggregate-worker-teams API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "35e8815ac4a6b463",
+      "updated": "2025-11-20T15:53:58.501Z"
+    },
+    {
+      "file": "src/app/api/admin/archive-data/route.ts",
+      "name": "Admin Archive-data API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "7df00ed01f66fc69",
+      "updated": "2025-11-20T15:53:58.504Z"
+    },
+    {
+      "file": "src/app/api/admin/check-cron-jobs/route.ts",
+      "name": "Admin Check-cron-jobs API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "459ab0a3e89f065f",
+      "updated": "2025-11-20T15:53:58.505Z"
+    },
+    {
+      "file": "src/app/api/admin/check-data/route.ts",
+      "name": "Admin Check-data API",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "a9d3787e6b6024c8",
+      "updated": "2025-11-20T15:53:58.506Z"
+    },
+    {
+      "file": "src/app/api/admin/check-endpoints-status/route.ts",
+      "name": "Admin Check-endpoints-status API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "03d08d1d0e4ec8ce",
+      "updated": "2025-11-20T15:53:58.507Z"
+    },
+    {
+      "file": "src/app/api/admin/check-environments/route.ts",
+      "name": "Admin Check-environments API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "126b3d3b318e68ca",
+      "updated": "2025-11-20T15:53:58.508Z"
+    },
+    {
+      "file": "src/app/api/admin/check-location-data/route.ts",
+      "name": "Admin Check-location-data API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "494dbecb2ffd8aee",
+      "updated": "2025-11-20T15:53:58.509Z"
+    },
+    {
+      "file": "src/app/api/admin/check-locations/route.ts",
+      "name": "Admin Check-locations API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "56b48b090f669260",
+      "updated": "2025-11-20T15:53:58.510Z"
+    },
+    {
+      "file": "src/app/api/admin/check-processed-shifts/route.ts",
+      "name": "Admin Check-processed-shifts API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "528831ced6e3fcbd",
+      "updated": "2025-11-20T15:53:58.511Z"
+    },
+    {
+      "file": "src/app/api/admin/check-shift-collections/route.ts",
+      "name": "Admin Check-shift-collections API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "18e7e99c7d8f8c2e",
+      "updated": "2025-11-20T15:53:58.512Z"
+    },
+    {
+      "file": "src/app/api/admin/check-team-data/route.ts",
+      "name": "Admin Check-team-data API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "13423e7a81237d3c",
+      "updated": "2025-11-20T15:53:58.512Z"
+    },
+    {
       "file": "src/app/api/admin/create-aggregated-tables/route.ts",
       "name": "Admin Create-aggregated-tables API",
       "type": "api-route",
@@ -9,6 +108,87 @@
       "touch_again": false,
       "checksum": "a2ebdae05bffd9d0",
       "updated": "2025-11-03T15:54:20.893Z"
+    },
+    {
+      "file": "src/app/api/admin/create-locations/route.ts",
+      "name": "Admin Create-locations API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "aa524e34717420da",
+      "updated": "2025-11-20T15:53:58.513Z"
+    },
+    {
+      "file": "src/app/api/admin/diagnose-workers-without-teams/route.ts",
+      "name": "Admin Diagnose-workers-without-teams API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "6bf37cf46c57613e",
+      "updated": "2025-11-20T15:53:58.514Z"
+    },
+    {
+      "file": "src/app/api/admin/get-all-environments/route.ts",
+      "name": "Admin Get-all-environments API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1fab6c0571a18a8d",
+      "updated": "2025-11-20T15:53:58.514Z"
+    },
+    {
+      "file": "src/app/api/admin/import-worker-contracts/route.ts",
+      "name": "Admin Import-worker-contracts API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1a1a5af4e5c0ddcd",
+      "updated": "2025-11-20T15:53:58.515Z"
+    },
+    {
+      "file": "src/app/api/admin/inspect-raw-record/route.ts",
+      "name": "Admin Inspect-raw-record API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "bcd200c257a6d2c7",
+      "updated": "2025-11-20T15:53:58.516Z"
+    },
+    {
+      "file": "src/app/api/admin/inspect-revenue-record/route.ts",
+      "name": "Admin Inspect-revenue-record API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "b3f0920730b066a8",
+      "updated": "2025-11-20T15:53:58.517Z"
+    },
+    {
+      "file": "src/app/api/admin/map-eitje-to-locations/route.ts",
+      "name": "Admin Map-eitje-to-locations API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "9969e7cea47a1d96",
+      "updated": "2025-11-20T15:53:58.520Z"
+    },
+    {
+      "file": "src/app/api/admin/parse-worker-contracts/route.ts",
+      "name": "Admin Parse-worker-contracts API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "668bf1e4a11f8b34",
+      "updated": "2025-11-20T15:53:58.520Z"
+    },
+    {
+      "file": "src/app/api/admin/seed-workers/route.ts",
+      "name": "Admin Seed-workers API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "776c546656ac8efa",
+      "updated": "2025-11-20T15:53:58.521Z"
     },
     {
       "file": "src/app/api/docs/route.ts",
@@ -54,6 +234,177 @@
       "touch_again": false,
       "checksum": "d6d2a5db040be622",
       "updated": "2025-11-03T15:54:20.931Z"
+    },
+    {
+      "file": "src/app/api/admin/keuken-analyses/aggregate/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "55e2bc826e664652",
+      "updated": "2025-11-20T15:53:58.519Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/aggregate/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "fb28f48a38d4ea69",
+      "updated": "2025-11-20T15:53:58.522Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/categories/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d1d45b070f9aa06f",
+      "updated": "2025-11-20T15:53:58.523Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/categories-products/aggregate/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "8d1a4019fcf0ba18",
+      "updated": "2025-11-20T15:53:58.525Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/check-data/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "273f82b8235bdac4",
+      "updated": "2025-11-20T15:53:58.526Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/cron/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f129a7455b21c0f7",
+      "updated": "2025-11-20T15:53:58.527Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/master-sync/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "85f1c1519e680357",
+      "updated": "2025-11-20T15:53:58.528Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/products/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1097cd099841913e",
+      "updated": "2025-11-20T15:53:58.529Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/sales/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "86a1ec941e411a1f",
+      "updated": "2025-11-20T15:53:58.530Z"
+    },
+    {
+      "file": "src/app/api/bork/v2/sync/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "in-progress",
+      "touch_again": true,
+      "checksum": "4effd691c9c16ab5",
+      "updated": "2025-11-20T15:53:58.532Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/aggregate/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "edc207b7251e3abc",
+      "updated": "2025-11-20T15:53:58.534Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/aggregated-hours/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "85c270dab6aba9d5",
+      "updated": "2025-11-20T15:53:58.536Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/check-data/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "f27caa725937bd59",
+      "updated": "2025-11-20T15:53:58.537Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/cron/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1139f8b7253ef485",
+      "updated": "2025-11-20T15:53:58.538Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/processed-hours/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "51b5ff53b5609c64",
+      "updated": "2025-11-20T15:53:58.541Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/progress/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "fbf678eb11d56b11",
+      "updated": "2025-11-20T15:53:58.543Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/sync/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "46759d17af4843ae",
+      "updated": "2025-11-20T15:53:58.544Z"
+    },
+    {
+      "file": "src/app/api/eitje/v2/unique-teams/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "62bde949aa8916a4",
+      "updated": "2025-11-20T15:53:58.545Z"
+    },
+    {
+      "file": "src/app/api/menus/[id]/products/route.ts",
+      "name": "API Route",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "27afabd7b796b85a",
+      "updated": "2025-11-20T15:53:58.547Z"
     },
     {
       "file": "src/app/api/bork/aggregate/route.ts",
@@ -389,6 +740,15 @@
       "updated": "2025-11-03T15:54:20.916Z"
     },
     {
+      "file": "src/app/api/eitje/test-connection/route.ts",
+      "name": "Eitje Test-connection API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "3cb734b338266e6a",
+      "updated": "2025-11-20T15:53:58.533Z"
+    },
+    {
       "file": "src/app/api/eitje/test-endpoint/route.ts",
       "name": "Eitje Test-endpoint API",
       "type": "api-route",
@@ -452,6 +812,15 @@
       "updated": "2025-11-03T15:54:20.919Z"
     },
     {
+      "file": "src/app/api/graphql/route.ts",
+      "name": "Graphql API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "e40b62bd9b02370d",
+      "updated": "2025-11-20T15:53:58.546Z"
+    },
+    {
       "file": "src/app/api/integrated/aggregate/route.ts",
       "name": "Integrated Aggregate API",
       "type": "api-route",
@@ -459,6 +828,51 @@
       "touch_again": false,
       "checksum": "4ea7639a8ff0104d",
       "updated": "2025-11-03T15:54:20.919Z"
+    },
+    {
+      "file": "src/app/api/menus/[id]/route.ts",
+      "name": "Menus [id] API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "2dc7aece9c74d2f9",
+      "updated": "2025-11-20T15:53:58.548Z"
+    },
+    {
+      "file": "src/app/api/menus/route.ts",
+      "name": "Menus API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "d3b0a617b3f1a16c",
+      "updated": "2025-11-20T15:53:58.549Z"
+    },
+    {
+      "file": "src/app/api/products/update-course-type/route.ts",
+      "name": "Products Update-course-type API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "ec887754dd17de33",
+      "updated": "2025-11-20T15:53:58.550Z"
+    },
+    {
+      "file": "src/app/api/products/update-mep/route.ts",
+      "name": "Products Update-mep API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "bd325a4888ebeb7b",
+      "updated": "2025-11-20T15:53:58.551Z"
+    },
+    {
+      "file": "src/app/api/products/update-workload/route.ts",
+      "name": "Products Update-workload API",
+      "type": "api-route",
+      "status": "completed",
+      "touch_again": false,
+      "checksum": "1b17f2e2dfac4c4d",
+      "updated": "2025-11-20T15:53:58.552Z"
     },
     {
       "file": "src/app/api/roadmap/automate/route.ts",
@@ -524,6 +938,6 @@
       "updated": "2025-11-03T15:54:20.940Z"
     }
   ],
-  "count": 58,
-  "last_updated": "2025-11-08T01:16:18.671Z"
+  "count": 104,
+  "last_updated": "2025-11-20T16:28:30.932Z"
 }

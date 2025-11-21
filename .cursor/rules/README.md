@@ -6,8 +6,22 @@ This directory contains optimized, branch-aware compliance rules that guide Curs
 
 ## 📂 Files
 
+### **00-0-0-registry-protection.mdc** (~120 lines)
+**Priority:** ABSOLUTE HIGHEST (loaded first)
+
+**Contains:**
+- 🚨 **CRITICAL: NEVER DELETE** - Compliance logs protection
+- ✅ **MANUAL Workflow** - Check registry manually (NO scripts, low token cost)
+- 🔒 **Registry Status** - 482 files tracked, 413 protected
+- 📊 **Update Frequency** - ONCE PER DAY (user runs manually, NOT AI)
+- 🚫 **Absolute Prohibitions** - Never bypass registry checks, AI never runs updater
+
+**Note:** Maximum token savings - AI only checks registry, user updates once per day
+
+---
+
 ### **00-0-project-goals.mdc** (~150 lines)
-**Priority:** HIGHEST (loaded first)
+**Priority:** HIGHEST (loaded second)
 
 **Contains:**
 - 🎯 **Project Goals** - V2 Migration context (MongoDB + GraphQL + MVVM)
@@ -21,8 +35,8 @@ This directory contains optimized, branch-aware compliance rules that guide Curs
 
 ---
 
-### **00-critical-rules.mdc** (~440 lines)
-**Priority:** HIGHEST (loaded second)
+### **00-critical-rules.mdc** (~420 lines)
+**Priority:** HIGHEST (loaded third)
 
 **Contains:**
 - 🛑 **RULE #0**: Understand → Clarify → Confirm → Build
@@ -254,25 +268,30 @@ You'll know the system works when:
 ## 📚 Related Files
 
 - **Rules**: `.cursor/rules/*.mdc` (this directory)
-- **Permission Log**: `.ai-compliance-permissions.json` (root)
-- **Registry**: `function-registry.json` (284+ protected files)
-- **Post-Check Script**: `tools/compliance/post-execution-check.js`
-- **GitHub Actions**: `.github/workflows/compliance-check.yml`
-- **Extension**: `.vscode-extension/ai-compliance-monitor/`
+- **Registry**: `function-registry/` directory (482 files tracked, 413 protected)
+- **Registry Index**: `function-registry/index.json` (summary and stats)
+- **Registry Updater**: `tools/compliance/registry-auto-updater-v2.js` (user runs once per day)
+- **Progress Log**: `tools/compliance/progress-log.json`
+- **Tracking System**: `tools/compliance/ai-tracking-system.json`
+- **Scripts**: `tools/compliance/pre-execution-check.js` and `post-execution-check.js` (NOT used per-change to save tokens)
 
 ---
 
 ## 🔄 Updates
 
-**Version:** 2.0 (Branch-Aware System)  
-**Date:** 2025-11-10  
+**Version:** 3.1 (Maximum Token Savings - Once Per Day Updates)  
+**Date:** 2025-11-20  
 **Changes:**
-- Added branch-aware protection (main vs feature)
-- Implemented C1 permission workflow
-- Added permission logging (commit + JSON file)
-- Optimized tokens (33% reduction)
-- Split into modular files (3 files vs 1)
-- Updated GitHub Actions for branch-aware enforcement
+- 🔒 Added `00-0-0-registry-protection.mdc` (protects compliance system)
+- 📊 Populated registry with 482 files (413 protected)
+- 🧹 **REMOVED automated script execution** (saves tokens)
+- ✅ **MANUAL registry checks only** (grep before changes)
+- ⚡ **Token optimization: ~80% reduction** (400 vs 2,000 tokens/response)
+- 🔄 **Registry updates ONCE PER DAY** (user runs manually, NOT AI)
+- 📁 Registry split into type-specific files (api-routes, pages, components, etc.)
+- 💰 **Use Haiku model for registry updates** (cheapest option)
+
+**Key Change:** AI never runs scripts - only manual grep checks. User runs registry updater once per day to maximize savings
 
 **Previous Version:** 1.0 (backup: `compliance-rules.mdc.backup`)
 

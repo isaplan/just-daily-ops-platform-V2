@@ -1,70 +1,54 @@
 {
   "version": "2.0.0",
-  "last_updated": "2025-11-08T01:16:18.671Z",
+  "last_updated": "2025-11-20T16:28:30.932Z",
   "registry_files": {
     "api-routes": {
       "file": "api-routes.json",
-      "count": 58,
-      "updated": "2025-11-08T01:16:18.671Z"
+      "count": 104,
+      "updated": "2025-11-20T16:28:30.932Z"
     },
     "pages": {
       "file": "pages.json",
-      "count": 60,
-      "updated": "2025-11-08T01:16:18.671Z"
+      "count": 82,
+      "updated": "2025-11-20T16:28:30.932Z"
     },
     "components": {
       "file": "components.json",
-      "count": 221,
-      "updated": "2025-11-08T01:16:18.671Z"
+      "count": 296,
+      "updated": "2025-11-20T16:28:30.932Z"
     },
     "services": {
       "file": "services.json",
-      "count": 4,
-      "updated": "2025-11-08T01:16:18.671Z"
+      "count": 5,
+      "updated": "2025-11-20T16:28:30.932Z"
     },
     "hooks": {
       "file": "hooks.json",
       "count": 0,
-      "updated": "2025-11-08T01:16:18.671Z"
+      "updated": "2025-11-20T16:28:30.932Z"
     },
     "modules": {
       "file": "modules.json",
       "count": 0,
-      "updated": "2025-11-08T01:16:18.671Z"
-    },
-    "archive-reference": {
-      "file": "archive-reference.json",
-      "count": 1,
-      "updated": "2025-01-27T00:00:00.000Z"
+      "updated": "2025-11-20T16:28:30.932Z"
     }
   },
   "summary": {
-    "total_functions": 343,
+    "total_functions": 487,
     "by_status": {
-      "completed": 286,
-      "in-progress": 57,
-      "archived": 1
+      "completed": 419,
+      "in-progress": 68
     },
-    "protected": 283
-  },
-  "archive_config": {
-    "folder": "old-pages-sql-scripts",
-    "status": "reference_only",
-    "excluded_from_checks": true,
-    "usage_restrictions": {
-      "direct_copy": false,
-      "direct_import": false,
-      "direct_reference": false
-    }
+    "protected": 416
   },
   "last_scan": {
-    "timestamp": "2025-11-08T01:16:18.671Z",
-    "files_scanned": 345,
+    "timestamp": "2025-11-20T16:28:30.932Z",
+    "files_scanned": 221,
     "changes": {
       "new": 0,
       "updated": 0,
       "removed": 0,
-      "unchanged": 343
+      "unchanged": 212
     }
   },
   "compliance_config": {

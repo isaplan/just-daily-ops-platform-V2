@@ -125,6 +125,81 @@ export interface BorkAggregated {
 }
 
 // ============================================
+// PRODUCTS AGGREGATED DATA (UNIFIED)
+// ============================================
+// Unified product collection combining:
+// - Workload/MEP metrics (from product catalog)
+// - Sales data (prices, revenue, from bork_raw_data)
+// - Location-specific information
+// - Menu associations
+
+export interface ProductsAggregated {
+  _id?: ObjectId;
+  productName: string;
+  locationId?: ObjectId; // Optional: location-specific product info
+  category?: string;
+  mainCategory?: string; // "Bar", "Keuken", "Other"
+  productSku?: string;
+  
+  // ============================================
+  // WORKLOAD & MEP METRICS (from product catalog)
+  // ============================================
+  workloadLevel?: 'low' | 'mid' | 'high';
+  workloadMinutes?: number; // Time to prepare during service
+  mepLevel?: 'low' | 'mid' | 'high'; // MEP = Mise en Place (prep time)
+  mepMinutes?: number; // Prep time before service
+  courseType?: string; // e.g., "starter", "main", "dessert"
+  notes?: string;
+  isActive: boolean; // Product is active/available
+  
+  // ============================================
+  // PRICE INFORMATION (from sales data)
+  // ============================================
+  averagePrice: number; // Average unit price across all sales
+  latestPrice: number; // Most recent price seen
+  minPrice: number; // Lowest price seen
+  maxPrice: number; // Highest price seen
+  priceHistory: Array<{
+    date: Date;
+    price: number;
+    quantity: number;
+    locationId?: ObjectId;
+    menuId?: ObjectId;
+  }>; // Recent price history (last 30 days)
+  
+  // ============================================
+  // SALES STATISTICS (from bork_raw_data)
+  // ============================================
+  totalQuantitySold: number; // Total quantity sold
+  totalRevenue: number; // Total revenue from this product
+  totalTransactions: number; // Number of transactions containing this product
+  firstSeen: Date; // First date this product was sold
+  lastSeen: Date; // Most recent date this product was sold
+  
+  // ============================================
+  // MENU ASSOCIATIONS
+  // ============================================
+  menuIds?: ObjectId[]; // Menus this product is assigned to
+  menuPrices?: Array<{
+    menuId: ObjectId;
+    menuTitle: string;
+    price: number;
+    dateAdded: Date;
+    dateRemoved?: Date;
+  }>; // Price history across menus
+  
+  // ============================================
+  // METADATA
+  // ============================================
+  vatRate?: number; // Average VAT rate
+  costPrice?: number; // Average cost price (if available)
+  
+  createdAt: Date;
+  updatedAt: Date;
+  lastAggregated?: Date; // Last time products were aggregated from sales data
+}
+
+// ============================================
 // EITJE DATA
 // ============================================
 

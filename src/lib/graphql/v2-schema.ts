@@ -749,6 +749,14 @@ export const typeDefs = `#graphql
     product(id: ID!): Product
     productByName(productName: String!): Product
     
+    # Products Aggregated (Unified - sales data + catalog + location + menu)
+    productsAggregated(
+      page: Int
+      limit: Int
+      filters: ProductsAggregatedFilters
+    ): ProductsAggregatedResponse!
+    productAggregated(productName: String!, locationId: ID): ProductsAggregated
+    
     # Daily Sales
     dailySales(
       startDate: String!
@@ -897,6 +905,88 @@ export const typeDefs = `#graphql
     mepLevel: String
     isActive: Boolean
     search: String # Search by product name
+  }
+
+  # ============================================
+  # PRODUCTS AGGREGATED (UNIFIED)
+  # ============================================
+
+  type PriceHistoryEntry {
+    date: String!
+    price: Float!
+    quantity: Float!
+    locationId: ID
+    menuId: ID
+  }
+
+  type MenuPriceEntry {
+    menuId: ID!
+    menuTitle: String!
+    price: Float!
+    dateAdded: String!
+    dateRemoved: String
+  }
+
+  type ProductsAggregated {
+    id: ID!
+    productName: String!
+    locationId: ID
+    category: String
+    mainCategory: String # "Bar", "Keuken", "Other"
+    productSku: String
+    
+    # Workload & MEP Metrics
+    workloadLevel: String # "low" | "mid" | "high"
+    workloadMinutes: Float
+    mepLevel: String # "low" | "mid" | "high"
+    mepMinutes: Float
+    courseType: String
+    notes: String
+    isActive: Boolean!
+    
+    # Price Information
+    averagePrice: Float!
+    latestPrice: Float!
+    minPrice: Float!
+    maxPrice: Float!
+    priceHistory: [PriceHistoryEntry!]!
+    
+    # Sales Statistics
+    totalQuantitySold: Float!
+    totalRevenue: Float!
+    totalTransactions: Int!
+    firstSeen: String!
+    lastSeen: String!
+    
+    # Menu Associations
+    menuIds: [ID!]
+    menuPrices: [MenuPriceEntry!]
+    
+    # Metadata
+    vatRate: Float
+    costPrice: Float
+    lastAggregated: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type ProductsAggregatedResponse {
+    success: Boolean!
+    records: [ProductsAggregated!]!
+    total: Int!
+    page: Int!
+    totalPages: Int!
+    error: String
+  }
+
+  input ProductsAggregatedFilters {
+    locationId: ID
+    category: String
+    mainCategory: String
+    isActive: Boolean
+    search: String
+    minPrice: Float
+    maxPrice: Float
   }
 
   type Mutation {

@@ -414,6 +414,28 @@ class CronJobManager {
           
           const result = await response.json();
           console.log(`[Cron Job] Bork sync for location ${connection.locationId}: ${result.recordsSaved || 0} records`);
+          
+          // ✅ Trigger products aggregation after successful sync (non-blocking)
+          if (result.recordsSaved > 0) {
+            try {
+              const aggregateResponse = await fetch(`${baseUrl}/api/bork/v2/products/aggregate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  startDate,
+                  endDate,
+                  locationId: connection.locationId?.toString(),
+                }),
+              });
+              
+              const aggregateResult = await aggregateResponse.json();
+              if (aggregateResult.success) {
+                console.log(`[Cron Job] Products aggregated for location ${connection.locationId}: ${aggregateResult.productsAggregated || 0} products`);
+              }
+            } catch (aggError: any) {
+              console.warn(`[Cron Job] Products aggregation failed for location ${connection.locationId} (non-blocking):`, aggError.message);
+            }
+          }
         } catch (error: any) {
           console.error(`[Cron Job] Error syncing Bork location ${connection.locationId}:`, error.message);
         }
@@ -458,6 +480,28 @@ class CronJobManager {
           
           const result = await response.json();
           console.log(`[Cron Job] Bork historical sync for location ${connection.locationId}: ${result.recordsSaved || 0} records`);
+          
+          // ✅ Trigger products aggregation after successful historical sync (non-blocking)
+          if (result.recordsSaved > 0) {
+            try {
+              const aggregateResponse = await fetch(`${baseUrl}/api/bork/v2/products/aggregate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  startDate: overallStartDate,
+                  endDate: overallEndDate,
+                  locationId: connection.locationId?.toString(),
+                }),
+              });
+              
+              const aggregateResult = await aggregateResponse.json();
+              if (aggregateResult.success) {
+                console.log(`[Cron Job] Products aggregated (historical) for location ${connection.locationId}: ${aggregateResult.productsAggregated || 0} products`);
+              }
+            } catch (aggError: any) {
+              console.warn(`[Cron Job] Products aggregation failed (historical) for location ${connection.locationId} (non-blocking):`, aggError.message);
+            }
+          }
         } catch (error: any) {
           console.error(`[Cron Job] Error in Bork historical sync for location ${connection.locationId}:`, error.message);
         }

@@ -3,12 +3,21 @@
  * Menu cards with products and date ranges
  */
 
+export interface MenuProduct {
+  productName: string;
+  price: number; // Price on this menu
+  dateAdded: Date; // When product was added to menu
+  dateRemoved?: Date; // When product was removed (if applicable)
+}
+
 export interface Menu {
   _id?: string;
   title: string;
   startDate: Date;
   endDate: Date;
-  productIds: string[]; // Product names assigned to this menu
+  locationId?: string; // Location this menu is for
+  productIds: string[]; // Product names assigned to this menu (legacy - for backward compatibility)
+  productPrices: MenuProduct[]; // Products with prices on this menu
   isActive: boolean;
   notes?: string;
   createdAt: Date;

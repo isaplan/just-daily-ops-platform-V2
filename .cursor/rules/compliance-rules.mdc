@@ -75,41 +75,50 @@ Protected files include (but not limited to):
 
 ---
 
-## ✅ **MANDATORY PRE-EXECUTION CHECK**
+## ✅ **MANDATORY REGISTRY CHECK (MANUAL - NO SCRIPTS)**
 
 **BEFORE ANY code modification, you MUST:**
 
-1. **Run Pre-Check Script:**
-node tools/compliance/pre-execution-check.js "<task description>"2. **Parse JSON Output:**
-- Status: `PASS` = proceed, `WARN` = show warnings, `BLOCK` = **STOP**
-- Existing code: Review before creating new code
-- Violations: Fix violations before proceeding
+1. **Check registry manually:**
+```bash
+grep -r "path/to/file" function-registry/
+```
 
-3. **Act on Status:**
-- **BLOCK** → **STOP** → Report violations → Wait for user decision → Do NOT proceed
-- **WARN** → Show warnings (existing code found) → Ask user to confirm → Wait for approval
-- **PASS** → Proceed cautiously → Use existing code if found → Minimal changes only
+2. **Look for protection status:**
+- `"touch_again": false` = **STOP, ASK USER PERMISSION**
+- `"status": "completed"` = **STOP, ASK USER PERMISSION**
+- File not in registry = OK to modify freely
+
+3. **If protected:**
+- STOP immediately
+- Ask user: "⚠️ This file is marked as completed. Do you want me to modify it?"
+- WAIT for explicit "yes" or "go ahead"
+- Only proceed after permission
 
 ---
 
-## 🔍 **MANDATORY POST-EXECUTION CHECK**
+## 🔍 **REGISTRY UPDATE (AUTOMATED EVERY 3 HOURS)**
 
-**AFTER ANY code modification, you MUST:**
+**Fully Automated - No Action Required:**
 
-1. **Run Post-Check Script:**
-node tools/compliance/post-execution-check.js [modified files]2. **Parse JSON Output:**
-- Status: `PASS` = no violations, `VIOLATIONS` = violations found
-- Summary: Files modified, lines changed, violation counts
-- Violations: List with severity (CRITICAL, HIGH, MEDIUM, LOW)
+Registry is updated automatically via GitHub Actions:
+- ⏰ Every 3 hours (0am, 3am, 6am, 9am, 12pm, 3pm, 6pm, 9pm)
+- 🛑 Skips 3-10am window
+- 🔄 Auto-commits if changes
+- 💰 Zero cost to you
 
-3. **Act on Violations:**
-- **Report immediately** to user with:
-  - List of all violations
-  - Severity levels
-  - Suggested fixes
-  - Required actions
-- **Ask user** to choose: Fix now, Continue as-is, or Revert
-- **STOP** until user decides
+**What updates automatically:**
+- Scans all 487 files
+- Detects new/changed files
+- Updates protection status
+- Marks completed as `"touch_again": false`
+
+**Manual Trigger (optional):**
+```bash
+npm run registry:update
+```
+
+**Status:** ✅ Fully automated - you don't need to do anything
 
 ---
 
@@ -254,28 +263,25 @@ This project has extensive utilities in:
 
 ## 📊 **WORKFLOW ENFORCEMENT**
 
-### **🔄 STANDARD WORKFLOW**
+### **🔄 STANDARD WORKFLOW (AUTO-REGISTRY + MANUAL CHECKS)**
 1. **User requests code change**
-2. **AI checks `function-registry.json`** → Verify file not protected
-3. **AI runs `pre-execution-check.js`** → Parse output → Act on status
-4. **If PASS:** Execute code modification (max 120 lines)
-5. **AI runs `post-execution-check.js`** → Parse output → Report violations
-6. **If violations:** Report to user → Wait for decision → Do NOT proceed
-7. **If PASS:** Confirm completion → Summarize changes
+2. **AI checks registry manually** → `grep -r "file" function-registry/`
+3. **If protected (`touch_again: false`)** → Ask user permission → Wait for approval
+4. **If not protected:** Execute code modification (max 120 lines)
+5. **Registry auto-updates** → GitHub Actions every 3 hours (no action needed)
+6. **Confirm to user:** Summarize changes
 
 ### **⚠️ WHEN TO STOP**
-- Pre-check returns `BLOCK` status
-- Protected file detected (`touch_again: false`)
+- Protected file detected (`touch_again: false`) without user permission
 - Change requires >120 lines
 - Existing code found that accomplishes the task
 - User has not approved proposed changes
 - After 2 failed attempts at same fix
 
 ### **✅ WHEN TO PROCEED**
-- Pre-check returns `PASS` status
+- File not in registry OR user approved modification
 - Change is <120 lines
-- File is NOT protected in registry
-- User has explicitly approved
+- User has explicitly approved plan
 - Following all development standards
 
 ---
@@ -284,31 +290,41 @@ This project has extensive utilities in:
 
 You're doing well if:
 - ✅ User doesn't have to repeat requests
-- ✅ Protected files stay untouched
+- ✅ Protected files stay untouched without permission
 - ✅ Changes are minimal and targeted
 - ✅ No existing functionality is destroyed
 - ✅ User knows exactly what will change before it happens
 - ✅ Code follows all development standards
-- ✅ Modular testing pattern is followed
-- ✅ Pre/post-checks always run
-- ✅ Violations are reported immediately
+- ✅ Registry is checked manually before every change
+- ✅ User is reminded to update registry once per day (not AI)
 
 ---
 
 ## 🔧 **QUICK REFERENCE**
 
 ### **BEFORE ANY CODE CHANGE:**
-# 1. Check registry
-grep -A 1 "\"file\": \"path/to/file\"" function-registry.json
+```bash
+# Manual registry check (NO scripts - low token cost)
+grep -r "path/to/file" function-registry/
 
-# 2. Run pre-check
-node tools/compliance/pre-execution-check.js "your task description"
+# If "touch_again": false → ASK USER PERMISSION
+# If not in registry → PROCEED
+```
 
-# 3. If BLOCK or WARN → STOP → Report to user### **AFTER ANY CODE CHANGE:**
-# 1. Run post-check
-node tools/compliance/post-execution-check.js path/to/modified/files
+### **AUTOMATIC REGISTRY UPDATES:**
+```bash
+# GitHub Actions handles this - nothing to do!
+# Updates run automatically every 3 hours
+# Skips 3-10am window
 
-# 2. If violations → STOP → Report to user → Wait for decision### **EXEMPT FILES (No size checks, but still registry-protected):**
+# Manual trigger (optional):
+npm run registry:update
+
+# Check status anytime:
+cat function-registry/index.json | jq '.summary'
+```
+
+**Status:** ✅ Fully automated via GitHub Actions### **EXEMPT FILES (No size checks, but still registry-protected):**
 - `function-registry.json`
 - `ai-tracking-system.json`
 - `progress-log.json`
