@@ -168,3 +168,4 @@ With Master Data Sync restored:
 **Expected Result**: Parent/main categories properly detected and displayed in the categories-products page!
 
 
+

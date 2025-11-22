@@ -281,3 +281,4 @@ export interface EndpointConfig {
 - **Critical Fix**: Corrected maxDays for shifts from 90 → 7 days
 
 
+

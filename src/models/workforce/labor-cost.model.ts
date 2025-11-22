@@ -54,3 +54,4 @@ export interface LocationOption {
 
 export type TimePeriodFilter = "year" | "month" | "week" | "day";
 
+

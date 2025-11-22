@@ -147,7 +147,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fetch raw data
+    // ✅ NOTE: This fetches all raw data for aggregation
+    // This is acceptable because:
+    // 1. Background job (runs via cron, not user-facing)
+    // 2. Needs all data to calculate accurate aggregations
+    // 3. Has 5-minute timeout (maxDuration = 300)
+    // 4. Uses indexed queries (locationId + date)
+    // For very large datasets (>100k records), consider batching in chunks
     const rawData = await db.collection('bork_raw_data')
       .find(query)
       .toArray();

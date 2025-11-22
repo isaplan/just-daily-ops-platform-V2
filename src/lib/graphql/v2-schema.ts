@@ -326,6 +326,14 @@ export const typeDefs = `#graphql
     transactionCount: Int!
   }
 
+  type ProductLocationDetail {
+    locationId: ID
+    locationName: String
+    lastSoldDate: String
+    totalQuantitySold: Float
+    totalRevenue: Float
+  }
+
   type ProductAggregate {
     productName: String!
     daily: TimePeriodTotals!
@@ -337,6 +345,8 @@ export const typeDefs = `#graphql
     mepLevel: String
     mepMinutes: Float
     courseType: String
+    isActive: Boolean
+    locationDetails: [ProductLocationDetail!]
   }
 
   type CategoryAggregate {
@@ -362,6 +372,21 @@ export const typeDefs = `#graphql
     success: Boolean!
     categories: [CategoryAggregate!]!
     mainCategories: [MainCategoryAggregate!]
+    totals: TimePeriodTotals!
+    error: String
+  }
+
+  # Category Metadata (lightweight - no products)
+  type CategoryMetadata {
+    categoryName: String!
+    mainCategoryName: String
+    productCount: Int!
+    total: TimePeriodTotals!
+  }
+
+  type CategoriesMetadataResponse {
+    success: Boolean!
+    categories: [CategoryMetadata!]!
     totals: TimePeriodTotals!
     error: String
   }
@@ -772,6 +797,21 @@ export const typeDefs = `#graphql
       endDate: String!
       filters: CategoriesProductsFilters
     ): CategoriesProductsResponse!
+    
+    # Lightweight categories metadata (for fast first paint)
+    categoriesMetadata(
+      startDate: String!
+      endDate: String!
+      filters: CategoriesProductsFilters
+    ): CategoriesMetadataResponse!
+    
+    # Load products for a specific category (lazy loading)
+    categoryProducts(
+      categoryName: String!
+      startDate: String!
+      endDate: String!
+      filters: CategoriesProductsFilters
+    ): CategoryAggregate!
     
     # Sales Aggregations
     waiterPerformance(

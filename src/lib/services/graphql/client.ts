@@ -17,6 +17,10 @@ export interface GraphQLResponse<T = any> {
   errors?: Array<{ message: string; path?: string[] }>;
 }
 
+// ✅ Singleton pattern for Apollo Server to prevent memory leaks
+let apolloServerInstance: any = null;
+let apolloServerPromise: Promise<any> | null = null;
+
 /**
  * Get the GraphQL endpoint URL
  * For Server Components: Construct absolute URL
@@ -64,17 +68,39 @@ export async function executeGraphQL<T = any>(
   // ✅ SERVER-SIDE: Use Apollo Server execution (no HTTP)
   if (isServer) {
     try {
-      // Import Apollo Server components
-      const { ApolloServer } = await import('@apollo/server');
-      const { typeDefs } = await import('@/lib/graphql/v2-schema');
-      const { resolvers } = await import('@/lib/graphql/v2-resolvers');
+      // ✅ Singleton pattern: Reuse existing Apollo Server instance
+      if (!apolloServerPromise) {
+        apolloServerPromise = (async () => {
+          try {
+            const { ApolloServer } = await import('@apollo/server');
+            const { typeDefs } = await import('@/lib/graphql/v2-schema');
+            const { resolvers } = await import('@/lib/graphql/v2-resolvers');
+            
+            const server = new ApolloServer({
+              typeDefs,
+              resolvers,
+              introspection: false,
+            });
+            
+            // Start the server (required before executing operations)
+            await server.start();
+            
+            return server;
+          } catch (error) {
+            // Reset promise on error so next call can retry
+            apolloServerPromise = null;
+            throw error;
+          }
+        })();
+      }
       
-      // Create a temporary Apollo Server instance for execution
-      const server = new ApolloServer({
-        typeDefs,
-        resolvers,
-        introspection: false,
-      });
+      // Wait for server to be ready (or get existing instance)
+      const server = await apolloServerPromise;
+      
+      // Store instance for reuse
+      if (!apolloServerInstance) {
+        apolloServerInstance = server;
+      }
       
       // Execute the query using Apollo Server's execution engine
       const result = await server.executeOperation(
@@ -97,8 +123,12 @@ export async function executeGraphQL<T = any>(
       
       // Transform Apollo result to GraphQLResponse format
       if (result.body.kind === 'single') {
+        // ✅ Force serialization through JSON to ensure all MongoDB objects/Date objects are converted to plain objects/strings
+        // This prevents "Only plain objects" errors when passing data from Server Components to Client Components
+        const serializedData = JSON.parse(JSON.stringify(result.body.singleResult.data));
+        
         return {
-          data: result.body.singleResult.data as T,
+          data: serializedData as T,
           errors: result.body.singleResult.errors?.map((e: any) => ({
             message: e.message,
             path: e.path,
@@ -141,8 +171,8 @@ export async function executeGraphQL<T = any>(
       },
       body: requestBody,
       cache: 'no-store', // Don't cache GraphQL requests
-      // Shorter timeout for client (10s)
-      signal: AbortSignal.timeout(10000),
+      // Increased timeout for complex queries (30s)
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {

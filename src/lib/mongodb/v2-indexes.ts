@@ -121,6 +121,11 @@ export async function createAllIndexes(): Promise<void> {
     { key: { lastSeen: -1 } }, // Sort by most recent
     { key: { averagePrice: 1 } }, // Price sorting
     { key: { totalQuantitySold: -1 } }, // Popularity sorting
+    // ✅ PERFORMANCE: Compound indexes for common query patterns
+    { key: { locationId: 1, lastSeen: -1, productName: 1 } }, // Location + sort + product
+    { key: { category: 1, lastSeen: -1 } }, // Category + sort
+    { key: { isActive: 1, lastSeen: -1 } }, // Active filter + sort
+    { key: { productName: 1, locationId: 1, lastSeen: -1 } }, // Product lookup + sort
   ]);
 
   // Menus indexes

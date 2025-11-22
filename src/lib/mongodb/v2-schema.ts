@@ -189,6 +189,46 @@ export interface ProductsAggregated {
   }>; // Price history across menus
   
   // ============================================
+  // LOCATION DETAILS (which locations sell this product)
+  // ============================================
+  locationDetails?: Array<{
+    locationId: ObjectId;
+    locationName: string;
+    lastSoldDate: Date;
+    totalQuantitySold: number;
+    totalRevenue: number;
+  }>;
+  
+  // ============================================
+  // TIME-SERIES SALES DATA (for categoriesProductsAggregate)
+  // Last 90 days of daily/weekly/monthly breakdowns
+  // ============================================
+  salesByDate?: Array<{
+    date: string; // YYYY-MM-DD
+    quantity: number;
+    revenueExVat: number;
+    revenueIncVat: number;
+    transactionCount: number;
+    locationId?: ObjectId;
+  }>; // Daily sales (last 90 days)
+  
+  salesByWeek?: Array<{
+    week: string; // YYYY-W## format
+    quantity: number;
+    revenueExVat: number;
+    revenueIncVat: number;
+    transactionCount: number;
+  }>; // Weekly sales (last 12 weeks)
+  
+  salesByMonth?: Array<{
+    month: string; // YYYY-MM format
+    quantity: number;
+    revenueExVat: number;
+    revenueIncVat: number;
+    transactionCount: number;
+  }>; // Monthly sales (last 12 months)
+  
+  // ============================================
   // METADATA
   // ============================================
   vatRate?: number; // Average VAT rate

@@ -199,9 +199,18 @@ registerBreadcrumb('/daily-ops/labor/transactions', {
 });
 
 // Products Management (Operations)
-registerBreadcrumb('/products', {
+registerBreadcrumb('/operations/products/catalog', {
+  label: 'Product Catalog',
+  subtitle: 'Manage products, workload, MEP time, and course types with advanced filters',
+  parentPath: '/operations/products',
+  parentLabel: 'Products',
+});
+
+registerBreadcrumb('/operations/products', {
   label: 'Products',
-  subtitle: 'Manage products, workload, MEP time, and course types',
+  subtitle: 'Manage products and product catalog',
+  parentPath: '/operations',
+  parentLabel: 'Operations',
 });
 
 // Operations

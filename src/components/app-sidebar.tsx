@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,7 +16,6 @@ import {
   BarChart3,
   TrendingUp,
   Clock,
-  Settings,
   Calendar,
   ChevronRight,
   Building2,
@@ -81,8 +79,18 @@ const dailyOpsItems: MenuItem[] = [
   { title: "Reports", icon: FileText, comingSoon: true },
 ];
 
+const operationsProductsItems: MenuItem[] = [
+  { title: "Catalog", icon: Package, url: "/operations/products/catalog" },
+];
+
 const operationsItems: MenuItem[] = [
-  { title: "Products", icon: Box, url: "/products" },
+  {
+    title: "Products",
+    icon: Box,
+    isCollapsible: true,
+    children: operationsProductsItems,
+  },
+  { title: "Manage Menus", icon: Calendar, url: "/operations/menus" },
   { title: "Suppliers", icon: Truck, comingSoon: true },
   { title: "Locations", icon: MapPin, comingSoon: true },
   { title: "Teams", icon: UserCheck, comingSoon: true },
@@ -135,8 +143,6 @@ const dataItems: MenuItem[] = [
 const settingsItems: MenuItem[] = [
   { title: "Eitje API Connect", icon: Plug, url: "/settings/eitje-api" },
   { title: "Bork API Connect", icon: Plug, url: "/settings/bork-api" },
-  { title: "Product Catalog", icon: Package, url: "/settings/products" },
-  { title: "Manage Menus", icon: Calendar, url: "/settings/menus" },
   { title: "Company Settings", icon: Building2, url: "/settings/company", comingSoon: true },
   { title: "SSR Demo", icon: Zap, url: "/demo-ssr" },
 ];
@@ -188,12 +194,14 @@ export function AppSidebar({ layoutVersion, onVersionChange }: AppSidebarProps) 
                         </Link>
                       </SidebarMenuSubButton>
                     ) : (
-                      <SidebarMenuSubButton disabled={child.comingSoon}>
-                        <child.icon />
-                        <span>{child.title}</span>
-                        {child.comingSoon && (
-                          <span className="ml-auto text-xs text-muted-foreground">Soon</span>
-                        )}
+                      <SidebarMenuSubButton asChild>
+                        <span className={child.comingSoon ? "opacity-50 cursor-not-allowed" : ""}>
+                          <child.icon />
+                          <span>{child.title}</span>
+                          {child.comingSoon && (
+                            <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+                          )}
+                        </span>
                       </SidebarMenuSubButton>
                     )}
                   </SidebarMenuSubItem>

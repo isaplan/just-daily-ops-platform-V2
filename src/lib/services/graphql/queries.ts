@@ -707,6 +707,21 @@ export interface CategoriesProductsResponse {
   error?: string;
 }
 
+// Category Metadata (lightweight - no products)
+export interface CategoryMetadata {
+  categoryName: string;
+  mainCategoryName?: string | null;
+  productCount: number;
+  total: TimePeriodTotals;
+}
+
+export interface CategoriesMetadataResponse {
+  success: boolean;
+  categories: CategoryMetadata[];
+  totals: TimePeriodTotals;
+  error?: string;
+}
+
 export interface CategoriesProductsFilters {
   locationId?: string;
   category?: string;
@@ -761,6 +776,19 @@ export async function getCategoriesProductsAggregate(
               revenueExVat
               revenueIncVat
               transactionCount
+            }
+            workloadLevel
+            workloadMinutes
+            mepLevel
+            mepMinutes
+            courseType
+            isActive
+            locationDetails {
+              locationId
+              locationName
+              lastSoldDate
+              totalQuantitySold
+              totalRevenue
             }
           }
           daily {
@@ -897,6 +925,170 @@ export async function getCategoriesProductsAggregate(
     },
     error: 'Failed to fetch categories/products aggregate',
   };
+}
+
+/**
+ * Get categories metadata only (lightweight - for fast first paint)
+ */
+export async function getCategoriesMetadata(
+  startDate: string,
+  endDate: string,
+  filters?: CategoriesProductsFilters
+): Promise<CategoriesMetadataResponse> {
+  const query = `
+    query GetCategoriesMetadata(
+      $startDate: String!
+      $endDate: String!
+      $filters: CategoriesProductsFilters
+    ) {
+      categoriesMetadata(
+        startDate: $startDate
+        endDate: $endDate
+        filters: $filters
+      ) {
+        success
+        categories {
+          categoryName
+          mainCategoryName
+          productCount
+          total {
+            quantity
+            revenueExVat
+            revenueIncVat
+            transactionCount
+          }
+        }
+        totals {
+          quantity
+          revenueExVat
+          revenueIncVat
+          transactionCount
+        }
+        error
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ categoriesMetadata: CategoriesMetadataResponse }>(
+    query,
+    { startDate, endDate, filters }
+  );
+
+  return result.data?.categoriesMetadata || {
+    success: false,
+    categories: [],
+    totals: {
+      quantity: 0,
+      revenueExVat: 0,
+      revenueIncVat: 0,
+      transactionCount: 0,
+    },
+    error: 'Failed to fetch categories metadata',
+  };
+}
+
+/**
+ * Get products for a specific category (lazy loading)
+ */
+export async function getCategoryProducts(
+  categoryName: string,
+  startDate: string,
+  endDate: string,
+  filters?: CategoriesProductsFilters
+): Promise<CategoryAggregate> {
+  const query = `
+    query GetCategoryProducts(
+      $categoryName: String!
+      $startDate: String!
+      $endDate: String!
+      $filters: CategoriesProductsFilters
+    ) {
+      categoryProducts(
+        categoryName: $categoryName
+        startDate: $startDate
+        endDate: $endDate
+        filters: $filters
+      ) {
+        categoryName
+        mainCategoryName
+        products {
+          productName
+          daily {
+            quantity
+            revenueExVat
+            revenueIncVat
+            transactionCount
+          }
+          weekly {
+            quantity
+            revenueExVat
+            revenueIncVat
+            transactionCount
+          }
+          monthly {
+            quantity
+            revenueExVat
+            revenueIncVat
+            transactionCount
+          }
+          total {
+            quantity
+            revenueExVat
+            revenueIncVat
+            transactionCount
+          }
+          workloadLevel
+          workloadMinutes
+          mepLevel
+          mepMinutes
+          courseType
+          isActive
+          locationDetails {
+            locationId
+            locationName
+            lastSoldDate
+            totalQuantitySold
+            totalRevenue
+          }
+        }
+        daily {
+          quantity
+          revenueExVat
+          revenueIncVat
+          transactionCount
+        }
+        weekly {
+          quantity
+          revenueExVat
+          revenueIncVat
+          transactionCount
+        }
+        monthly {
+          quantity
+          revenueExVat
+          revenueIncVat
+          transactionCount
+        }
+        total {
+          quantity
+          revenueExVat
+          revenueIncVat
+          transactionCount
+        }
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ categoryProducts: CategoryAggregate }>(
+    query,
+    { categoryName, startDate, endDate, filters }
+  );
+
+  if (!result.data?.categoryProducts) {
+    throw new Error('Failed to fetch category products');
+  }
+
+  return result.data.categoryProducts;
 }
 
 // ============================================

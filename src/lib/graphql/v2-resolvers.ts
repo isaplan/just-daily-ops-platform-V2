@@ -8,9 +8,12 @@
 import { getDatabase } from '@/lib/mongodb/v2-connection';
 import { ObjectId } from 'mongodb';
 
-// Helper to convert ObjectId to string
-const toId = (id: ObjectId | string | undefined): string => {
-  if (!id) throw new Error('ID is required');
+// Helper to convert ObjectId to string (with null safety)
+const toId = (id: ObjectId | string | undefined | null): string => {
+  if (!id) {
+    console.warn('[GraphQL] toId called with null/undefined ID - returning empty string');
+    return ''; // Return empty string instead of throwing to prevent crashes
+  }
   return id instanceof ObjectId ? id.toString() : id;
 };
 
@@ -108,7 +111,23 @@ export const resolvers = {
     // Locations
     locations: async () => {
       const db = await getDatabase();
-      return db.collection('locations').find({ isActive: true }).toArray();
+      const locations = await db.collection('locations').find({ isActive: true }).toArray();
+      
+      // ✅ Serialize MongoDB documents to plain objects for Server Components
+      // ✅ Filter out locations with null/undefined _id
+      return locations
+        .filter((loc: any) => loc._id != null) // Filter out null/undefined _id
+        .map((loc: any) => ({
+          id: toId(loc._id),
+          name: loc.name,
+          code: loc.code || null,
+          address: loc.address || null,
+          city: loc.city || null,
+          country: loc.country || null,
+          isActive: loc.isActive !== undefined ? loc.isActive : true,
+          createdAt: loc.createdAt instanceof Date ? loc.createdAt.toISOString() : (loc.createdAt || new Date().toISOString()),
+          updatedAt: loc.updatedAt instanceof Date ? loc.updatedAt.toISOString() : (loc.updatedAt || new Date().toISOString()),
+        }));
     },
     
     location: async (_: any, { id }: { id: string }) => {
@@ -892,13 +911,13 @@ export const resolvers = {
 
         const skip = (page - 1) * limit;
         const [records, total] = await Promise.all([
-          db.collection('products')
+          db.collection('products_aggregated')
             .find(query)
             .sort({ productName: 1 })
             .skip(skip)
             .limit(limit)
             .toArray(),
-          db.collection('products').countDocuments(query),
+          db.collection('products_aggregated').countDocuments(query),
         ]);
 
         return {
@@ -937,7 +956,7 @@ export const resolvers = {
     product: async (_: any, { id }: { id: string }) => {
       try {
         const db = await getDatabase();
-        const product = await db.collection('products').findOne({ _id: toObjectId(id) });
+        const product = await db.collection('products_aggregated').findOne({ _id: toObjectId(id) });
         
         if (!product) return null;
 
@@ -963,7 +982,7 @@ export const resolvers = {
     productByName: async (_: any, { productName }: { productName: string }) => {
       try {
         const db = await getDatabase();
-        const product = await db.collection('products').findOne({ productName });
+        const product = await db.collection('products_aggregated').findOne({ productName });
         
         if (!product) return null;
 
@@ -1050,13 +1069,22 @@ export const resolvers = {
             latestPrice: r.latestPrice || 0,
             minPrice: r.minPrice || 0,
             maxPrice: r.maxPrice || 0,
-            priceHistory: (r.priceHistory || []).map((ph: any) => ({
-              date: ph.date?.toISOString() || new Date().toISOString(),
-              price: ph.price || 0,
-              quantity: ph.quantity || 0,
-              locationId: ph.locationId?.toString() || null,
-              menuId: ph.menuId?.toString() || null,
-            })),
+            // ✅ OPTIMIZATION: Limit priceHistory to last 30 days to reduce payload size
+            priceHistory: (r.priceHistory || [])
+              .filter((ph: any) => {
+                const phDate = ph.date instanceof Date ? ph.date : new Date(ph.date);
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                return phDate >= thirtyDaysAgo;
+              })
+              .slice(-30) // Keep only last 30 entries
+              .map((ph: any) => ({
+                date: ph.date?.toISOString() || new Date().toISOString(),
+                price: ph.price || 0,
+                quantity: ph.quantity || 0,
+                locationId: ph.locationId?.toString() || null,
+                menuId: ph.menuId?.toString() || null,
+              })),
             totalQuantitySold: r.totalQuantitySold || 0,
             totalRevenue: r.totalRevenue || 0,
             totalTransactions: r.totalTransactions || 0,
@@ -1552,6 +1580,10 @@ export const resolvers = {
     },
 
     // Daily Sales
+    // ⚠️ EXCEPTION: Uses bork_raw_data because it needs transaction-level detail
+    // (ticket keys, order keys, waiter names, table numbers, payment methods)
+    // Aggregated collections (bork_aggregated, products_aggregated) only have daily/product totals
+    // This resolver is used for detailed sales line-item views that require individual transaction data
     dailySales: async (
       _: any,
       { 
@@ -1827,156 +1859,39 @@ export const resolvers = {
           end = endDateObj;
         }
 
+        // ✅ Query products_aggregated instead of bork_raw_data
+        // For catalog view, show all products (not just active ones with sales)
         const query: any = {
-          date: {
-            $gte: start,
-            $lte: end,
-          },
+          // Don't filter by isActive - show all products in catalog
+          // Client-side filters can handle active/inactive filtering
         };
 
         let locationObjectId: ObjectId | null = null;
-        if (filters.locationId && filters.locationId !== 'all') {
+        if (filters && filters.locationId && filters.locationId !== 'all') {
           try {
             locationObjectId = new ObjectId(filters.locationId);
-            query.locationId = locationObjectId;
+            query['locationDetails.locationId'] = locationObjectId;
           } catch (e) {
             console.warn(`Invalid locationId: ${filters.locationId}`);
           }
         }
 
-        // Load product groups hierarchy
-        const productGroupsQuery: any = {};
-        if (locationObjectId) {
-          productGroupsQuery.locationId = locationObjectId;
-        }
-        
-        const productGroups = await db.collection('bork_product_groups')
-          .find(productGroupsQuery)
-          .toArray();
-
-        // Build hierarchy maps
-        const groupNameMap = new Map<string, {
-          groupId: string;
-          groupName: string;
-          parentGroupId: string | null;
-          parentGroupName: string | null;
-          groupLevel: number | null;
-        }>();
-        
-        const groupIdMap = new Map<string, {
-          groupId: string;
-          groupName: string;
-          parentGroupId: string | null;
-          parentGroupName: string | null;
-          groupLevel: number | null;
-        }>();
-
-        for (const pg of productGroups) {
-          const groupId = pg.groupId != null ? String(pg.groupId) : null;
-          const parentGroupId = pg.parentGroupId != null ? String(pg.parentGroupId) : null;
-          
-          const groupInfo = {
-            groupId,
-            groupName: pg.groupName || null,
-            parentGroupId,
-            parentGroupName: pg.parentGroupName || null,
-            groupLevel: pg.groupLevel != null ? Number(pg.groupLevel) : null,
-          };
-          
-          if (groupInfo.groupName) {
-            groupNameMap.set(groupInfo.groupName, groupInfo);
-          }
-          if (groupInfo.groupId) {
-            groupIdMap.set(groupInfo.groupId, groupInfo);
-          }
+        // Filter by category
+        if (filters && filters.category && filters.category !== 'all') {
+          query.category = filters.category;
         }
 
-        // Helper to find main category
-        const findMainCategory = (groupName: string): { mainCategory: string | null; category: string } => {
-          const groupInfo = groupNameMap.get(groupName);
-          if (!groupInfo) {
-            return { mainCategory: null, category: groupName };
-          }
+        // Filter by product name
+        if (filters && filters.productName) {
+          query.productName = { $regex: filters.productName, $options: 'i' };
+        }
 
-          if (!groupInfo.parentGroupId && !groupInfo.parentGroupName) {
-            if (groupInfo.groupLevel === 1) {
-              return { mainCategory: groupName, category: groupName };
-            }
-            return { mainCategory: null, category: groupName };
-          }
+        // Filter by main category if needed
+        if (filters && filters.mainCategory && filters.mainCategory !== 'all') {
+          query.mainCategory = filters.mainCategory;
+        }
 
-          let currentGroup = groupInfo;
-          let rootCategory: string | null = null;
-          let depth = 0;
-          const maxDepth = 10;
-          
-          while (depth < maxDepth) {
-            let parentInfo: typeof currentGroup | null = null;
-            
-            if (currentGroup.parentGroupName) {
-              parentInfo = groupNameMap.get(currentGroup.parentGroupName) || null;
-            }
-            
-            if (!parentInfo && currentGroup.parentGroupId) {
-              parentInfo = groupIdMap.get(currentGroup.parentGroupId) || null;
-            }
-            
-            if (!parentInfo) {
-              if (rootCategory) {
-                return { mainCategory: rootCategory, category: groupName };
-              }
-              if (currentGroup.parentGroupName) {
-                return { mainCategory: currentGroup.parentGroupName, category: groupName };
-              }
-              return { mainCategory: null, category: groupName };
-            }
-            
-            if (!parentInfo.parentGroupId && !parentInfo.parentGroupName) {
-              rootCategory = parentInfo.groupName || currentGroup.parentGroupName || null;
-              return { mainCategory: rootCategory, category: groupName };
-            }
-            
-            rootCategory = parentInfo.groupName || currentGroup.parentGroupName || null;
-            currentGroup = parentInfo;
-            depth++;
-          }
-          
-          if (rootCategory) {
-            return { mainCategory: rootCategory, category: groupName };
-          }
-          
-          if (groupInfo.parentGroupName) {
-            return { mainCategory: groupInfo.parentGroupName, category: groupName };
-          }
-          
-          if (groupInfo.groupLevel === 1) {
-            return { mainCategory: groupName, category: groupName };
-          }
-          
-          return { mainCategory: null, category: groupName };
-        };
-
-        // Helper functions for time periods
-        const getISOWeek = (date: Date): string => {
-          const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-          const dayNum = d.getUTCDay() || 7;
-          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-          const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-          const year = d.getUTCFullYear();
-          return `${year}-W${String(weekNo).padStart(2, '0')}`;
-        };
-
-        const getMonthKey = (date: Date): string => {
-          const year = date.getUTCFullYear();
-          const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-          return `${year}-${month}`;
-        };
-
-        const getDateKey = (date: Date): string => {
-          return date.toISOString().split('T')[0];
-        };
-
+        // Helper functions
         const initTotals = () => ({
           quantity: 0,
           revenueExVat: 0,
@@ -1985,198 +1900,256 @@ export const resolvers = {
         });
 
         const addTotals = (target: any, source: any) => {
-          target.quantity += source.quantity;
-          target.revenueExVat += source.revenueExVat;
-          target.revenueIncVat += source.revenueIncVat;
-          target.transactionCount += source.transactionCount;
+          target.quantity += source.quantity || 0;
+          target.revenueExVat += source.revenueExVat || 0;
+          target.revenueIncVat += source.revenueIncVat || 0;
+          target.transactionCount += source.transactionCount || 0;
         };
 
-        // Fetch raw data
-        const rawDataRecords = await db.collection('bork_raw_data')
+        // ✅ Fetch products from products_aggregated (pre-calculated data)
+        const products = await db.collection('products_aggregated')
           .find(query)
           .toArray();
 
-        // Data structures for aggregation
-        const mainCategoryMap = new Map<string, Map<string, Map<string, {
-          daily: Map<string, any>;
-          weekly: Map<string, any>;
-          monthly: Map<string, any>;
-          transactions: Set<string>;
-        }>>>();
+        // Log in development only
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[categoriesProductsAggregate] Found ${products.length} products from products_aggregated`);
+        }
+
+        // ✅ Process pre-aggregated products data
+        // Group products by category and main category
+        const mainCategoryMap = new Map<string, Map<string, any[]>>();
+        const categoryProductMap = new Map<string, any[]>();
         
-        const categoryProductMap = new Map<string, Map<string, {
-          daily: Map<string, any>;
-          weekly: Map<string, any>;
-          monthly: Map<string, any>;
-          transactions: Set<string>;
-        }>>();
+        let productsWithMainCategory = 0;
+        let productsWithoutMainCategory = 0;
+        let productsProcessed = 0;
 
-        // Process raw data
-        for (const record of rawDataRecords) {
-          const rawApiResponse = record.rawApiResponse;
-          if (!rawApiResponse) continue;
+        for (const product of products) {
+          productsProcessed++;
+          const category = product.category || 'Uncategorized';
+          const mainCategory = product.mainCategory || null;
+          const productName = product.productName;
 
-          const tickets = Array.isArray(rawApiResponse) ? rawApiResponse : [rawApiResponse];
-          const recordDate = record.date instanceof Date 
-            ? record.date 
-            : typeof record.date === 'string' 
-              ? new Date(record.date) 
-              : new Date();
+          // Filter salesByDate, salesByWeek, salesByMonth by date range
+          const startDateStr = startDate; // Already in YYYY-MM-DD format
+          const endDateStr = endDate; // Already in YYYY-MM-DD format
+          
+          const filteredDaily = (product.salesByDate || []).filter((sale: any) => {
+            const saleDate = sale.date; // Should be YYYY-MM-DD string
+            return saleDate >= startDateStr && saleDate <= endDateStr;
+          });
 
-          for (const ticket of tickets) {
-            if (!ticket || typeof ticket !== 'object') continue;
+          const filteredWeekly = (product.salesByWeek || []); // Keep all for now, can filter by week range if needed
 
-            const ticketKey = ticket.Key || ticket.key || null;
-            const orders = ticket.Orders || ticket.orders || [];
+          const filteredMonthly = (product.salesByMonth || []).filter((sale: any) => {
+            const monthDate = sale.month; // Should be YYYY-MM format
+            const startMonth = startDateStr.substring(0, 7); // YYYY-MM
+            const endMonth = endDateStr.substring(0, 7);
+            return monthDate >= startMonth && monthDate <= endMonth;
+          });
 
-            if (Array.isArray(orders) && orders.length > 0) {
-              for (const order of orders) {
-                if (!order || typeof order !== 'object') continue;
-                const orderLines = order.Lines || order.lines || [];
-                if (!Array.isArray(orderLines)) continue;
+          // Calculate totals from filtered data
+          const productDaily = initTotals();
+          const productWeekly = initTotals();
+          const productMonthly = initTotals();
+          const productTotal = initTotals();
 
-                for (const line of orderLines) {
-                  if (!line || typeof line !== 'object') continue;
+          for (const sale of filteredDaily) {
+            addTotals(productDaily, sale);
+            addTotals(productTotal, sale);
+          }
+          for (const sale of filteredWeekly) {
+            addTotals(productWeekly, sale);
+          }
+          for (const sale of filteredMonthly) {
+            addTotals(productMonthly, sale);
+          }
 
-                  if (filters.category && filters.category !== 'all') {
-                    const lineCategory = line.GroupName || line.groupName || line.Category || line.category;
-                    if (!lineCategory || lineCategory !== filters.category) continue;
-                  }
+          // Create product aggregate
+          // Serialize locationDetails (convert ObjectId to string, Date to ISO string)
+          const serializedLocationDetails = (product.locationDetails || []).map((loc: any) => ({
+            locationId: loc.locationId instanceof ObjectId ? loc.locationId.toString() : (loc.locationId?.toString() || null),
+            locationName: loc.locationName || null,
+            lastSoldDate: loc.lastSoldDate instanceof Date ? loc.lastSoldDate.toISOString() : (loc.lastSoldDate || null),
+            totalQuantitySold: loc.totalQuantitySold || 0,
+            totalRevenue: loc.totalRevenue || 0,
+          }));
 
-                  const lineProductName = line.ProductName || line.productName || line.Name || line.name || null;
-                  
-                  if (filters.productName) {
-                    if (!lineProductName || !lineProductName.toLowerCase().includes(filters.productName.toLowerCase())) continue;
-                  }
+          const productAggregate = {
+            productName,
+            daily: productDaily,
+            weekly: productWeekly,
+            monthly: productMonthly,
+            total: productTotal,
+            workloadLevel: product.workloadLevel || 'mid',
+            workloadMinutes: product.workloadMinutes || 5,
+            mepLevel: product.mepLevel || 'low',
+            mepMinutes: product.mepMinutes || 1,
+            courseType: product.courseType || undefined,
+            isActive: product.isActive !== undefined ? product.isActive : true, // Include isActive for client-side filtering
+            locationDetails: serializedLocationDetails, // Include location info (which locations sell this product)
+          };
 
-                  const category = line.GroupName || line.groupName || line.Category || line.category || 'Uncategorized';
-                  const { mainCategory, category: finalCategory } = findMainCategory(category);
-                  const productName = lineProductName || 'Unknown Product';
-                  
-                  const quantity = line.Qty ?? line.qty ?? line.Quantity ?? line.quantity ?? 1;
-                  const totalExVat = line.TotalEx ?? line.totalEx ?? line.TotalExVat ?? line.totalExVat ?? 0;
-                  const totalIncVat = line.TotalInc ?? line.totalInc ?? line.TotalIncVat ?? line.totalIncVat ?? 0;
-
-                  const totals = {
-                    quantity: Number(quantity),
-                    revenueExVat: Number(totalExVat),
-                    revenueIncVat: Number(totalIncVat),
-                    transactionCount: ticketKey ? 1 : 0,
-                  };
-
-                  const dateKey = getDateKey(recordDate);
-                  const weekKey = getISOWeek(recordDate);
-                  const monthKey = getMonthKey(recordDate);
-
+          // Group by category
                   if (mainCategory) {
+            productsWithMainCategory++;
                     if (!mainCategoryMap.has(mainCategory)) {
                       mainCategoryMap.set(mainCategory, new Map());
                     }
                     const categoryMap = mainCategoryMap.get(mainCategory)!;
-                    
-                    if (!categoryMap.has(finalCategory)) {
-                      categoryMap.set(finalCategory, new Map());
-                    }
-                    const productMap = categoryMap.get(finalCategory)!;
-                    
-                    if (!productMap.has(productName)) {
-                      productMap.set(productName, {
-                        daily: new Map(),
-                        weekly: new Map(),
-                        monthly: new Map(),
-                        transactions: new Set(),
-                      });
-                    }
-                    const productData = productMap.get(productName)!;
-                    
-                    // Daily
-                    if (!productData.daily.has(dateKey)) {
-                      productData.daily.set(dateKey, initTotals());
-                    }
-                    addTotals(productData.daily.get(dateKey)!, totals);
-                    
-                    // Weekly
-                    if (!productData.weekly.has(weekKey)) {
-                      productData.weekly.set(weekKey, initTotals());
-                    }
-                    addTotals(productData.weekly.get(weekKey)!, totals);
-                    
-                    // Monthly
-                    if (!productData.monthly.has(monthKey)) {
-                      productData.monthly.set(monthKey, initTotals());
-                    }
-                    addTotals(productData.monthly.get(monthKey)!, totals);
-                    
-                    if (ticketKey) {
-                      productData.transactions.add(ticketKey);
-                    }
-                  } else {
-                    if (!categoryProductMap.has(finalCategory)) {
-                      categoryProductMap.set(finalCategory, new Map());
-                    }
-                    const productMap = categoryProductMap.get(finalCategory)!;
-                    
-                    if (!productMap.has(productName)) {
-                      productMap.set(productName, {
-                        daily: new Map(),
-                        weekly: new Map(),
-                        monthly: new Map(),
-                        transactions: new Set(),
-                      });
-                    }
-                    const productData = productMap.get(productName)!;
-                    
-                    // Daily
-                    if (!productData.daily.has(dateKey)) {
-                      productData.daily.set(dateKey, initTotals());
-                    }
-                    addTotals(productData.daily.get(dateKey)!, totals);
-                    
-                    // Weekly
-                    if (!productData.weekly.has(weekKey)) {
-                      productData.weekly.set(weekKey, initTotals());
-                    }
-                    addTotals(productData.weekly.get(weekKey)!, totals);
-                    
-                    // Monthly
-                    if (!productData.monthly.has(monthKey)) {
-                      productData.monthly.set(monthKey, initTotals());
-                    }
-                    addTotals(productData.monthly.get(monthKey)!, totals);
-                    
-                    if (ticketKey) {
-                      productData.transactions.add(ticketKey);
-                    }
-                  }
-                }
-              }
+            if (!categoryMap.has(category)) {
+              categoryMap.set(category, []);
             }
+            categoryMap.get(category)!.push(productAggregate);
+          } else {
+            productsWithoutMainCategory++;
+            if (!categoryProductMap.has(category)) {
+              categoryProductMap.set(category, []);
+            }
+            categoryProductMap.get(category)!.push(productAggregate);
           }
         }
-
-        // Load product catalog for workload/MEP/courseType metadata
-        const productCatalog = new Map<string, { workloadLevel?: string; workloadMinutes?: number; mepLevel?: string; mepMinutes?: number; courseType?: string }>();
-        try {
-          const products = await db.collection('products').find({ isActive: true }).toArray();
-          products.forEach((p: any) => {
-            productCatalog.set(p.productName, {
-              workloadLevel: p.workloadLevel || 'mid',
-              workloadMinutes: p.workloadMinutes || (p.workloadLevel === 'low' ? 2.5 : p.workloadLevel === 'high' ? 10 : 5),
-              mepLevel: p.mepLevel || 'low',
-              mepMinutes: p.mepMinutes || (p.mepLevel === 'low' ? 1 : p.mepLevel === 'high' ? 4 : 2),
-              courseType: p.courseType || undefined,
-            });
-          });
-        } catch (error) {
-          console.warn('[GraphQL Resolver] Failed to load product catalog:', error);
+        
+        // Log in development only
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[categoriesProductsAggregate] Processed ${productsProcessed} products: ${productsWithMainCategory} with mainCategory, ${productsWithoutMainCategory} without`);
         }
 
-        // Build response structure
-        const categories: any[] = [];
+        // ✅ Deduplicate products within each category BEFORE building response
+        // This ensures each product appears only once per category, even if it exists multiple times in DB
+        const deduplicateProductsInCategory = (productList: any[]): any[] => {
+          const productMap = new Map<string, any>();
+          
+          for (const product of productList) {
+            const productName = product.productName;
+            
+            if (productMap.has(productName)) {
+              // Merge with existing product
+              const existing = productMap.get(productName)!;
+              
+              // Merge totals
+              addTotals(existing.daily, product.daily);
+              addTotals(existing.weekly, product.weekly);
+              addTotals(existing.monthly, product.monthly);
+              addTotals(existing.total, product.total);
+              
+              // Merge locationDetails (deduplicate by locationId)
+              const existingLocationIds = new Set(
+                (existing.locationDetails || []).map((loc: any) => loc.locationId?.toString())
+              );
+              
+              for (const loc of (product.locationDetails || [])) {
+                const locId = loc.locationId?.toString();
+                if (locId && !existingLocationIds.has(locId)) {
+                  existing.locationDetails.push(loc);
+                  existingLocationIds.add(locId);
+                }
+              }
+              
+              // Keep best workload/mep/courseType (prefer non-default values)
+              if (product.workloadLevel && product.workloadLevel !== 'mid') {
+                existing.workloadLevel = product.workloadLevel;
+                existing.workloadMinutes = product.workloadMinutes || existing.workloadMinutes;
+              }
+              if (product.mepLevel && product.mepLevel !== 'low') {
+                existing.mepLevel = product.mepLevel;
+                existing.mepMinutes = product.mepMinutes || existing.mepMinutes;
+              }
+              if (product.courseType && !existing.courseType) {
+                existing.courseType = product.courseType;
+              }
+            } else {
+              // First occurrence of this product
+                      productMap.set(productName, {
+                ...product,
+                locationDetails: [...(product.locationDetails || [])],
+              });
+            }
+          }
+          
+          return Array.from(productMap.values());
+        };
+
+        // Deduplicate products in all categories
+        for (const categoryMap of mainCategoryMap.values()) {
+          for (const [categoryName, productList] of categoryMap.entries()) {
+            categoryMap.set(categoryName, deduplicateProductsInCategory(productList));
+          }
+        }
+        for (const [categoryName, productList] of categoryProductMap.entries()) {
+          categoryProductMap.set(categoryName, deduplicateProductsInCategory(productList));
+        }
+
+        // ✅ Build response structure from grouped data
+        // ✅ UNIFY CATEGORIES: Use categoryName as key (not mainCategory::category)
+        // Categories are shared across locations - same category name = same category
+        const categoriesMap = new Map<string, {
+          categoryName: string;
+          mainCategoryName: string | null; // Use most common mainCategory if multiple
+          products: any[];
+          daily: any;
+          weekly: any;
+          monthly: any;
+          total: any;
+        }>();
         const mainCategories: any[] = [];
         const grandTotals = initTotals();
 
-        // Process main categories
+        // ✅ Helper to deduplicate and merge products by productName
+        // Products with the same name from different locations are merged into one
+        const deduplicateProducts = (products: any[]): any[] => {
+          const productMap = new Map<string, any>();
+          
+          for (const product of products) {
+            const productName = product.productName;
+            
+            if (productMap.has(productName)) {
+              // Merge with existing product
+              const existing = productMap.get(productName)!;
+              
+              // Merge totals
+              addTotals(existing.daily, product.daily);
+              addTotals(existing.weekly, product.weekly);
+              addTotals(existing.monthly, product.monthly);
+              addTotals(existing.total, product.total);
+              
+              // Merge locationDetails (deduplicate by locationId)
+              const existingLocationIds = new Set(
+                (existing.locationDetails || []).map((loc: any) => loc.locationId?.toString())
+              );
+              
+              for (const loc of (product.locationDetails || [])) {
+                const locId = loc.locationId?.toString();
+                if (locId && !existingLocationIds.has(locId)) {
+                  existing.locationDetails.push(loc);
+                  existingLocationIds.add(locId);
+                }
+              }
+              
+              // Keep existing workload/mep/courseType (or use product's if existing is default)
+              if (!existing.workloadLevel || existing.workloadLevel === 'mid') {
+                existing.workloadLevel = product.workloadLevel || existing.workloadLevel;
+              }
+              if (!existing.mepLevel || existing.mepLevel === 'low') {
+                existing.mepLevel = product.mepLevel || existing.mepLevel;
+              }
+              if (!existing.courseType && product.courseType) {
+                existing.courseType = product.courseType;
+              }
+            } else {
+              // First occurrence of this product
+              productMap.set(productName, {
+                ...product,
+                locationDetails: [...(product.locationDetails || [])],
+              });
+            }
+          }
+          
+          return Array.from(productMap.values());
+        };
+
+        // Process main categories - unify by category name only
         for (const [mainCategoryName, categoryMap] of mainCategoryMap.entries()) {
           const mainCategoryTotals = {
             daily: initTotals(),
@@ -2187,7 +2160,7 @@ export const resolvers = {
           
           const categoryAggregates: any[] = [];
           
-          for (const [categoryName, productMap] of categoryMap.entries()) {
+          for (const [categoryName, productList] of categoryMap.entries()) {
             const categoryTotals = {
               daily: initTotals(),
               weekly: initTotals(),
@@ -2195,62 +2168,52 @@ export const resolvers = {
               total: initTotals(),
             };
             
-            const products: any[] = [];
-            
-            for (const [productName, productData] of productMap.entries()) {
-              const productDaily = initTotals();
-              const productWeekly = initTotals();
-              const productMonthly = initTotals();
-              const productTotal = initTotals();
-              
-              for (const totals of productData.daily.values()) {
-                addTotals(productDaily, totals);
-                addTotals(productTotal, totals);
-              }
-              for (const totals of productData.weekly.values()) {
-                addTotals(productWeekly, totals);
-              }
-              for (const totals of productData.monthly.values()) {
-                addTotals(productMonthly, totals);
-              }
-              
-              productTotal.transactionCount = productData.transactions.size;
-              
-              // Get product metadata from catalog
-              const productMeta = productCatalog.get(productName) || {
-                workloadLevel: 'mid' as const,
-                workloadMinutes: 5,
-                mepLevel: 'low' as const,
-                mepMinutes: 1,
-              };
-
-              products.push({
-                productName,
-                daily: productDaily,
-                weekly: productWeekly,
-                monthly: productMonthly,
-                total: productTotal,
-                workloadLevel: productMeta.workloadLevel,
-                workloadMinutes: productMeta.workloadMinutes,
-                mepLevel: productMeta.mepLevel,
-                mepMinutes: productMeta.mepMinutes,
-                courseType: productMeta.courseType,
-              });
-              
-              addTotals(categoryTotals.daily, productDaily);
-              addTotals(categoryTotals.weekly, productWeekly);
-              addTotals(categoryTotals.monthly, productMonthly);
-              addTotals(categoryTotals.total, productTotal);
+            // Sum up all products in this category
+            for (const product of productList) {
+              addTotals(categoryTotals.daily, product.daily);
+              addTotals(categoryTotals.weekly, product.weekly);
+              addTotals(categoryTotals.monthly, product.monthly);
+              addTotals(categoryTotals.total, product.total);
             }
             
-            categoryTotals.total.transactionCount = new Set(
-              Array.from(productMap.values()).flatMap(p => Array.from(p.transactions))
-            ).size;
+            // ✅ UNIFIED KEY: Use categoryName only (categories are shared across locations)
+            const categoryKey = categoryName;
             
+            // Merge products with same category name (unified category)
+            if (categoriesMap.has(categoryKey)) {
+              // Merge with existing unified category
+              const existing = categoriesMap.get(categoryKey)!;
+              // ✅ Deduplicate products by productName when merging
+              const mergedProducts = deduplicateProducts([...existing.products, ...productList]);
+              existing.products = mergedProducts;
+              addTotals(existing.daily, categoryTotals.daily);
+              addTotals(existing.weekly, categoryTotals.weekly);
+              addTotals(existing.monthly, categoryTotals.monthly);
+              addTotals(existing.total, categoryTotals.total);
+              // Keep mainCategory if not set, or use current if existing is null
+              if (!existing.mainCategoryName && mainCategoryName) {
+                existing.mainCategoryName = mainCategoryName;
+              }
+            } else {
+              // ✅ Deduplicate products in new category
+              const deduplicatedProducts = deduplicateProducts(productList);
+              categoriesMap.set(categoryKey, {
+                categoryName,
+                mainCategoryName,
+                products: deduplicatedProducts,
+                daily: categoryTotals.daily,
+                weekly: categoryTotals.weekly,
+                monthly: categoryTotals.monthly,
+                total: categoryTotals.total,
+              });
+            }
+            
+            // ✅ Deduplicate products in categoryAggregates
+            const deduplicatedProductsForAggregate = deduplicateProducts(productList);
             categoryAggregates.push({
               categoryName,
               mainCategoryName,
-              products,
+              products: deduplicatedProductsForAggregate,
               daily: categoryTotals.daily,
               weekly: categoryTotals.weekly,
               monthly: categoryTotals.monthly,
@@ -2262,12 +2225,6 @@ export const resolvers = {
             addTotals(mainCategoryTotals.monthly, categoryTotals.monthly);
             addTotals(mainCategoryTotals.total, categoryTotals.total);
           }
-          
-          mainCategoryTotals.total.transactionCount = new Set(
-            Array.from(categoryMap.values()).flatMap(pm => 
-              Array.from(pm.values()).flatMap(p => Array.from(p.transactions))
-            )
-          ).size;
           
           mainCategories.push({
             mainCategoryName,
@@ -2281,8 +2238,8 @@ export const resolvers = {
           addTotals(grandTotals, mainCategoryTotals.total);
         }
 
-        // Process categories without main category
-        for (const [categoryName, productMap] of categoryProductMap.entries()) {
+        // Process categories without main category - merge into unified categories
+        for (const [categoryName, productList] of categoryProductMap.entries()) {
           const categoryTotals = {
             daily: initTotals(),
             weekly: initTotals(),
@@ -2290,68 +2247,53 @@ export const resolvers = {
             total: initTotals(),
           };
           
-          const products: any[] = [];
-          
-          for (const [productName, productData] of productMap.entries()) {
-            const productDaily = initTotals();
-            const productWeekly = initTotals();
-            const productMonthly = initTotals();
-            const productTotal = initTotals();
-            
-            for (const totals of productData.daily.values()) {
-              addTotals(productDaily, totals);
-              addTotals(productTotal, totals);
-            }
-            for (const totals of productData.weekly.values()) {
-              addTotals(productWeekly, totals);
-            }
-            for (const totals of productData.monthly.values()) {
-              addTotals(productMonthly, totals);
-            }
-            
-            productTotal.transactionCount = productData.transactions.size;
-            
-            // Get product metadata from catalog
-            const productMeta = productCatalog.get(productName) || {
-              workloadLevel: 'mid' as const,
-              workloadMinutes: 5,
-              mepLevel: 'low' as const,
-              mepMinutes: 1,
-            };
-
-            products.push({
-              productName,
-              daily: productDaily,
-              weekly: productWeekly,
-              monthly: productMonthly,
-              total: productTotal,
-              workloadLevel: productMeta.workloadLevel,
-              workloadMinutes: productMeta.workloadMinutes,
-              mepLevel: productMeta.mepLevel,
-              mepMinutes: productMeta.mepMinutes,
-            });
-            
-            addTotals(categoryTotals.daily, productDaily);
-            addTotals(categoryTotals.weekly, productWeekly);
-            addTotals(categoryTotals.monthly, productMonthly);
-            addTotals(categoryTotals.total, productTotal);
+          // Sum up all products in this category
+          for (const product of productList) {
+            addTotals(categoryTotals.daily, product.daily);
+            addTotals(categoryTotals.weekly, product.weekly);
+            addTotals(categoryTotals.monthly, product.monthly);
+            addTotals(categoryTotals.total, product.total);
           }
           
-          categoryTotals.total.transactionCount = new Set(
-            Array.from(productMap.values()).flatMap(p => Array.from(p.transactions))
-          ).size;
+          // ✅ UNIFIED KEY: Use categoryName only
+          const categoryKey = categoryName;
           
-          categories.push({
+          // Merge into unified category (same category name = same category)
+          if (categoriesMap.has(categoryKey)) {
+            // Merge with existing unified category
+            const existing = categoriesMap.get(categoryKey)!;
+            // ✅ Deduplicate products by productName when merging
+            const mergedProducts = deduplicateProducts([...existing.products, ...productList]);
+            existing.products = mergedProducts;
+            addTotals(existing.daily, categoryTotals.daily);
+            addTotals(existing.weekly, categoryTotals.weekly);
+            addTotals(existing.monthly, categoryTotals.monthly);
+            addTotals(existing.total, categoryTotals.total);
+          } else {
+            // ✅ Deduplicate products in new category
+            const deduplicatedProducts = deduplicateProducts(productList);
+            categoriesMap.set(categoryKey, {
             categoryName,
             mainCategoryName: null,
-            products,
+              products: deduplicatedProducts,
             daily: categoryTotals.daily,
             weekly: categoryTotals.weekly,
             monthly: categoryTotals.monthly,
             total: categoryTotals.total,
           });
+          }
           
           addTotals(grandTotals, categoryTotals.total);
+        }
+
+        // Convert map to array (unified categories - one per category name)
+        // ✅ Filter out categories with empty or invalid names
+        const categories = Array.from(categoriesMap.values())
+          .filter(cat => cat.categoryName && cat.categoryName.trim() !== '');
+
+        // Log in development only
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[categoriesProductsAggregate] Returning ${categories.length} unified categories, ${mainCategories.length} main categories, ${categories.reduce((sum, cat) => sum + cat.products.length, 0)} total products`);
         }
 
         return {
@@ -2373,6 +2315,346 @@ export const resolvers = {
           },
           error: error.message || 'Failed to fetch categories/products aggregate',
         };
+      }
+    },
+
+    // ✅ Lightweight categories metadata (for fast first paint - no products)
+    categoriesMetadata: async (
+      _: any,
+      { 
+        startDate, 
+        endDate, 
+        filters = {} 
+      }: { 
+        startDate: string; 
+        endDate: string; 
+        filters?: any;
+      }
+    ) => {
+      try {
+        const db = await getDatabase();
+        const start = new Date(startDate + 'T00:00:00.000Z');
+        let end: Date;
+        if (startDate === endDate) {
+          const endDateObj = new Date(endDate + 'T00:00:00.000Z');
+          endDateObj.setUTCDate(endDateObj.getUTCDate() + 1);
+          endDateObj.setUTCHours(1, 0, 0, 0);
+          end = endDateObj;
+        } else {
+          const endDateObj = new Date(endDate + 'T00:00:00.000Z');
+          endDateObj.setUTCHours(23, 59, 59, 999);
+          end = endDateObj;
+        }
+
+        // Build query (same as categoriesProductsAggregate but we only need metadata)
+        const query: any = {};
+        let locationObjectId: ObjectId | null = null;
+        if (filters && filters.locationId && filters.locationId !== 'all') {
+          try {
+            locationObjectId = new ObjectId(filters.locationId);
+            query['locationDetails.locationId'] = locationObjectId;
+          } catch (e) {
+            console.warn(`Invalid locationId: ${filters.locationId}`);
+          }
+        }
+        if (filters && filters.category && filters.category !== 'all') {
+          query.category = filters.category;
+        }
+        if (filters && filters.productName) {
+          query.productName = { $regex: filters.productName, $options: 'i' };
+        }
+        if (filters && filters.mainCategory && filters.mainCategory !== 'all') {
+          query.mainCategory = filters.mainCategory;
+        }
+
+        // ✅ Simple query - get products and group in JavaScript (simpler and still fast)
+        // Only fetch minimal fields needed for metadata
+        const products = await db.collection('products_aggregated')
+          .find(query, {
+            projection: {
+              category: 1,
+              mainCategory: 1,
+              productName: 1,
+              salesByDate: 1,
+            }
+          })
+          .toArray();
+
+        const startDateStr = startDate;
+        const endDateStr = endDate;
+        
+        // Group by category in JavaScript
+        const categoryMap = new Map<string, {
+          categoryName: string;
+          mainCategoryName: string | null;
+          productCount: number;
+          totalQuantity: number;
+          totalRevenueIncVat: number;
+        }>();
+
+        for (const product of products) {
+          const categoryName = product.category || 'Uncategorized';
+          if (!categoryName || categoryName.trim() === '') continue;
+
+          // Calculate totals from salesByDate filtered by date range
+          const filteredSales = (product.salesByDate || []).filter((sale: any) => {
+            const saleDate = sale.date;
+            return saleDate >= startDateStr && saleDate <= endDateStr;
+          });
+
+          const categoryTotalQuantity = filteredSales.reduce((sum: number, sale: any) => sum + (sale.quantity || 0), 0);
+          const categoryTotalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.revenueIncVat || 0), 0);
+
+          if (categoryMap.has(categoryName)) {
+            const existing = categoryMap.get(categoryName)!;
+            existing.productCount += 1;
+            existing.totalQuantity += categoryTotalQuantity;
+            existing.totalRevenueIncVat += categoryTotalRevenue;
+            // Use first mainCategory encountered
+            if (!existing.mainCategoryName && product.mainCategory) {
+              existing.mainCategoryName = product.mainCategory;
+            }
+          } else {
+            categoryMap.set(categoryName, {
+              categoryName,
+              mainCategoryName: product.mainCategory || null,
+              productCount: 1,
+              totalQuantity: categoryTotalQuantity,
+              totalRevenueIncVat: categoryTotalRevenue,
+            });
+          }
+        }
+
+        const categories = Array.from(categoryMap.values());
+
+        // Calculate grand totals
+        const grandTotals = {
+          quantity: 0,
+          revenueExVat: 0,
+          revenueIncVat: 0,
+          transactionCount: 0,
+        };
+
+        const categoriesArray = categories
+          .filter(cat => cat.categoryName && cat.categoryName.trim() !== '')
+          .map(cat => {
+            grandTotals.quantity += cat.totalQuantity;
+            grandTotals.revenueIncVat += cat.totalRevenueIncVat;
+            
+            return {
+              categoryName: cat.categoryName,
+              mainCategoryName: cat.mainCategoryName,
+              productCount: cat.productCount,
+              total: {
+                quantity: cat.totalQuantity,
+                revenueExVat: 0,
+                revenueIncVat: cat.totalRevenueIncVat,
+                transactionCount: 0,
+              },
+            };
+          });
+
+        return {
+          success: true,
+          categories: categoriesArray,
+          totals: grandTotals,
+        };
+      } catch (error: any) {
+        console.error('[GraphQL Resolver] categoriesMetadata error:', error);
+        return {
+          success: false,
+          categories: [],
+          totals: {
+            quantity: 0,
+            revenueExVat: 0,
+            revenueIncVat: 0,
+            transactionCount: 0,
+          },
+          error: error.message || 'Failed to fetch categories metadata',
+        };
+      }
+    },
+
+    // ✅ Load products for a specific category (lazy loading)
+    categoryProducts: async (
+      _: any,
+      { 
+        categoryName,
+        startDate, 
+        endDate, 
+        filters = {} 
+      }: { 
+        categoryName: string;
+        startDate: string; 
+        endDate: string; 
+        filters?: any;
+      }
+    ) => {
+      try {
+        const db = await getDatabase();
+        const start = new Date(startDate + 'T00:00:00.000Z');
+        let end: Date;
+        if (startDate === endDate) {
+          const endDateObj = new Date(endDate + 'T00:00:00.000Z');
+          endDateObj.setUTCDate(endDateObj.getUTCDate() + 1);
+          endDateObj.setUTCHours(1, 0, 0, 0);
+          end = endDateObj;
+        } else {
+          const endDateObj = new Date(endDate + 'T00:00:00.000Z');
+          endDateObj.setUTCHours(23, 59, 59, 999);
+          end = endDateObj;
+        }
+
+        // Build query for this specific category
+        const query: any = {
+          category: categoryName,
+        };
+
+        let locationObjectId: ObjectId | null = null;
+        if (filters && filters.locationId && filters.locationId !== 'all') {
+          try {
+            locationObjectId = new ObjectId(filters.locationId);
+            query['locationDetails.locationId'] = locationObjectId;
+          } catch (e) {
+            console.warn(`Invalid locationId: ${filters.locationId}`);
+          }
+        }
+        if (filters && filters.productName) {
+          query.productName = { $regex: filters.productName, $options: 'i' };
+        }
+
+        // Helper functions (same as categoriesProductsAggregate)
+        const initTotals = () => ({
+          quantity: 0,
+          revenueExVat: 0,
+          revenueIncVat: 0,
+          transactionCount: 0,
+        });
+
+        const addTotals = (target: any, source: any) => {
+          target.quantity += source.quantity || 0;
+          target.revenueExVat += source.revenueExVat || 0;
+          target.revenueIncVat += source.revenueIncVat || 0;
+          target.transactionCount += source.transactionCount || 0;
+        };
+
+        // Fetch products for this category
+        const products = await db.collection('products_aggregated')
+          .find(query)
+          .toArray();
+
+        const startDateStr = startDate;
+        const endDateStr = endDate;
+        const categoryTotals = {
+          daily: initTotals(),
+          weekly: initTotals(),
+          monthly: initTotals(),
+          total: initTotals(),
+        };
+
+        const productAggregates: any[] = [];
+
+        for (const product of products) {
+          // Filter salesByDate, salesByWeek, salesByMonth by date range
+          const filteredDaily = (product.salesByDate || []).filter((sale: any) => {
+            const saleDate = sale.date;
+            return saleDate >= startDateStr && saleDate <= endDateStr;
+          });
+
+          const filteredWeekly = (product.salesByWeek || []);
+          const filteredMonthly = (product.salesByMonth || []).filter((sale: any) => {
+            const monthDate = sale.month;
+            const startMonth = startDateStr.substring(0, 7);
+            const endMonth = endDateStr.substring(0, 7);
+            return monthDate >= startMonth && monthDate <= endMonth;
+          });
+
+          // Calculate totals
+          const productDaily = initTotals();
+          const productWeekly = initTotals();
+          const productMonthly = initTotals();
+          const productTotal = initTotals();
+
+          for (const sale of filteredDaily) {
+            addTotals(productDaily, sale);
+            addTotals(productTotal, sale);
+          }
+          for (const sale of filteredWeekly) {
+            addTotals(productWeekly, sale);
+          }
+          for (const sale of filteredMonthly) {
+            addTotals(productMonthly, sale);
+          }
+
+          // Serialize locationDetails
+          const serializedLocationDetails = (product.locationDetails || []).map((loc: any) => ({
+            locationId: loc.locationId instanceof ObjectId ? loc.locationId.toString() : (loc.locationId?.toString() || null),
+            locationName: loc.locationName || null,
+            lastSoldDate: loc.lastSoldDate instanceof Date ? loc.lastSoldDate.toISOString() : (loc.lastSoldDate || null),
+            totalQuantitySold: loc.totalQuantitySold || 0,
+            totalRevenue: loc.totalRevenue || 0,
+          }));
+
+          productAggregates.push({
+            productName: product.productName,
+            daily: productDaily,
+            weekly: productWeekly,
+            monthly: productMonthly,
+            total: productTotal,
+            workloadLevel: product.workloadLevel || 'mid',
+            workloadMinutes: product.workloadMinutes || 5,
+            mepLevel: product.mepLevel || 'low',
+            mepMinutes: product.mepMinutes || 1,
+            courseType: product.courseType || undefined,
+            isActive: product.isActive !== undefined ? product.isActive : true,
+            locationDetails: serializedLocationDetails,
+          });
+
+          addTotals(categoryTotals.total, productTotal);
+        }
+
+        // Deduplicate products by productName
+        const productMap = new Map<string, any>();
+        for (const product of productAggregates) {
+          if (productMap.has(product.productName)) {
+            const existing = productMap.get(product.productName)!;
+            addTotals(existing.daily, product.daily);
+            addTotals(existing.weekly, product.weekly);
+            addTotals(existing.monthly, product.monthly);
+            addTotals(existing.total, product.total);
+            // Merge locationDetails
+            const existingLocationIds = new Set(
+              (existing.locationDetails || []).map((loc: any) => loc.locationId?.toString())
+            );
+            for (const loc of (product.locationDetails || [])) {
+              const locId = loc.locationId?.toString();
+              if (locId && !existingLocationIds.has(locId)) {
+                existing.locationDetails.push(loc);
+                existingLocationIds.add(locId);
+              }
+            }
+          } else {
+            productMap.set(product.productName, {
+              ...product,
+              locationDetails: [...(product.locationDetails || [])],
+            });
+          }
+        }
+
+        const deduplicatedProducts = Array.from(productMap.values());
+
+        return {
+          categoryName,
+          mainCategoryName: products[0]?.mainCategory || null,
+          products: deduplicatedProducts,
+          daily: categoryTotals.daily,
+          weekly: categoryTotals.weekly,
+          monthly: categoryTotals.monthly,
+          total: categoryTotals.total,
+        };
+      } catch (error: any) {
+        console.error('[GraphQL Resolver] categoryProducts error:', error);
+        throw new Error(error.message || 'Failed to fetch category products');
       }
     },
 
@@ -3122,7 +3404,7 @@ export const resolvers = {
         const db = await getDatabase();
         
         // Check if product already exists
-        const existing = await db.collection('products').findOne({ productName: input.productName });
+        const existing = await db.collection('products_aggregated').findOne({ productName: input.productName });
         if (existing) {
           throw new Error(`Product "${input.productName}" already exists`);
         }
@@ -3131,21 +3413,46 @@ export const resolvers = {
         const workloadMinutes = input.workloadLevel === 'low' ? 2.5 : input.workloadLevel === 'mid' ? 5 : 10;
         const mepMinutes = input.mepLevel === 'low' ? 1 : input.mepLevel === 'mid' ? 2 : 4;
 
+        const now = new Date();
         const product = {
           productName: input.productName,
           category: input.category || null,
+          mainCategory: null,
+          productSku: null,
+          locationId: null, // Global product
           workloadLevel: input.workloadLevel,
           workloadMinutes,
           mepLevel: input.mepLevel,
           mepMinutes,
+          courseType: input.courseType || null,
           isActive: input.isActive !== undefined ? input.isActive : true,
           notes: input.notes || null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          // Initialize aggregated fields with defaults
+          totalQuantitySold: 0,
+          totalRevenue: 0,
+          totalTransactions: 0,
+          firstSeen: now,
+          lastSeen: now,
+          averagePrice: 0,
+          latestPrice: 0,
+          minPrice: 0,
+          maxPrice: 0,
+          priceHistory: [],
+          salesByDate: [],
+          salesByWeek: [],
+          salesByMonth: [],
+          locationDetails: [],
+          menuIds: [],
+          menuPrices: [],
+          vatRate: null,
+          costPrice: null,
+          createdAt: now,
+          updatedAt: now,
+          lastAggregated: null,
         };
 
-        const result = await db.collection('products').insertOne(product);
-        const created = await db.collection('products').findOne({ _id: result.insertedId });
+        const result = await db.collection('products_aggregated').insertOne(product);
+        const created = await db.collection('products_aggregated').findOne({ _id: result.insertedId });
 
         return {
           id: created!._id.toString(),
@@ -3186,12 +3493,12 @@ export const resolvers = {
         if (input.notes !== undefined) update.notes = input.notes;
         if (input.isActive !== undefined) update.isActive = input.isActive;
 
-        await db.collection('products').updateOne(
+        await db.collection('products_aggregated').updateOne(
           { _id: toObjectId(id) },
           { $set: update }
         );
 
-        const updated = await db.collection('products').findOne({ _id: toObjectId(id) });
+        const updated = await db.collection('products_aggregated').findOne({ _id: toObjectId(id) });
         if (!updated) throw new Error('Product not found after update');
 
         return {
@@ -3216,7 +3523,7 @@ export const resolvers = {
     deleteProduct: async (_: any, { id }: { id: string }) => {
       try {
         const db = await getDatabase();
-        const result = await db.collection('products').deleteOne({ _id: toObjectId(id) });
+        const result = await db.collection('products_aggregated').deleteOne({ _id: toObjectId(id) });
         return result.deletedCount === 1;
       } catch (error: any) {
         console.error('[GraphQL Resolver] deleteProduct error:', error);
@@ -3227,7 +3534,14 @@ export const resolvers = {
 
   // Field resolvers for relationships
   Location: {
-    id: (parent: any) => toId(parent._id),
+    id: (parent: any) => {
+      // ✅ Handle null/undefined _id gracefully
+      if (!parent || !parent._id) {
+        console.warn('[GraphQL] Location.id resolver called with null/undefined _id');
+        return '';
+      }
+      return toId(parent._id);
+    },
     users: async (parent: any) => {
       const db = await getDatabase();
       return db.collection('unified_users').find({
@@ -3420,6 +3734,9 @@ export const resolvers = {
 // ============================================
 
 // Helper function to extract sales records (reused from dailySales)
+// ⚠️ EXCEPTION: Uses bork_raw_data because it needs transaction-level detail
+// (ticket keys, order keys, waiter names, table numbers, payment methods)
+// Aggregated collections don't have this level of detail
 async function extractSalesRecords(
   startDate: string,
   endDate: string,

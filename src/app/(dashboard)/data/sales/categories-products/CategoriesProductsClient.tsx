@@ -19,16 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCategoriesProductsViewModel, TimePeriod } from "@/viewmodels/sales/useCategoriesProductsViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { ProductAggregate, CategoryAggregate, TimePeriodTotals, MainCategoryAggregate } from "@/models/sales/categories-products.model";
-
-// Helper to format currency
-function formatCurrency(value: number): string {
-  return `€${value.toFixed(2)}`;
-}
-
-// Helper to format number
-function formatNumber(value: number): string {
-  return value.toFixed(2);
-}
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 // Helper to get totals for a specific time period
 function getPeriodTotals(
@@ -169,7 +160,7 @@ function AggregatedTable({ categories, period, onUpdateWorkload, onUpdateMEP }: 
             <TableRow className="bg-gray-50 font-semibold">
               <TableCell className="font-semibold">{category.categoryName}</TableCell>
               <TableCell className="text-muted-foreground italic">Category Total</TableCell>
-              <TableCell className="font-semibold">{formatNumber(categoryTotals.quantity)}</TableCell>
+              <TableCell className="font-semibold">{formatNumber(categoryTotals.quantity, 0, false)}</TableCell>
               <TableCell className="font-semibold">{formatCurrency(categoryTotals.revenueExVat)}</TableCell>
               <TableCell className="font-semibold">{formatCurrency(categoryTotals.revenueIncVat)}</TableCell>
               <TableCell className="font-semibold">{categoryTotals.transactionCount}</TableCell>
@@ -188,7 +179,7 @@ function AggregatedTable({ categories, period, onUpdateWorkload, onUpdateMEP }: 
                   <TableRow key={`${category.categoryName}-${product.productName}`} className="hover:bg-gray-50">
                     <TableCell></TableCell>
                     <TableCell className="pl-8">{product.productName}</TableCell>
-                    <TableCell>{formatNumber(productTotals.quantity)}</TableCell>
+                    <TableCell>{formatNumber(productTotals.quantity, 0, false)}</TableCell>
                     <TableCell>{formatCurrency(productTotals.revenueExVat)}</TableCell>
                     <TableCell>{formatCurrency(productTotals.revenueIncVat)}</TableCell>
                     <TableCell>{productTotals.transactionCount}</TableCell>
@@ -372,7 +363,7 @@ export function CategoriesProductsClient({ initialData }: CategoriesProductsClie
                 <div className="grid grid-cols-4 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Total Quantity: </span>
-                    <span className="font-semibold">{formatNumber(grandTotals.quantity)}</span>
+                    <span className="font-semibold">{formatNumber(grandTotals.quantity, 0, false)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Revenue Ex VAT: </span>

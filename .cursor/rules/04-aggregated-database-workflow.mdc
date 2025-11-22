@@ -1,0 +1,139 @@
+---
+alwaysApply: true
+---
+
+# 📊 AGGREGATED DATABASE WORKFLOW (CRITICAL)
+
+## 🎯 WORKFLOW PRINCIPLE
+
+**ALWAYS use aggregated collections for GraphQL queries. Raw data is ONLY for cron jobs.**
+
+### **Data Flow:**
+```
+Raw Data (cron) → Aggregated Database (daily cron) → GraphQL Queries → UI
+```
+
+---
+
+## ✅ AGGREGATED COLLECTIONS (USE THESE)
+
+### **Products:**
+- ✅ **`products_aggregated`** - Single source of truth for all product data
+  - Contains: sales stats, price history, location details, menu associations, categories, workload/MEP metrics
+  - Updated by: `/api/products/aggregate` (daily cron)
+  - GraphQL: `products`, `product`, `productByName`, `categoriesProductsAggregate`
+  - **Status:** ✅ Migrated - All product queries/mutations use this
+
+### **Sales:**
+- ✅ **`bork_aggregated`** - Daily sales aggregations
+  - Contains: daily totals per location, revenue by category
+  - Updated by: Bork sync cron jobs
+  - GraphQL: `salesAggregated`
+  - **Status:** ✅ Migrated - Used for dashboard queries
+
+### **Labor:**
+- ✅ **`eitje_aggregated`** - Daily labor aggregations
+  - Contains: daily hours, wage costs, team stats
+  - Updated by: Eitje sync cron jobs
+  - GraphQL: `laborAggregated`
+  - **Status:** ✅ Migrated - Used for dashboard queries
+
+---
+
+## ❌ RAW DATA COLLECTIONS (DON'T USE IN GRAPHQL)
+
+### **When to use raw data:**
+- ✅ **ONLY in cron jobs** that populate aggregated collections
+- ✅ **ONLY for diagnostics/debugging** (e.g., `checkTeamData` resolver)
+- ✅ **ONLY when transaction-level detail is required** (document exception)
+
+### **When NOT to use raw data:**
+- ❌ **NEVER in GraphQL resolvers** (too slow, causes timeouts)
+- ❌ **NEVER in API routes** that serve UI data
+- ❌ **NEVER in ViewModels or Services** that fetch data for pages
+
+---
+
+## 🔧 MIGRATION CHECKLIST
+
+When building a new feature or fixing existing code:
+
+1. **Check if aggregated collection exists:**
+   - ✅ If yes → Use aggregated collection in GraphQL resolver
+   - ❌ If no → Create aggregated collection + daily cron job first
+
+2. **Update GraphQL resolvers:**
+   - Replace `collection('products')` → `collection('products_aggregated')`
+   - Replace `collection('bork_raw_data')` → `collection('bork_aggregated')` (if applicable)
+   - Replace `collection('eitje_raw_data')` → `collection('eitje_aggregated')` (if applicable)
+
+3. **Create/Update daily cron job:**
+   - Aggregates raw data → aggregated collection
+   - Runs daily (or on-demand via API route)
+   - Preserves existing data (merge, don't overwrite)
+
+4. **Verify:**
+   - GraphQL queries use aggregated collections
+   - No raw_data queries in resolvers (except diagnostics)
+   - Cron job updates aggregated collection correctly
+
+---
+
+## 🚨 COMMON MISTAKES
+
+### ❌ **WRONG:**
+```typescript
+// GraphQL resolver querying raw data
+const products = await db.collection('bork_raw_data')
+  .find({ productName: 'Pizza' })
+  .toArray();
+```
+
+### ✅ **CORRECT:**
+```typescript
+// GraphQL resolver querying aggregated data
+const products = await db.collection('products_aggregated')
+  .find({ productName: 'Pizza' })
+  .toArray();
+```
+
+---
+
+## 📋 CURRENT STATUS
+
+### ✅ **Migrated to Aggregated:**
+- `categoriesProductsAggregate` → uses `products_aggregated`
+- `salesAggregated` → uses `bork_aggregated`
+- `laborAggregated` → uses `eitje_aggregated`
+
+### ⚠️ **Exceptions (Documented):**
+- `dailySales` resolver → uses `bork_raw_data` (needs transaction-level detail: ticket keys, order keys, waiter names, table numbers, payment methods, timestamps)
+- `extractSalesRecords` helper → uses `bork_raw_data` (used by resolvers needing transaction detail)
+- `checkTeamData` resolver → uses `eitje_raw_data` (diagnostics only)
+
+**Why exceptions exist:**
+- Aggregated collections store daily/product totals, not individual transaction line items
+- Some views require transaction-level detail (e.g., detailed sales reports with waiter/table info)
+- These resolvers are documented with comments explaining why raw data is necessary
+
+### ❌ **Still Using Raw/Old Collections (TO FIX):**
+- None - all product queries/mutations migrated to `products_aggregated`
+
+---
+
+## 🔍 VERIFICATION COMMANDS
+
+To check for violations:
+
+```bash
+# Find GraphQL resolvers using raw data (should be empty except exceptions)
+grep -r "collection('bork_raw_data')" src/lib/graphql/
+grep -r "collection('eitje_raw_data')" src/lib/graphql/
+
+# Find old product collection usage (should be empty)
+grep -r "collection('products')" src/lib/graphql/v2-resolvers.ts
+```
+
+---
+
+**Priority:** 🔴 HIGHEST - This rule prevents 404/500 errors and performance issues

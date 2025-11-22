@@ -99,13 +99,20 @@ export function useCategoriesProductsViewModel(initialData?: { aggregatedData?: 
   const locationOptions = useMemo<LocationOption[]>(() => {
     const validLocations = locations.filter(
       (loc: any) => 
+        loc && 
+        loc.id && 
+        loc.id.toString().trim() !== '' && // ✅ Ensure id is not empty
+        loc.name && 
+        loc.name.trim() !== '' && // ✅ Ensure name is not empty
         loc.name !== "All HNHG Locations" && 
         loc.name !== "All HNG Locations" &&
         loc.name !== "Default Location"
     );
     return [
       { value: "all", label: "All Locations" },
-      ...validLocations.map((loc: any) => ({ value: loc.id, label: loc.name })),
+      ...validLocations
+        .map((loc: any) => ({ value: loc.id.toString(), label: loc.name }))
+        .filter(option => option.value && option.value.trim() !== ''), // ✅ Double-check: filter out any empty values
     ];
   }, [locations]);
 
