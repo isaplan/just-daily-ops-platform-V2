@@ -14,11 +14,32 @@ import { useRevenueBreakdownViewModel } from "@/viewmodels/sales/useRevenueBreak
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatDateDDMMYY } from "@/lib/dateFormatters";
 import { formatCurrency } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 export default function RevenueAnalysisPage() {
   const viewModel = useRevenueBreakdownViewModel();
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from revenue data
+  const revenueTotals = viewModel.revenueData ? (() => {
+    const data = viewModel.revenueData;
+    const totalRevenueExVat = data.reduce((sum, r) => sum + (r.total_revenue_ex_vat || 0), 0);
+    const totalRevenueIncVat = data.reduce((sum, r) => sum + (r.total_revenue_inc_vat || 0), 0);
+    const totalVat = data.reduce((sum, r) => sum + (r.total_vat || 0), 0);
+    const totalTransactions = data.reduce((sum, r) => sum + (r.total_transactions || 0), 0);
+    const avgTransactionValue = totalTransactions > 0 ? totalRevenueIncVat / totalTransactions : 0;
+    const dailyAvg = data.length > 0 ? totalRevenueIncVat / data.length : 0;
+    
+    return {
+      totalRevenueExVat,
+      totalRevenueIncVat,
+      totalVat,
+      totalTransactions,
+      avgTransactionValue,
+      dailyAvg,
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -92,6 +113,21 @@ export default function RevenueAnalysisPage() {
                 )}
               </TableBody>
             </UITable>
+
+            {/* Revenue Totals Summary */}
+            {revenueTotals && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Revenue (Ex VAT)", value: revenueTotals.totalRevenueExVat, format: "currency" },
+                  { label: "Total Revenue (Inc VAT)", value: revenueTotals.totalRevenueIncVat, format: "currency" },
+                  { label: "Total VAT", value: revenueTotals.totalVat, format: "currency" },
+                  { label: "Total Transactions", value: revenueTotals.totalTransactions, format: "number", decimals: 0 },
+                  { label: "Avg Transaction Value", value: revenueTotals.avgTransactionValue, format: "currency" },
+                  { label: "Daily Avg Revenue", value: revenueTotals.dailyAvg, format: "currency" },
+                ]}
+              />
+            )}
           </div>
         )}
       </div>

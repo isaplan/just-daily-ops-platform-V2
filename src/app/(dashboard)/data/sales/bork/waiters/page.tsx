@@ -14,11 +14,31 @@ import { UITable } from "@/components/view-data/UITable";
 import { useWaiterPerformanceViewModel } from "@/viewmodels/sales/useWaiterPerformanceViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
+import { ClickableWorkerName } from "@/components/workforce/ClickableWorkerName";
 
 export default function WaiterPerformancePage() {
   const viewModel = useWaiterPerformanceViewModel();
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from waiter data
+  const waiterTotals = viewModel.waiterData ? (() => {
+    const data = viewModel.waiterData;
+    const totalWaiters = data.length;
+    const totalSales = data.reduce((sum, w) => sum + (w.total_revenue || 0), 0);
+    const totalTransactions = data.reduce((sum, w) => sum + (w.total_transactions || 0), 0);
+    const totalItems = data.reduce((sum, w) => sum + (w.total_items_sold || 0), 0);
+    const avgSalesPerWaiter = totalWaiters > 0 ? totalSales / totalWaiters : 0;
+    
+    return {
+      totalWaiters,
+      totalSales,
+      totalTransactions,
+      totalItems,
+      avgSalesPerWaiter,
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -84,7 +104,17 @@ export default function WaiterPerformancePage() {
                 ) : (
                   viewModel.waiterData.map((waiter: any, index: number) => (
                     <TableRow key={`${waiter.waiter_name}_${waiter.location_id || 'unknown'}_${index}`}>
-                      <TableCell className="font-medium">{waiter.waiter_name || '-'}</TableCell>
+                      <TableCell>
+                        {waiter.waiter_name ? (
+                          <ClickableWorkerName 
+                            worker={{
+                              user_name: waiter.waiter_name,
+                            }}
+                          />
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
                       <TableCell>{waiter.location_name || '-'}</TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(waiter.total_revenue)}
@@ -102,6 +132,20 @@ export default function WaiterPerformancePage() {
                 )}
               </TableBody>
             </UITable>
+
+            {/* Waiter Totals Summary */}
+            {waiterTotals && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Waiters", value: waiterTotals.totalWaiters, format: "number", decimals: 0 },
+                  { label: "Total Sales", value: waiterTotals.totalSales, format: "currency" },
+                  { label: "Total Transactions", value: waiterTotals.totalTransactions, format: "number", decimals: 0 },
+                  { label: "Total Items", value: waiterTotals.totalItems, format: "number", decimals: 0 },
+                  { label: "Avg Sales per Waiter", value: waiterTotals.avgSalesPerWaiter, format: "currency" },
+                ]}
+              />
+            )}
           </div>
         )}
       </div>

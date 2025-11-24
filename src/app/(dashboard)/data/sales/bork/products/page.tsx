@@ -14,11 +14,32 @@ import { SimplePagination } from "@/components/view-data/SimplePagination";
 import { useProductPerformanceViewModel } from "@/viewmodels/sales/useProductPerformanceViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 export default function ProductPerformancePage() {
   const viewModel = useProductPerformanceViewModel();
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from product data
+  const productTotals = viewModel.productData ? (() => {
+    const data = viewModel.productData;
+    const totalProducts = data.length;
+    const totalQuantity = data.reduce((sum, p) => sum + (p.total_quantity_sold || 0), 0);
+    const totalRevenue = data.reduce((sum, p) => sum + (p.total_revenue || 0), 0);
+    const totalProfit = data.reduce((sum, p) => sum + (p.total_profit || 0), 0);
+    const totalTransactions = data.reduce((sum, p) => sum + (p.transaction_count || 0), 0);
+    const avgProductRevenue = totalProducts > 0 ? totalRevenue / totalProducts : 0;
+    
+    return {
+      totalProducts,
+      totalQuantity,
+      totalRevenue,
+      totalProfit,
+      totalTransactions,
+      avgProductRevenue,
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -96,6 +117,21 @@ export default function ProductPerformancePage() {
                 )}
               </TableBody>
             </UITable>
+
+            {/* Product Totals Summary */}
+            {productTotals && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Products", value: productTotals.totalProducts, format: "number", decimals: 0 },
+                  { label: "Total Quantity", value: productTotals.totalQuantity, format: "number", decimals: 0 },
+                  { label: "Total Revenue", value: productTotals.totalRevenue, format: "currency" },
+                  { label: "Total Profit", value: productTotals.totalProfit, format: "currency" },
+                  { label: "Total Transactions", value: productTotals.totalTransactions, format: "number", decimals: 0 },
+                  { label: "Avg Product Revenue", value: productTotals.avgProductRevenue, format: "currency" },
+                ]}
+              />
+            )}
 
             {viewModel.totalPages > 1 && (
               <SimplePagination

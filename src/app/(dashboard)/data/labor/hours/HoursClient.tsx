@@ -18,6 +18,7 @@ import { formatDateDDMMYY, formatTimeOnly } from "@/lib/dateFormatters";
 import { useHoursV2ViewModel } from "@/viewmodels/workforce/useHoursV2ViewModel";
 import { ProcessedHoursRecord } from "@/models/workforce/hours-v2.model";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
+import { ClickableWorkerName } from "@/components/workforce/ClickableWorkerName";
 
 interface HoursClientProps {
   initialData?: {
@@ -127,7 +128,18 @@ export function HoursClient({ initialData }: HoursClientProps) {
                     <TableCell>{formatDateDDMMYY(record.date)}</TableCell>
                     <TableCell className="whitespace-nowrap">{record.environment_name || record.environment_id || "-"}</TableCell>
                     <TableCell>{record.team_name || record.team_id || "-"}</TableCell>
-                    <TableCell>{record.user_name || record.user_id || "-"}</TableCell>
+                    <TableCell>
+                      {record.user_name || record.user_id ? (
+                        <ClickableWorkerName 
+                          worker={{
+                            eitje_user_id: record.user_id,
+                            user_name: record.user_name,
+                          }}
+                        />
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
                     <TableCell>{record.start ? formatTimeOnly(record.start) : "-"}</TableCell>
                     <TableCell>{record.end ? formatTimeOnly(record.end) : "-"}</TableCell>
                     <TableCell>{record.worked_hours !== null && record.worked_hours !== undefined ? Number(record.worked_hours).toFixed(2) : "-"}</TableCell>

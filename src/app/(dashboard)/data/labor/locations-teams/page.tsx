@@ -25,6 +25,7 @@ import { formatDateDDMMYY } from "@/lib/dateFormatters";
 import { useLocationsTeamsViewModel } from "@/viewmodels/labor/useLocationsTeamsViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { Users, UserX, Copy, Ghost } from "lucide-react";
+import { ClickableWorkerName } from "@/components/workforce/ClickableWorkerName";
 
 export default function LocationsTeamsPage() {
   const viewModel = useLocationsTeamsViewModel();
@@ -220,8 +221,7 @@ export default function LocationsTeamsPage() {
                       )}
                       
                       <TableCell>
-                        <div className="font-medium">{worker.user_name || `User ${worker.eitje_user_id}`}</div>
-                        <div className="text-xs text-muted-foreground">ID: {worker.eitje_user_id}</div>
+                        <ClickableWorkerName worker={worker} showId />
                       </TableCell>
                       <TableCell>{worker.location_name || worker.location_id || "-"}</TableCell>
                       <TableCell>

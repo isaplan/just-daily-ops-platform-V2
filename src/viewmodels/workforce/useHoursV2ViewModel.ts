@@ -70,7 +70,7 @@ export function useHoursV2ViewModel(initialData?: { processedData?: any; locatio
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [selectedShiftType, setSelectedShiftType] = useState<string>("worked");
+  const [selectedShiftType, setSelectedShiftType] = useState<string>("all");
   const [selectedDatePreset, setSelectedDatePreset] = useState<DatePreset>("this-year");
   const [currentPage, setCurrentPage] = useState(1);
   const [showAllColumns, setShowAllColumns] = useState(false);
@@ -130,6 +130,7 @@ export function useHoursV2ViewModel(initialData?: { processedData?: any; locatio
   // Build shift type options (based on type_name field)
   const shiftTypeOptions = useMemo(() => {
     return [
+      { value: "all", label: "All" },
       { value: "worked", label: "Gewerkte Uren" },
       { value: "verlof", label: "Verlof" },
       { value: "ziek", label: "Ziek" },
@@ -183,11 +184,14 @@ export function useHoursV2ViewModel(initialData?: { processedData?: any; locatio
     }
 
     // Shift type filter (by type_name)
+    // "all" = show all shifts (no filter)
     // "worked" = actual worked hours (type_name is null or empty)
     // "verlof" = leave/vacation shifts
     // "ziek" = sick leave shifts  
     // "bijzonder" = special leave shifts
-    if (selectedShiftType === "worked") {
+    if (selectedShiftType === "all") {
+      // Don't set typeName filter - show all shifts
+    } else if (selectedShiftType === "worked") {
       filters.typeName = null; // Show only worked hours (no type_name)
     } else {
       filters.typeName = selectedShiftType; // Show only this specific type
@@ -211,11 +215,22 @@ export function useHoursV2ViewModel(initialData?: { processedData?: any; locatio
     isLoading: isLoadingProcessed, 
     error: processedError 
   } = useQuery({
-    queryKey: ["eitje-v2-processed-hours", queryParams, selectedTeam, selectedShiftType],
+    queryKey: [
+      "eitje-v2-processed-hours", 
+      queryParams.startDate,
+      queryParams.endDate,
+      queryParams.page,
+      queryParams.limit,
+      queryParams.locationId,
+      queryParams.teamName,
+      queryParams.typeName, // Explicitly include typeName in query key
+      selectedShiftType // Include selectedShiftType to ensure query re-runs on filter change
+    ],
     queryFn: () => fetchProcessedHours(queryParams),
     initialData: initialData?.processedData,
     enabled: activeTab === "processed" && !!queryParams.startDate && !!queryParams.endDate,
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 0, // Always refetch when filters change
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   // Fetch aggregated hours data

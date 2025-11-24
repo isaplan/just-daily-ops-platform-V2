@@ -13,11 +13,30 @@ import { UITable } from "@/components/view-data/UITable";
 import { usePaymentMethodStatsViewModel } from "@/viewmodels/sales/usePaymentMethodStatsViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 export default function PaymentMethodsPage() {
   const viewModel = usePaymentMethodStatsViewModel();
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from payment data
+  const paymentTotals = viewModel.paymentData ? (() => {
+    const data = viewModel.paymentData;
+    const totalMethods = data.length;
+    const totalAmount = data.reduce((sum, p) => sum + (p.total_revenue || 0), 0);
+    const totalTransactions = data.reduce((sum, p) => sum + (p.total_transactions || 0), 0);
+    const topMethod = data.length > 0 ? data.reduce((max, p) => 
+      (p.total_revenue || 0) > (max.total_revenue || 0) ? p : max
+    ) : null;
+    
+    return {
+      totalMethods,
+      totalAmount,
+      totalTransactions,
+      topMethod: topMethod?.payment_method || '-',
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -89,6 +108,19 @@ export default function PaymentMethodsPage() {
                 )}
               </TableBody>
             </UITable>
+
+            {/* Payment Totals Summary */}
+            {paymentTotals && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Payment Methods", value: paymentTotals.totalMethods, format: "number", decimals: 0 },
+                  { label: "Total Amount", value: paymentTotals.totalAmount, format: "currency" },
+                  { label: "Total Transactions", value: paymentTotals.totalTransactions, format: "number", decimals: 0 },
+                  { label: "Top Method", value: paymentTotals.topMethod, format: "text" },
+                ]}
+              />
+            )}
           </div>
         )}
       </div>

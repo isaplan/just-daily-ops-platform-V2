@@ -12,6 +12,8 @@ import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AutocompleteSearch, AutocompleteOption } from "@/components/view-data/AutocompleteSearch";
+import { useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UITable } from "@/components/view-data/UITable";
@@ -31,6 +33,15 @@ export default function ProductsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAggregating, setIsAggregating] = useState(false);
   const [lastAggregated, setLastAggregated] = useState<Date | null>(null);
+
+  // Product search options for autocomplete
+  const productSearchOptions = useMemo<AutocompleteOption[]>(() => {
+    return viewModel.products.map(product => ({
+      value: product.productName,
+      label: product.productName,
+      product: product,
+    }));
+  }, [viewModel.products]);
 
   // Load last aggregated timestamp
   useEffect(() => {
@@ -179,14 +190,14 @@ export default function ProductsPage() {
       <div className="space-y-4">
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div>
-            <Label>Search</Label>
-            <Input
-              placeholder="Search products..."
-              value={viewModel.searchTerm}
-              onChange={(e) => viewModel.setSearchTerm(e.target.value)}
-            />
-          </div>
+          <AutocompleteSearch
+            options={productSearchOptions}
+            value={viewModel.searchTerm}
+            onValueChange={viewModel.setSearchTerm}
+            placeholder="Search products..."
+            label="Search"
+            emptyMessage="No products found."
+          />
           <div>
             <Label>Category</Label>
             <Select value={viewModel.selectedCategory} onValueChange={viewModel.setSelectedCategory}>

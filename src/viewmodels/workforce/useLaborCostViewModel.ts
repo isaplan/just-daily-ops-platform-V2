@@ -63,7 +63,7 @@ export interface UseLaborCostViewModelReturn {
   };
 }
 
-export function useLaborCostViewModel(): UseLaborCostViewModelReturn {
+export function useLaborCostViewModel(initialData?: { laborCostData?: any; locations?: any[] }): UseLaborCostViewModelReturn {
   // State management
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -80,16 +80,25 @@ export function useLaborCostViewModel(): UseLaborCostViewModelReturn {
     setCurrentPage(1);
   }, [selectedTeam, selectedLocation, selectedWorker, selectedYear, selectedMonth, selectedDay, selectedDatePreset]);
 
+  // Reset month/day when date preset changes (preset takes priority)
+  useEffect(() => {
+    if (selectedDatePreset !== "custom") {
+      setSelectedMonth(null);
+      setSelectedDay(null);
+    }
+  }, [selectedDatePreset]);
+
   // Get date range from preset
   const dateRange = useMemo(() => {
     return getDateRangeForPreset(selectedDatePreset);
   }, [selectedDatePreset]);
 
-  // Fetch locations via GraphQL
-  const { data: locations = [] } = useQuery({
+  // Fetch locations via GraphQL - use initialData if provided
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    initialData: initialData?.locations,
+    staleTime: 60 * 60 * 1000, // 60 minutes (static data)
   });
 
   // Build location options - filter out invalid locations
@@ -131,7 +140,6 @@ export function useLaborCostViewModel(): UseLaborCostViewModelReturn {
         const result = await getWorkerProfiles(selectedYear, null, null, 1, 1000, undefined);
         return result;
       } catch (error) {
-        console.error('Error fetching workers for search:', error);
         // Return empty result on error to prevent page crash
         return {
           success: false,
@@ -165,34 +173,31 @@ export function useLaborCostViewModel(): UseLaborCostViewModelReturn {
   // Build query filters (business logic)
   const queryFilters = useMemo<LaborCostFilters>(() => {
     const filters: LaborCostFilters = {};
+    const currentYear = new Date().getFullYear();
     
-    // Priority: selectedDay > selectedMonth > dateRange (from preset) > selectedYear
+    // Priority: selectedDay > selectedMonth > dateRange (from preset, only for current year) > selectedYear
     if (selectedDay !== null && selectedMonth !== null) {
+      // Specific day selected
       filters.startDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`;
       filters.endDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`;
     } else if (selectedMonth) {
+      // Specific month selected
       filters.startDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
       const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
-      filters.endDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${lastDay}`;
-    } else if (dateRange) {
-      const presetStartYear = dateRange.start.getFullYear();
-      const presetEndYear = dateRange.end.getFullYear();
+      filters.endDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (dateRange && selectedYear === currentYear && selectedDatePreset !== "custom") {
+      // Only use date range preset if viewing current year AND preset is not "custom"
+      const startYear = dateRange.start.getFullYear();
+      const startMonth = String(dateRange.start.getMonth() + 1).padStart(2, "0");
+      const startDay = String(dateRange.start.getDate()).padStart(2, "0");
+      filters.startDate = `${startYear}-${startMonth}-${startDay}`;
       
-      if (presetStartYear !== selectedYear || presetEndYear !== selectedYear) {
-        filters.startDate = `${selectedYear}-01-01`;
-        filters.endDate = `${selectedYear}-12-31`;
-      } else {
-        const startYear = dateRange.start.getFullYear();
-        const startMonth = String(dateRange.start.getMonth() + 1).padStart(2, "0");
-        const startDay = String(dateRange.start.getDate()).padStart(2, "0");
-        filters.startDate = `${startYear}-${startMonth}-${startDay}`;
-        
-        const endYear = dateRange.end.getFullYear();
-        const endMonth = String(dateRange.end.getMonth() + 1).padStart(2, "0");
-        const endDay = String(dateRange.end.getDate()).padStart(2, "0");
-        filters.endDate = `${endYear}-${endMonth}-${endDay}`;
-      }
+      const endYear = dateRange.end.getFullYear();
+      const endMonth = String(dateRange.end.getMonth() + 1).padStart(2, "0");
+      const endDay = String(dateRange.end.getDate()).padStart(2, "0");
+      filters.endDate = `${endYear}-${endMonth}-${endDay}`;
     } else {
+      // Default to full year range for non-current years or when preset is "custom"
       filters.startDate = `${selectedYear}-01-01`;
       filters.endDate = `${selectedYear}-12-31`;
     }
@@ -216,7 +221,7 @@ export function useLaborCostViewModel(): UseLaborCostViewModelReturn {
     // Aggregated hours are already filtered to worked hours only
 
     return filters;
-  }, [selectedYear, selectedMonth, selectedDay, selectedLocation, selectedTeam, selectedWorker, dateRange]);
+  }, [selectedYear, selectedMonth, selectedDay, selectedLocation, selectedTeam, selectedWorker, dateRange, selectedDatePreset]);
 
   // Build query params
   const queryParams = useMemo<LaborCostQueryParams>(() => {
@@ -227,7 +232,7 @@ export function useLaborCostViewModel(): UseLaborCostViewModelReturn {
     };
   }, [queryFilters, currentPage]);
 
-  // Fetch labor cost data
+  // Fetch labor cost data (paginated for table)
   const { 
     data: laborCostResponse, 
     isLoading, 
@@ -236,11 +241,31 @@ export function useLaborCostViewModel(): UseLaborCostViewModelReturn {
     queryKey: ["labor-costs", queryParams],
     queryFn: () => fetchLaborCosts(queryParams),
     enabled: !!queryParams.startDate && !!queryParams.endDate,
+    placeholderData: (previousData) => {
+      // Use initialData only on first load when no previous data exists
+      if (!previousData && initialData?.laborCostData) {
+        return initialData.laborCostData;
+      }
+      return previousData;
+    },
+    staleTime: 0, // Always refetch when filters change
   });
 
-  // Aggregate costs per time period
+  // Fetch ALL records for aggregated costs calculation (no pagination)
+  const { data: allLaborCostResponse } = useQuery({
+    queryKey: ["labor-costs-all", queryFilters], // Use queryFilters, not queryParams (no pagination)
+    queryFn: () => fetchLaborCosts({
+      ...queryFilters,
+      page: 1,
+      limit: 10000, // Large limit to get all records
+    }),
+    enabled: !!queryFilters.startDate && !!queryFilters.endDate,
+    staleTime: 0, // Always refetch when filters change
+  });
+
+  // Aggregate costs per time period - use ALL filtered records, not just current page
   const aggregatedCosts = useMemo(() => {
-    const records = laborCostResponse?.records || [];
+    const records = allLaborCostResponse?.records || [];
     
     if (records.length === 0) {
       return {

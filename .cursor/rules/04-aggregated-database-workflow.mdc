@@ -136,4 +136,139 @@ grep -r "collection('products')" src/lib/graphql/v2-resolvers.ts
 
 ---
 
+## 📊 HIERARCHICAL TIME-SERIES DATA (NEW)
+
+### **Structure:**
+
+Both `products_aggregated` and `eitje_aggregated` now support hierarchical time-series data for fast historical queries:
+
+**Products:**
+- `salesByYear` - Year totals with location breakdowns
+- `salesByMonth` - Month totals (only months >1 month old)
+- `salesByWeek` - Week totals (only weeks >1 week old)
+- `salesByDay` - Day totals (only current week, excluding today)
+
+**Labor:**
+- `hoursByYear` - Year totals with location → team → worker breakdowns
+- `hoursByMonth` - Month totals (only months >1 month old)
+- `hoursByWeek` - Week totals (only weeks >1 week old)
+- `hoursByDay` - Day totals (only current week, excluding today)
+
+### **When to Use Hierarchical Data:**
+
+- ✅ **ALWAYS check for hierarchical data first** in GraphQL resolvers
+- ✅ **Route based on query type** (year/month/week/day) using `detectQueryType()`
+- ✅ **Use hierarchical data** when available for 10-100x faster queries
+- ✅ **Fallback to calculation** if hierarchical data missing (backward compatibility)
+
+### **GraphQL Resolver Routing Logic:**
+
+**Decision Tree:**
+1. Check if hierarchical data exists (`hasHierarchicalData()`)
+2. If yes, detect query type (`detectQueryType(startDate, endDate)`)
+3. Route to appropriate hierarchical field:
+   - Year query → `salesByYear` / `hoursByYear`
+   - Month query → `salesByMonth` / `hoursByMonth`
+   - Week query → `salesByWeek` / `hoursByWeek`
+   - Day query → `salesByDay` / `hoursByDay`
+4. Apply location/team/worker filters within hierarchical data
+5. If no hierarchical data, fallback to existing calculation logic
+
+**Example (Products):**
+```typescript
+// ✅ CORRECT: Use hierarchical data for year queries
+const yearData = product.salesByYear?.find(y => y.year === "2025");
+if (yearData) {
+  let locationData = yearData.byLocation;
+  if (locationId) {
+    locationData = locationData.filter(loc => loc.locationId.toString() === locationId);
+  }
+  return {
+    total: {
+      quantity: locationData.reduce((sum, loc) => sum + loc.quantity, 0),
+      revenueExVat: locationData.reduce((sum, loc) => sum + loc.revenueExVat, 0),
+      // ...
+    }
+  };
+}
+
+// ✅ CORRECT: Fallback to calculation if hierarchical data missing
+if (!product.salesByYear || product.salesByYear.length === 0) {
+  // Calculate from salesByDate (backward compatibility)
+  return calculateYearTotals(product.salesByDate, locationId);
+}
+```
+
+**Example (Labor):**
+```typescript
+// ✅ CORRECT: Use hierarchical data for year queries with worker breakdown
+const yearData = record.hoursByYear?.find(y => y.year === "2025");
+if (yearData) {
+  const locationData = yearData.byLocation.find(loc => 
+    loc.locationId.toString() === locationId
+  );
+  if (locationData) {
+    // Filter by team if specified
+    let teams = locationData.byTeam;
+    if (teamId) {
+      teams = teams.filter(team => team.teamId === teamId);
+    }
+    // Filter by worker if specified
+    if (workerId) {
+      teams = teams.map(team => ({
+        ...team,
+        byWorker: team.byWorker.filter(w => w.unifiedUserId.toString() === workerId)
+      }));
+    }
+    return teams;
+  }
+}
+```
+
+### **Reaggregation Requirements:**
+
+**When hierarchical data is missing:**
+- Run `/api/products/reaggregate-hierarchical` to populate products
+- Run `/api/eitje/v2/reaggregate-hierarchical` to populate labor records
+- These endpoints process all historical data and build hierarchical structure
+
+**Incremental Updates:**
+- Daily aggregation cron jobs automatically update hierarchical data
+- New days/weeks/months are added as time passes
+- Data moves between levels (week → month when week is >1 week old)
+
+### **Migration Checklist (Updated):**
+
+When building a new feature or fixing existing code:
+
+1. **Check if aggregated collection exists:**
+   - ✅ If yes → Use aggregated collection in GraphQL resolver
+   - ❌ If no → Create aggregated collection + daily cron job first
+
+2. **Update GraphQL resolvers:**
+   - Replace `collection('products')` → `collection('products_aggregated')`
+   - Replace `collection('bork_raw_data')` → `collection('bork_aggregated')` (if applicable)
+   - Replace `collection('eitje_raw_data')` → `collection('eitje_aggregated')` (if applicable)
+   - **NEW:** Check for hierarchical data first, route based on query type
+   - **NEW:** Fallback to calculation if hierarchical data missing
+
+3. **Create/Update daily cron job:**
+   - Aggregates raw data → aggregated collection
+   - **NEW:** Builds hierarchical time-series structure
+   - Runs daily (or on-demand via API route)
+   - Preserves existing data (merge, don't overwrite)
+
+4. **Reaggregate existing data:**
+   - Run `/api/products/reaggregate-hierarchical` for products
+   - Run `/api/eitje/v2/reaggregate-hierarchical` for labor
+   - This populates hierarchical data for all existing records
+
+5. **Verify:**
+   - GraphQL queries use hierarchical data when available
+   - Resolvers fallback to calculation if hierarchical data missing
+   - No raw_data queries in resolvers (except diagnostics)
+   - Cron job updates hierarchical data correctly
+
+---
+
 **Priority:** 🔴 HIGHEST - This rule prevents 404/500 errors and performance issues

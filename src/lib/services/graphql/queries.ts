@@ -409,6 +409,8 @@ export interface WorkerProfile {
   userName?: string | null;
   locationId?: string | null;
   locationName?: string | null;
+  locationIds?: string[] | null;
+  locationNames?: string[] | null;
   contractType?: string | null;
   contractHours?: number | null;
   hourlyWage?: number | null;
@@ -538,6 +540,40 @@ export async function getWorkerProfile(id: string): Promise<WorkerProfile | null
   return result.data?.workerProfile || null;
 }
 
+/**
+ * Get a worker profile by user name (uses unified_users system)
+ */
+export async function getWorkerProfileByName(userName: string): Promise<WorkerProfile | null> {
+  const query = `
+    query GetWorkerProfileByName($userName: String!) {
+      workerProfileByName(userName: $userName) {
+        id
+        eitjeUserId
+        userName
+        locationId
+        locationName
+        contractType
+        contractHours
+        hourlyWage
+        wageOverride
+        effectiveFrom
+        effectiveTo
+        notes
+        isActive
+        createdAt
+        updatedAt
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ workerProfileByName: WorkerProfile | null }>(
+    query,
+    { userName }
+  );
+
+  return result.data?.workerProfileByName || null;
+}
+
 // ============================================
 // SALES QUERIES
 // ============================================
@@ -583,6 +619,7 @@ export interface SalesFilters {
   locationId?: string;
   category?: string;
   productName?: string;
+  waiterName?: string;
 }
 
 /**

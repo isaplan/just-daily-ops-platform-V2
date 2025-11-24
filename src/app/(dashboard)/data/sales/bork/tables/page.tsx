@@ -14,11 +14,30 @@ import { UITable } from "@/components/view-data/UITable";
 import { useTableAnalysisViewModel } from "@/viewmodels/sales/useTableAnalysisViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 export default function TableAnalysisPage() {
   const viewModel = useTableAnalysisViewModel();
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from table data
+  const tableTotals = viewModel.tableData ? (() => {
+    const data = viewModel.tableData;
+    const totalTables = data.length;
+    const totalRevenue = data.reduce((sum, t) => sum + (t.total_revenue || 0), 0);
+    const totalTransactions = data.reduce((sum, t) => sum + (t.total_transactions || 0), 0);
+    const totalItems = data.reduce((sum, t) => sum + (t.total_items_sold || 0), 0);
+    const avgRevenuePerTable = totalTables > 0 ? totalRevenue / totalTables : 0;
+    
+    return {
+      totalTables,
+      totalRevenue,
+      totalTransactions,
+      totalItems,
+      avgRevenuePerTable,
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -90,6 +109,20 @@ export default function TableAnalysisPage() {
                 )}
               </TableBody>
             </UITable>
+
+            {/* Table Totals Summary */}
+            {tableTotals && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Tables", value: tableTotals.totalTables, format: "number", decimals: 0 },
+                  { label: "Total Revenue", value: tableTotals.totalRevenue, format: "currency" },
+                  { label: "Total Transactions", value: tableTotals.totalTransactions, format: "number", decimals: 0 },
+                  { label: "Total Items", value: tableTotals.totalItems, format: "number", decimals: 0 },
+                  { label: "Avg Revenue per Table", value: tableTotals.avgRevenuePerTable, format: "currency" },
+                ]}
+              />
+            )}
           </div>
         )}
       </div>

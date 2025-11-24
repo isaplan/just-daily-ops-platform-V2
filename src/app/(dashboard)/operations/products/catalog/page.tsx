@@ -15,20 +15,19 @@ export const revalidate = 1800;
 
 export default async function ProductCatalogPage() {
   // ✅ Fetch initial data on server (fast, SSR)
-  // Use this week (Monday to Sunday) as default
+  // Use current month as default (matches client-side default)
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust if Sunday
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() + diffToMonday);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-11
+  
+  const startOfMonth = new Date(currentYear, currentMonth, 1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  
+  const endOfMonth = new Date(currentYear, currentMonth + 1, 0); // Last day of current month
+  endOfMonth.setHours(23, 59, 59, 999);
 
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  endOfWeek.setHours(23, 59, 59, 999);
-
-  const startDate = startOfWeek.toISOString().split('T')[0];
-  const endDate = endOfWeek.toISOString().split('T')[0];
+  const startDate = startOfMonth.toISOString().split('T')[0];
+  const endDate = endOfMonth.toISOString().split('T')[0];
   
   // ✅ Fetch only category metadata (lightweight - ~5-10KB vs 500KB+)
   // Products will be lazy-loaded when categories are expanded
@@ -49,7 +48,10 @@ export default async function ProductCatalogPage() {
       },
       error: 'Failed to fetch categories metadata',
     })),
-    getLocations().catch(() => []),
+    getLocations().catch((error) => {
+      console.error('[ProductCatalogPage] Error fetching locations:', error);
+      return [];
+    }),
   ]);
   
   // ✅ Pass lightweight metadata to client component

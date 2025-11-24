@@ -18,6 +18,7 @@ import { useProductivityViewModel } from "@/viewmodels/workforce/useProductivity
 import { ProductivityAggregation } from "@/models/workforce/productivity.model";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 export default function ProductivityPage() {
   const viewModel = useProductivityViewModel();
@@ -80,32 +81,6 @@ export default function ProductivityPage() {
           </div>
         </div>
 
-        {/* Totals Summary */}
-        {viewModel.productivityData && viewModel.productivityData.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-muted rounded-lg">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Hours</p>
-              <p className="text-lg font-semibold">{viewModel.totals.totalHoursWorked.toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Cost</p>
-              <p className="text-lg font-semibold">€{viewModel.totals.totalWageCost.toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
-              <p className="text-lg font-semibold">€{viewModel.totals.totalRevenue.toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Revenue/Hour</p>
-              <p className="text-lg font-semibold">€{viewModel.totals.revenuePerHour.toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Labor Cost %</p>
-              <p className="text-lg font-semibold">{viewModel.totals.laborCostPercentage.toFixed(1)}%</p>
-            </div>
-          </div>
-        )}
-
         {/* Productivity Table */}
         {viewModel.isLoading && <LoadingState />}
 
@@ -152,6 +127,20 @@ export default function ProductivityPage() {
               </TableBody>
             </UITable>
 
+            {/* Totals Summary */}
+            {viewModel.productivityData && viewModel.productivityData.length > 0 && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Hours", value: viewModel.totals.totalHoursWorked, format: "number", decimals: 2 },
+                  { label: "Total Cost", value: viewModel.totals.totalWageCost, format: "currency" },
+                  { label: "Total Revenue", value: viewModel.totals.totalRevenue, format: "currency" },
+                  { label: "Revenue/Hour", value: viewModel.totals.revenuePerHour, format: "currency" },
+                  { label: "Labor Cost %", value: viewModel.totals.laborCostPercentage, format: "percentage", decimals: 1 },
+                ]}
+              />
+            )}
+
             {/* Pagination */}
             <SimplePagination
               currentPage={viewModel.currentPage}
@@ -166,5 +155,6 @@ export default function ProductivityPage() {
     </div>
   );
 }
+
 
 

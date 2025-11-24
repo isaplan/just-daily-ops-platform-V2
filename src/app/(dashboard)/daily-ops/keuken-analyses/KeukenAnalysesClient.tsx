@@ -7,7 +7,7 @@
 
 import { usePathname } from "next/navigation";
 import { EitjeDataFilters } from "@/components/view-data/EitjeDataFilters";
-import { WorkerSearch } from "@/components/view-data/WorkerSearch";
+import { AutocompleteSearch, AutocompleteOption } from "@/components/view-data/AutocompleteSearch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -335,15 +335,24 @@ export function KeukenAnalysesClient({ initialData }: KeukenAnalysesClientProps)
           
           {/* Worker Filter */}
           <div className="flex gap-4 items-end">
-            <div className="space-y-2 min-w-[250px]">
-              <label className="text-sm font-medium">Kitchen Worker</label>
-              <WorkerSearch
-                options={viewModel.workerOptions.map(o => ({ ...o, userId: parseInt(o.value) || 0 }))}
-                selectedValue={viewModel.selectedWorker || "all"}
-                onValueChange={(value) => viewModel.setSelectedWorker(value === "all" ? null : value)}
-                placeholder="Select worker to analyze..."
-              />
-            </div>
+            <AutocompleteSearch
+              options={viewModel.workerOptions.map(o => ({
+                value: o.value,
+                label: o.label,
+                userId: parseInt(o.value) || 0,
+              }))}
+              value={viewModel.selectedWorker || "all"}
+              onValueChange={(value) => viewModel.setSelectedWorker(value === "all" ? null : value)}
+              placeholder="Select worker to analyze..."
+              label="Kitchen Worker"
+              emptyMessage="No workers found."
+              filterFn={(option, search) => {
+                const searchLower = search.toLowerCase();
+                return option.label.toLowerCase().includes(searchLower) || 
+                       String(option.userId || '').includes(searchLower);
+              }}
+              className="min-w-[250px]"
+            />
           </div>
         </div>
 

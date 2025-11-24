@@ -210,7 +210,7 @@ export interface ProductsAggregated {
     revenueIncVat: number;
     transactionCount: number;
     locationId?: ObjectId;
-  }>; // Daily sales (last 90 days)
+  }>; // Daily sales (last 90 days) - DEPRECATED: Use salesByDay instead
   
   salesByWeek?: Array<{
     week: string; // YYYY-W## format
@@ -218,7 +218,7 @@ export interface ProductsAggregated {
     revenueExVat: number;
     revenueIncVat: number;
     transactionCount: number;
-  }>; // Weekly sales (last 12 weeks)
+  }>; // Weekly sales (last 12 weeks) - DEPRECATED: Use hierarchical structure instead
   
   salesByMonth?: Array<{
     month: string; // YYYY-MM format
@@ -226,7 +226,79 @@ export interface ProductsAggregated {
     revenueExVat: number;
     revenueIncVat: number;
     transactionCount: number;
-  }>; // Monthly sales (last 12 months)
+  }>; // Monthly sales (last 12 months) - DEPRECATED: Use hierarchical structure instead
+  
+  // ============================================
+  // HIERARCHICAL TIME-SERIES SALES DATA (NEW)
+  // Fast queries for year/month/week/day breakdowns
+  // ============================================
+  salesByYear?: Array<{
+    year: string; // "2024", "2025"
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>;
+  
+  salesByMonth?: Array<{
+    year: string; // "2025"
+    month: string; // "01", "02", ... "12"
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>; // Only for months older than 1 month
+  
+  salesByWeek?: Array<{
+    year: string; // "2025"
+    week: string; // "01", "02", ... "46", "47"
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>; // Only for weeks older than 1 week
+  
+  salesByDay?: Array<{
+    year: string; // "2025"
+    week: string; // "46" (current week)
+    date: string; // "2025-11-17" (YYYY-MM-DD)
+    quantity: number;
+    revenueExVat: number;
+    revenueIncVat: number;
+    transactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>; // Only for current week, excluding today
   
   // ============================================
   // METADATA
@@ -278,6 +350,124 @@ export interface EitjeAggregated {
     hours: number;
     cost: number;
   }>;
+  
+  // ============================================
+  // HIERARCHICAL TIME-SERIES LABOR DATA (NEW)
+  // Fast queries for year/month/week/day breakdowns with worker/team details
+  // ============================================
+  hoursByYear?: Array<{
+    year: string; // "2024", "2025"
+    totalHoursWorked: number;
+    totalWageCost: number;
+    totalRevenue: number;
+    laborCostPercentage: number;
+    revenuePerHour: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      totalHoursWorked: number;
+      totalWageCost: number;
+      totalRevenue: number;
+      byTeam: Array<{
+        teamId: string | ObjectId;
+        teamName: string;
+        totalHoursWorked: number;
+        totalWageCost: number;
+        byWorker: Array<{
+          unifiedUserId: ObjectId;
+          workerName: string;
+          totalHoursWorked: number;
+          totalWageCost: number;
+        }>;
+      }>;
+    }>;
+  }>;
+  
+  hoursByMonth?: Array<{
+    year: string; // "2025"
+    month: string; // "01", "02", ... "12"
+    totalHoursWorked: number;
+    totalWageCost: number;
+    totalRevenue: number;
+    laborCostPercentage: number;
+    revenuePerHour: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      totalHoursWorked: number;
+      totalWageCost: number;
+      byTeam: Array<{
+        teamId: string | ObjectId;
+        teamName: string;
+        totalHoursWorked: number;
+        totalWageCost: number;
+        byWorker: Array<{
+          unifiedUserId: ObjectId;
+          workerName: string;
+          totalHoursWorked: number;
+          totalWageCost: number;
+        }>;
+      }>;
+    }>;
+  }>; // Only for months older than 1 month
+  
+  hoursByWeek?: Array<{
+    year: string; // "2025"
+    week: string; // "01", "02", ... "46", "47"
+    totalHoursWorked: number;
+    totalWageCost: number;
+    totalRevenue: number;
+    laborCostPercentage: number;
+    revenuePerHour: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      totalHoursWorked: number;
+      totalWageCost: number;
+      byTeam: Array<{
+        teamId: string | ObjectId;
+        teamName: string;
+        totalHoursWorked: number;
+        totalWageCost: number;
+        byWorker: Array<{
+          unifiedUserId: ObjectId;
+          workerName: string;
+          totalHoursWorked: number;
+          totalWageCost: number;
+        }>;
+      }>;
+    }>;
+  }>; // Only for weeks older than 1 week
+  
+  hoursByDay?: Array<{
+    year: string; // "2025"
+    week: string; // "46" (current week)
+    date: string; // "2025-11-17" (YYYY-MM-DD)
+    totalHoursWorked: number;
+    totalWageCost: number;
+    totalRevenue: number;
+    laborCostPercentage: number;
+    revenuePerHour: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      totalHoursWorked: number;
+      totalWageCost: number;
+      byTeam: Array<{
+        teamId: string | ObjectId;
+        teamName: string;
+        totalHoursWorked: number;
+        totalWageCost: number;
+        byWorker: Array<{
+          unifiedUserId: ObjectId;
+          workerName: string;
+          totalHoursWorked: number;
+          totalWageCost: number;
+        }>;
+      }>;
+    }>;
+  }>; // Only for current week, excluding today
+  
   createdAt: Date;
   updatedAt: Date;
 }

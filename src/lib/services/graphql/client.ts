@@ -206,6 +206,12 @@ export async function executeGraphQL<T = any>(
 
     return result;
   } catch (error: any) {
+    // Ignore AbortError - this is expected when requests are cancelled (e.g., by React Query)
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      // Silently ignore - this is expected behavior when requests are cancelled
+      throw error; // Re-throw so React Query can handle it properly
+    }
+    
     console.error('[GraphQL Client] Error:', error);
     
     // Handle network errors with more detail

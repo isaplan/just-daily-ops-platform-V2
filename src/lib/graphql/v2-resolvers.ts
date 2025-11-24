@@ -7,11 +7,12 @@
 
 import { getDatabase } from '@/lib/mongodb/v2-connection';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/utils/logger';
 
 // Helper to convert ObjectId to string (with null safety)
 const toId = (id: ObjectId | string | undefined | null): string => {
   if (!id) {
-    console.warn('[GraphQL] toId called with null/undefined ID - returning empty string');
+    logger.warn('[GraphQL] toId called with null/undefined ID - returning empty string');
     return ''; // Return empty string instead of throwing to prevent crashes
   }
   return id instanceof ObjectId ? id.toString() : id;
@@ -25,6 +26,308 @@ const toObjectId = (id: string): ObjectId => {
     throw new Error(`Invalid ID format: ${id}`);
   }
 };
+
+// Helper to get location ID from parent (handles both id string and _id ObjectId)
+const getLocationId = (parent: any): ObjectId | null => {
+  if (!parent) return null;
+  // If id is already set (from query resolver), convert to ObjectId
+  if (parent.id) {
+    try {
+      return new ObjectId(parent.id);
+    } catch {
+      return null;
+    }
+  }
+  // Otherwise, use _id directly
+  if (parent._id) {
+    return parent._id instanceof ObjectId ? parent._id : new ObjectId(parent._id);
+  }
+  return null;
+};
+
+// ============================================
+// HIERARCHICAL TIME-SERIES ROUTING HELPERS
+// ============================================
+
+/**
+ * Detect query type from date range
+ */
+function detectQueryType(startDate: string, endDate: string): 'year' | 'month' | 'week' | 'day' | 'range' {
+  const start = new Date(startDate + 'T00:00:00.000Z');
+  const end = new Date(endDate + 'T00:00:00.000Z');
+  
+  // Check if it's a single day
+  const startDay = start.toISOString().split('T')[0];
+  const endDay = end.toISOString().split('T')[0];
+  if (startDay === endDay) {
+    return 'day';
+  }
+  
+  // Check if it's a single week (7 days)
+  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysDiff <= 7) {
+    return 'week';
+  }
+  
+  // Check if it's a single month
+  const startYear = start.getUTCFullYear();
+  const startMonth = start.getUTCMonth();
+  const endYear = end.getUTCFullYear();
+  const endMonth = end.getUTCMonth();
+  if (startYear === endYear && startMonth === endMonth) {
+    return 'month';
+  }
+  
+  // Check if it's a full year (Jan 1 to Dec 31)
+  const isJan1 = start.getUTCMonth() === 0 && start.getUTCDate() === 1;
+  const isDec31 = end.getUTCMonth() === 11 && end.getUTCDate() === 31;
+  if (startYear === endYear && isJan1 && isDec31) {
+    return 'year';
+  }
+  
+  return 'range';
+}
+
+/**
+ * Extract time periods from date range
+ */
+function extractTimePeriods(startDate: string, endDate: string): { year?: string; month?: string; week?: string; date?: string } {
+  const start = new Date(startDate + 'T00:00:00.000Z');
+  const end = new Date(endDate + 'T00:00:00.000Z');
+  
+  const result: { year?: string; month?: string; week?: string; date?: string } = {};
+  
+  // Extract year
+  result.year = String(start.getUTCFullYear());
+  
+  // Extract month (YYYY-MM format)
+  const month = String(start.getUTCMonth() + 1).padStart(2, '0');
+  result.month = `${result.year}-${month}`;
+  
+  // Extract week (ISO week)
+  const d = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  result.week = String(weekNo).padStart(2, '0');
+  
+  // Extract date (YYYY-MM-DD format)
+  result.date = start.toISOString().split('T')[0];
+  
+  return result;
+}
+
+/**
+ * Check if hierarchical data exists in record
+ */
+function hasHierarchicalData(record: any, type: 'sales' | 'labor'): boolean {
+  if (!record) return false;
+  
+  if (type === 'sales') {
+    return !!(
+      record.salesByYear &&
+      Array.isArray(record.salesByYear) &&
+      record.salesByYear.length > 0
+    );
+  } else {
+    return !!(
+      record.hoursByYear &&
+      Array.isArray(record.hoursByYear) &&
+      record.hoursByYear.length > 0
+    );
+  }
+}
+
+/**
+ * Get product sales data using hierarchical structure or fallback to calculation
+ */
+function getProductSalesData(
+  product: any,
+  startDate: string,
+  endDate: string,
+  locationId?: string
+): { daily: any; weekly: any; monthly: any; total: any } {
+  const initTotals = () => ({
+    quantity: 0,
+    revenueExVat: 0,
+    revenueIncVat: 0,
+    transactionCount: 0,
+  });
+
+  const addTotals = (target: any, source: any) => {
+    target.quantity += source.quantity || 0;
+    target.revenueExVat += source.revenueExVat || 0;
+    target.revenueIncVat += source.revenueIncVat || 0;
+    target.transactionCount += source.transactionCount || 0;
+  };
+
+  // Check if hierarchical data exists
+  if (hasHierarchicalData(product, 'sales')) {
+    const queryType = detectQueryType(startDate, endDate);
+    const periods = extractTimePeriods(startDate, endDate);
+    
+    let hierarchicalTotals = {
+      daily: initTotals(),
+      weekly: initTotals(),
+      monthly: initTotals(),
+      total: initTotals(),
+    };
+
+    // Route based on query type
+    if (queryType === 'year' && periods.year) {
+      const yearData = product.salesByYear?.find((y: any) => y.year === periods.year);
+      if (yearData) {
+        let locationData = yearData.byLocation;
+        if (locationId) {
+          locationData = locationData.filter((loc: any) => 
+            loc.locationId.toString() === locationId
+          );
+        }
+        
+        // Aggregate across all locations
+        locationData.forEach((loc: any) => {
+          addTotals(hierarchicalTotals.total, {
+            quantity: loc.quantity,
+            revenueExVat: loc.revenueExVat,
+            revenueIncVat: loc.revenueIncVat,
+            transactionCount: loc.transactions,
+          });
+        });
+        
+        return {
+          daily: hierarchicalTotals.daily, // Year data doesn't have daily breakdown
+          weekly: hierarchicalTotals.weekly, // Year data doesn't have weekly breakdown
+          monthly: hierarchicalTotals.monthly, // Year data doesn't have monthly breakdown
+          total: hierarchicalTotals.total,
+        };
+      }
+    } else if (queryType === 'month' && periods.month) {
+      const [year, month] = periods.month.split('-');
+      const monthData = product.salesByMonth?.find((m: any) => 
+        m.year === year && m.month === month
+      );
+      if (monthData) {
+        let locationData = monthData.byLocation;
+        if (locationId) {
+          locationData = locationData.filter((loc: any) => 
+            loc.locationId.toString() === locationId
+          );
+        }
+        
+        locationData.forEach((loc: any) => {
+          addTotals(hierarchicalTotals.total, {
+            quantity: loc.quantity,
+            revenueExVat: loc.revenueExVat,
+            revenueIncVat: loc.revenueIncVat,
+            transactionCount: loc.transactions,
+          });
+        });
+        
+        return {
+          daily: hierarchicalTotals.daily,
+          weekly: hierarchicalTotals.weekly,
+          monthly: hierarchicalTotals.total,
+          total: hierarchicalTotals.total,
+        };
+      }
+    } else if (queryType === 'week' && periods.week) {
+      const weekData = product.salesByWeek?.find((w: any) => 
+        w.year === periods.year && w.week === periods.week
+      );
+      if (weekData) {
+        let locationData = weekData.byLocation;
+        if (locationId) {
+          locationData = locationData.filter((loc: any) => 
+            loc.locationId.toString() === locationId
+          );
+        }
+        
+        locationData.forEach((loc: any) => {
+          addTotals(hierarchicalTotals.total, {
+            quantity: loc.quantity,
+            revenueExVat: loc.revenueExVat,
+            revenueIncVat: loc.revenueIncVat,
+            transactionCount: loc.transactions,
+          });
+        });
+        
+        return {
+          daily: hierarchicalTotals.daily,
+          weekly: hierarchicalTotals.total,
+          monthly: hierarchicalTotals.monthly,
+          total: hierarchicalTotals.total,
+        };
+      }
+    } else if (queryType === 'day' && periods.date) {
+      const dayData = product.salesByDay?.find((d: any) => d.date === periods.date);
+      if (dayData) {
+        let locationData = dayData.byLocation;
+        if (locationId) {
+          locationData = locationData.filter((loc: any) => 
+            loc.locationId.toString() === locationId
+          );
+        }
+        
+        locationData.forEach((loc: any) => {
+          addTotals(hierarchicalTotals.total, {
+            quantity: loc.quantity,
+            revenueExVat: loc.revenueExVat,
+            revenueIncVat: loc.revenueIncVat,
+            transactionCount: loc.transactions,
+          });
+        });
+        
+        return {
+          daily: hierarchicalTotals.total,
+          weekly: hierarchicalTotals.weekly,
+          monthly: hierarchicalTotals.monthly,
+          total: hierarchicalTotals.total,
+        };
+      }
+    }
+  }
+
+  // Fallback to existing calculation logic
+  const startDateStr = startDate;
+  const endDateStr = endDate;
+  
+  const filteredDaily = (product.salesByDate || []).filter((sale: any) => {
+    const saleDate = sale.date;
+    return saleDate >= startDateStr && saleDate <= endDateStr;
+  });
+
+  const filteredWeekly = (product.salesByWeek || []);
+  const filteredMonthly = (product.salesByMonth || []).filter((sale: any) => {
+    const monthDate = sale.month;
+    const startMonth = startDateStr.substring(0, 7);
+    const endMonth = endDateStr.substring(0, 7);
+    return monthDate >= startMonth && monthDate <= endMonth;
+  });
+
+  const productDaily = initTotals();
+  const productWeekly = initTotals();
+  const productMonthly = initTotals();
+  const productTotal = initTotals();
+
+  for (const sale of filteredDaily) {
+    addTotals(productDaily, sale);
+    addTotals(productTotal, sale);
+  }
+  for (const sale of filteredWeekly) {
+    addTotals(productWeekly, sale);
+  }
+  for (const sale of filteredMonthly) {
+    addTotals(productMonthly, sale);
+  }
+
+  return {
+    daily: productDaily,
+    weekly: productWeekly,
+    monthly: productMonthly,
+    total: productTotal,
+  };
+}
 
 export const resolvers = {
   Query: {
@@ -172,7 +475,7 @@ export const resolvers = {
             }
           }
         } catch (e) {
-          console.warn('Error filtering teams by location:', e);
+          logger.warn('Error filtering teams by location:', e);
         }
       }
       
@@ -291,6 +594,74 @@ export const resolvers = {
       }
     ) => {
       const db = await getDatabase();
+      
+      // Check if we can use hierarchical data
+      const queryType = detectQueryType(startDate, endDate);
+      const periods = extractTimePeriods(startDate, endDate);
+      
+      // Try to use hierarchical data if available
+      if (queryType === 'year' && periods.year) {
+        // Query for records with hierarchical data for this year
+        const recordsWithHierarchical = await db.collection('eitje_aggregated')
+          .find({
+            locationId: toObjectId(locationId),
+            'hoursByYear.year': periods.year,
+          })
+          .toArray();
+        
+        if (recordsWithHierarchical.length > 0) {
+          // Extract hierarchical data for this location/year
+          const hierarchicalRecords = recordsWithHierarchical
+            .map(record => {
+              if (!record || !record.locationId) return null;
+              
+              const yearData = record.hoursByYear?.find((y: any) => y.year === periods.year);
+              if (!yearData) return null;
+              
+              const locationData = yearData.byLocation?.find((loc: any) => 
+                loc?.locationId && loc.locationId.toString() === locationId
+              );
+              
+              if (!locationData) return null;
+              
+              return {
+                locationId: record.locationId,
+                date: record.date,
+                totalHoursWorked: locationData.totalHoursWorked,
+                totalWageCost: locationData.totalWageCost,
+                totalRevenue: locationData.totalRevenue,
+                laborCostPercentage: yearData.laborCostPercentage,
+                revenuePerHour: yearData.revenuePerHour,
+                teamStats: locationData.byTeam?.map((team: any) => ({
+                  teamId: team.teamId,
+                  teamName: team.teamName,
+                  hours: team.totalHoursWorked,
+                  cost: team.totalWageCost,
+                })) || [],
+                byTeam: locationData.byTeam || [],
+                byWorker: locationData.byTeam?.flatMap((team: any) => team.byWorker || []) || [],
+              };
+            })
+            .filter((r): r is any => r !== null);
+          
+          if (hierarchicalRecords.length > 0) {
+            const total = hierarchicalRecords.length;
+            const skip = (page - 1) * limit;
+            const paginated = hierarchicalRecords.slice(skip, skip + limit);
+            
+            return {
+              success: true,
+              records: paginated,
+              total,
+              page,
+              totalPages: Math.ceil(total / limit),
+              error: null,
+            };
+          }
+        }
+      }
+      
+      // Fallback to existing query logic
       const query = {
         locationId: toObjectId(locationId),
         date: {
@@ -385,7 +756,7 @@ export const resolvers = {
 
         // If no records found, trigger on-demand aggregation
         if (records.length === 0) {
-          console.log('[Kitchen Dashboard] No aggregated data found, triggering aggregation...');
+          logger.log('[Kitchen Dashboard] No aggregated data found, triggering aggregation...');
           const { aggregateKeukenAnalysesData } = await import('@/lib/services/daily-ops/keuken-analyses-aggregation.service');
           
           // Aggregate for all locations if "all", otherwise specific location
@@ -397,7 +768,7 @@ export const resolvers = {
             
             for (const location of locations) {
               await aggregateKeukenAnalysesData(start, end, location._id).catch((err) => {
-                console.warn(`[Kitchen Dashboard] Failed to aggregate for location ${location._id}:`, err);
+                logger.warn(`[Kitchen Dashboard] Failed to aggregate for location ${location._id}:`, err);
               });
             }
           } else {
@@ -530,7 +901,7 @@ export const resolvers = {
           error: null,
         };
       } catch (error: any) {
-        console.error('[Kitchen Dashboard Resolver] Error:', error);
+        logger.error('[Kitchen Dashboard Resolver] Error:', error);
         return {
           success: false,
           records: [],
@@ -570,6 +941,7 @@ export const resolvers = {
         const safeFilters = filters || {};
         
         // Date filtering logic (for finding workers active during specified period)
+        // Make it more lenient: show workers if they have no dates OR if their dates overlap with the period
         if (year) {
           let startDate: Date;
           let endDate: Date;
@@ -589,26 +961,43 @@ export const resolvers = {
             endDate = new Date(year, 11, 31, 23, 59, 59, 999);
           }
           
-          // Find workers whose contract overlaps with the date range
-          // Contract overlaps if:
-          // 1. It has started (effective_from is null OR <= endDate)
-          andConditions.push({
+          // Find workers whose contract overlaps with the date range OR have no dates set
+          // More lenient: Show workers if:
+          // 1. They have no effective_from AND no effective_to (no dates = show always)
+          // 2. OR their contract overlaps with the date range
+          const dateFilter: any = {
             $or: [
-              { effective_from: null },
-              { effective_from: { $lte: endDate } }
+              // No dates at all - show always
+              { 
+                $and: [
+                  { effective_from: null },
+                  { effective_to: null }
+                ]
+              },
+              // Has dates - check if they overlap with the period
+              {
+                $and: [
+                  // Contract has started (effective_from is null OR <= endDate)
+                  {
+                    $or: [
+                      { effective_from: null },
+                      { effective_from: { $lte: endDate } }
+                    ]
+                  },
+                  // Contract hasn't ended (effective_to is null OR >= startDate)
+                  // BUT: Don't add this if activeOnly filter is set (it will be added below)
+                  ...(safeFilters.activeOnly === null || safeFilters.activeOnly === undefined ? [{
+                    $or: [
+                      { effective_to: null },
+                      { effective_to: { $gte: startDate } }
+                    ]
+                  }] : [])
+                ]
+              }
             ]
-          });
+          };
           
-          // 2. It hasn't ended (effective_to is null OR >= startDate)
-          // BUT: Don't add this if activeOnly filter is set (it will be added below)
-          if (safeFilters.activeOnly === null || safeFilters.activeOnly === undefined) {
-            andConditions.push({
-              $or: [
-                { effective_to: null },
-                { effective_to: { $gte: startDate } }
-              ]
-            });
-          }
+          andConditions.push(dateFilter);
         }
         
         // Location filter
@@ -634,13 +1023,13 @@ export const resolvers = {
         }
         
         // Debug logging
-        console.log('[GraphQL Resolver] workerProfiles query:', JSON.stringify(query, null, 2));
+        logger.log('[GraphQL Resolver] workerProfiles query:', JSON.stringify(query, null, 2));
         
         // Pagination
         const skip = (page - 1) * limit;
         const total = await db.collection('worker_profiles').countDocuments(query);
         
-        console.log('[GraphQL Resolver] Found', total, 'worker profiles');
+        logger.log('[GraphQL Resolver] Found', total, 'worker profiles');
         const totalPages = Math.ceil(total / limit);
         
         // Fetch records
@@ -673,13 +1062,13 @@ export const resolvers = {
         
         // Teams are now stored directly in worker_profiles (pre-aggregated)
         // No need to query shifts on every request
-        console.log(`[GraphQL] Reading teams from worker_profiles (pre-aggregated data)`);
+        logger.log(`[GraphQL] Reading teams from worker_profiles (pre-aggregated data)`);
         
         // Team filter - filter records by team membership (from pre-aggregated data)
         let filteredRecords = records;
         if (safeFilters.teamId && safeFilters.teamId !== 'all') {
           const filterTeamId = String(safeFilters.teamId);
-          console.log(`[GraphQL] Filtering by team: ${filterTeamId}`);
+          logger.log(`[GraphQL] Filtering by team: ${filterTeamId}`);
           
           filteredRecords = records.filter(record => {
             const teams = record.teams || [];
@@ -691,7 +1080,7 @@ export const resolvers = {
             );
           });
           
-          console.log(`[GraphQL] Filtered to ${filteredRecords.length} workers in team ${filterTeamId}`);
+          logger.log(`[GraphQL] Filtered to ${filteredRecords.length} workers in team ${filterTeamId}`);
         }
         
         // Enrich with location names from locations collection
@@ -728,6 +1117,10 @@ export const resolvers = {
             teams: teams.length > 0 ? teams : null,
             locationId: record.location_id || null,
             locationName: record.location_id ? locationMap.get(record.location_id) || null : null,
+            locationIds: record.location_ids || (record.location_id ? [record.location_id] : null),
+            locationNames: record.location_ids 
+              ? record.location_ids.map((id: string) => locationMap.get(id)).filter(Boolean)
+              : (record.location_id && locationMap.get(record.location_id) ? [locationMap.get(record.location_id)] : null),
             contractType: record.contract_type || null,
             contractHours: record.contract_hours || null,
             hourlyWage: record.hourly_wage || null,
@@ -753,7 +1146,7 @@ export const resolvers = {
           totalPages: filteredTotalPages,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] workerProfiles error:', error);
+        logger.error('[GraphQL Resolver] workerProfiles error:', error);
         return {
           success: false,
           records: [],
@@ -801,7 +1194,245 @@ export const resolvers = {
           }
         }
         
-        // Get location name
+        // Get location names (support multiple locations)
+        let locationName = null;
+        let locationNames: string[] = [];
+        const locationIds = record.location_ids || (record.location_id ? [record.location_id] : []);
+        
+        if (locationIds.length > 0) {
+          try {
+            const locationObjIds = locationIds.map(id => {
+              try {
+                return toObjectId(id);
+              } catch {
+                return null;
+              }
+            }).filter(Boolean);
+            
+            const locations = await db.collection('locations').find({
+              _id: { $in: locationObjIds }
+            }).toArray();
+            
+            locationNames = locations.map((loc: any) => loc.name).filter(Boolean);
+            locationName = locationNames.length > 0 ? locationNames[0] : null;
+          } catch (error) {
+            console.warn('[GraphQL] Error fetching location names:', error);
+          }
+        }
+        
+        return {
+          id: record._id.toString(),
+          eitjeUserId: record.eitje_user_id,
+          userName,
+          teamName,
+          locationId: record.location_id || null,
+          locationName,
+          locationIds: locationIds.length > 0 ? locationIds : null,
+          locationNames: locationNames.length > 0 ? locationNames : null,
+          contractType: record.contract_type || null,
+          contractHours: record.contract_hours || null,
+          hourlyWage: record.hourly_wage || null,
+          wageOverride: record.wage_override || false,
+          effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
+          effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
+          notes: record.notes || null,
+          isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
+          createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
+          updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
+        };
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] workerProfile error:', error);
+        throw error;
+      }
+    },
+
+    workerProfileByName: async (_: any, { userName }: { userName: string }) => {
+      try {
+        const db = await getDatabase();
+        
+        // Parse name: "First Last" or "First Middle Last"
+        const nameParts = userName.trim().split(/\s+/);
+        const firstName = nameParts[0] || null;
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
+        
+        if (!firstName || !lastName) {
+          // Try to find by full name match in eitje_raw_data
+          const user = await db.collection('eitje_raw_data').findOne({
+            endpoint: 'users',
+            $or: [
+              { 'extracted.first_name': firstName, 'extracted.last_name': lastName },
+              { 'rawApiResponse.first_name': firstName, 'rawApiResponse.last_name': lastName },
+            ]
+          });
+          
+          if (user) {
+            const eitjeUserId = user.extracted?.id || user.rawApiResponse?.id;
+            if (eitjeUserId) {
+              // Find worker profile by eitje_user_id
+              const record = await db.collection('worker_profiles').findOne({ 
+                eitje_user_id: eitjeUserId 
+              });
+              
+              if (record) {
+                // Use same enrichment logic as workerProfile resolver
+                let teamName = null;
+                const shift = await db.collection('eitje_time_registration_shifts_processed_v2')
+                  .findOne({
+                    user_id: eitjeUserId,
+                    team_name: { $exists: true, $ne: null }
+                  }, {
+                    sort: { date: -1 }
+                  });
+                if (shift) {
+                  teamName = shift.team_name || null;
+                }
+                
+                let locationName = null;
+                if (record.location_id) {
+                  try {
+                    const location = await db.collection('locations').findOne({ 
+                      _id: toObjectId(record.location_id) 
+                    });
+                    if (location) {
+                      locationName = location.name || null;
+                    }
+                  } catch (error) {
+                    console.warn('[GraphQL] Error fetching location name:', error);
+                  }
+                }
+                
+                return {
+                  id: record._id.toString(),
+                  eitjeUserId: record.eitje_user_id,
+                  userName,
+                  teamName,
+                  locationId: record.location_id || null,
+                  locationName,
+                  contractType: record.contract_type || null,
+                  contractHours: record.contract_hours || null,
+                  hourlyWage: record.hourly_wage || null,
+                  wageOverride: record.wage_override || false,
+                  effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
+                  effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
+                  notes: record.notes || null,
+                  isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
+                  createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
+                  updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
+                };
+              }
+            }
+          }
+          return null;
+        }
+        
+        // Find unified user by name
+        const unifiedUser = await db.collection('unified_users').findOne({
+          firstName,
+          lastName,
+        });
+        
+        if (!unifiedUser) {
+          // Fallback: try to find by name in eitje_raw_data
+          const user = await db.collection('eitje_raw_data').findOne({
+            endpoint: 'users',
+            $or: [
+              { 'extracted.first_name': firstName, 'extracted.last_name': lastName },
+              { 'rawApiResponse.first_name': firstName, 'rawApiResponse.last_name': lastName },
+            ]
+          });
+          
+          if (user) {
+            const eitjeUserId = user.extracted?.id || user.rawApiResponse?.id;
+            if (eitjeUserId) {
+              const record = await db.collection('worker_profiles').findOne({ 
+                eitje_user_id: eitjeUserId 
+              });
+              
+              if (record) {
+                // Enrich with team and location
+                let teamName = null;
+                const shift = await db.collection('eitje_time_registration_shifts_processed_v2')
+                  .findOne({
+                    user_id: eitjeUserId,
+                    team_name: { $exists: true, $ne: null }
+                  }, {
+                    sort: { date: -1 }
+                  });
+                if (shift) {
+                  teamName = shift.team_name || null;
+                }
+                
+                let locationName = null;
+                if (record.location_id) {
+                  try {
+                    const location = await db.collection('locations').findOne({ 
+                      _id: toObjectId(record.location_id) 
+                    });
+                    if (location) {
+                      locationName = location.name || null;
+                    }
+                  } catch (error) {
+                    console.warn('[GraphQL] Error fetching location name:', error);
+                  }
+                }
+                
+                return {
+                  id: record._id.toString(),
+                  eitjeUserId: record.eitje_user_id,
+                  userName,
+                  teamName,
+                  locationId: record.location_id || null,
+                  locationName,
+                  contractType: record.contract_type || null,
+                  contractHours: record.contract_hours || null,
+                  hourlyWage: record.hourly_wage || null,
+                  wageOverride: record.wage_override || false,
+                  effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
+                  effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
+                  notes: record.notes || null,
+                  isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
+                  createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
+                  updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
+                };
+              }
+            }
+          }
+          return null;
+        }
+        
+        // Find eitje_user_id from unified user's system mappings
+        const eitjeMapping = unifiedUser.systemMappings?.find((m: any) => m.system === 'eitje');
+        if (!eitjeMapping) {
+          return null;
+        }
+        
+        const eitjeUserId = parseInt(eitjeMapping.externalId, 10);
+        if (!eitjeUserId) {
+          return null;
+        }
+        
+        // Find worker profile by eitje_user_id
+        const record = await db.collection('worker_profiles').findOne({ 
+          eitje_user_id: eitjeUserId 
+        });
+        
+        if (!record) {
+          return null;
+        }
+        
+        // Enrich with team and location (same as workerProfile resolver)
+        let teamName = null;
+        const shift = await db.collection('eitje_time_registration_shifts_processed_v2')
+          .findOne({
+            user_id: eitjeUserId,
+            team_name: { $exists: true, $ne: null }
+          }, {
+            sort: { date: -1 }
+          });
+        if (shift) {
+          teamName = shift.team_name || null;
+        }
+        
         let locationName = null;
         if (record.location_id) {
           try {
@@ -835,8 +1466,8 @@ export const resolvers = {
           updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] workerProfile error:', error);
-        throw error;
+        logger.error('[GraphQL Resolver] workerProfileByName error:', error);
+        return null;
       }
     },
 
@@ -856,7 +1487,7 @@ export const resolvers = {
         }
         return db.collection('api_credentials').find(query).toArray();
       } catch (error: any) {
-        console.error('[GraphQL Resolver] apiCredentials error:', error);
+        logger.error('[GraphQL Resolver] apiCredentials error:', error);
         // Re-throw with more context for GraphQL error handling
         if (error.message?.includes('ETIMEOUT') || error.message?.includes('querySrv')) {
           throw new Error('MongoDB connection timeout. Please check your MongoDB connection settings or try again later.');
@@ -873,7 +1504,7 @@ export const resolvers = {
         const db = await getDatabase();
         return db.collection('api_credentials').findOne({ _id: toObjectId(id) });
       } catch (error: any) {
-        console.error('[GraphQL Resolver] apiCredential error:', error);
+        logger.error('[GraphQL Resolver] apiCredential error:', error);
         if (error.message?.includes('ETIMEOUT') || error.message?.includes('querySrv')) {
           throw new Error('MongoDB connection timeout. Please check your MongoDB connection settings or try again later.');
         }
@@ -941,7 +1572,7 @@ export const resolvers = {
           error: null,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] products error:', error);
+        logger.error('[GraphQL Resolver] products error:', error);
         return {
           success: false,
           records: [],
@@ -974,7 +1605,7 @@ export const resolvers = {
           updatedAt: product.updatedAt?.toISOString() || new Date().toISOString(),
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] product error:', error);
+        logger.error('[GraphQL Resolver] product error:', error);
         throw error;
       }
     },
@@ -1000,7 +1631,7 @@ export const resolvers = {
           updatedAt: product.updatedAt?.toISOString() || new Date().toISOString(),
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] productByName error:', error);
+        logger.error('[GraphQL Resolver] productByName error:', error);
         throw error;
       }
     },
@@ -1110,7 +1741,7 @@ export const resolvers = {
           error: null,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] productsAggregated error:', error);
+        logger.error('[GraphQL Resolver] productsAggregated error:', error);
         return {
           success: false,
           records: [],
@@ -1185,7 +1816,7 @@ export const resolvers = {
           updatedAt: product.updatedAt?.toISOString() || new Date().toISOString(),
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] productAggregated error:', error);
+        logger.error('[GraphQL Resolver] productAggregated error:', error);
         throw error;
       }
     },
@@ -1208,6 +1839,9 @@ export const resolvers = {
       }
     ) => {
       try {
+        // Ensure filters is always an object
+        const safeFilters = filters || {};
+        
         const db = await getDatabase();
         const start = new Date(startDate);
         const end = new Date(endDate);
@@ -1224,12 +1858,14 @@ export const resolvers = {
         const andConditions: any[] = [];
 
         // Location filter
-        if (filters.locationId && filters.locationId !== 'all') {
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
           try {
-            const locationObjId = new ObjectId(filters.locationId);
+            const locationObjId = new ObjectId(safeFilters.locationId);
             const location = await db.collection('locations').findOne({ _id: locationObjId });
             
-            if (location && location.systemMappings && Array.isArray(location.systemMappings)) {
+            if (!location) {
+              logger.warn(`Location not found for locationId: ${safeFilters.locationId}`);
+            } else if (location.systemMappings && Array.isArray(location.systemMappings)) {
               const eitjeMapping = location.systemMappings.find((m: any) => m.system === 'eitje');
               if (eitjeMapping && eitjeMapping.externalId) {
                 andConditions.push({ environmentId: parseInt(eitjeMapping.externalId) });
@@ -1245,37 +1881,37 @@ export const resolvers = {
               andConditions.push({ locationId: locationObjId });
             }
           } catch (e) {
-            console.warn(`Invalid locationId: ${filters.locationId}`);
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`, e);
           }
         }
 
         // Environment filter
-        if (filters.environmentId) {
-          andConditions.push({ environmentId: parseInt(String(filters.environmentId)) });
+        if (safeFilters.environmentId) {
+          andConditions.push({ environmentId: parseInt(String(safeFilters.environmentId)) });
         }
 
         // Team filter
-        if (filters.teamName && filters.teamName !== 'all') {
+        if (safeFilters.teamName && safeFilters.teamName !== 'all') {
           andConditions.push({
             $or: [
-              { 'extracted.team_name': filters.teamName },
-              { 'extracted.teamName': filters.teamName },
-              { 'rawApiResponse.team_name': filters.teamName },
-              { 'rawApiResponse.teamName': filters.teamName }
+              { 'extracted.team_name': safeFilters.teamName },
+              { 'extracted.teamName': safeFilters.teamName },
+              { 'rawApiResponse.team_name': safeFilters.teamName },
+              { 'rawApiResponse.teamName': safeFilters.teamName }
             ]
           });
         }
 
         // Type name filter
-        if (filters.typeName !== undefined && filters.typeName !== null) {
-          console.log('[GraphQL Resolver] typeName filter:', filters.typeName);
-          if (filters.typeName === 'WORKED' || filters.typeName === '') {
+        if (safeFilters.typeName !== undefined && safeFilters.typeName !== null) {
+          logger.log('[GraphQL Resolver] typeName filter:', safeFilters.typeName);
+          if (safeFilters.typeName === 'WORKED' || safeFilters.typeName === '') {
             // "WORKED" marker or empty string means "Gewerkte Uren" (worked hours)
-            // Match records where NEITHER extracted.type_name NOR rawApiResponse.type_name contains a leave type
-            // Use $and to ensure both fields are checked
+            // Match records where NONE of the type_name fields contain leave types
+            // Check both snake_case (type_name) and camelCase (typeName) variants
             andConditions.push({
               $and: [
-                // extracted.type_name must be null, empty, gewerkte_uren, or not exist
+                // extracted.type_name (snake_case) must be null, empty, gewerkte_uren, or not exist
                 {
               $or: [
                 { 'extracted.type_name': null },
@@ -1285,7 +1921,17 @@ export const resolvers = {
                     { 'extracted.type_name': 'Gewerkte Uren' }
                   ]
                 },
-                // rawApiResponse.type_name must be null, empty, gewerkte_uren, or not exist
+                // extracted.typeName (camelCase) must be null, empty, gewerkte_uren, or not exist
+                {
+                  $or: [
+                    { 'extracted.typeName': null },
+                    { 'extracted.typeName': { $exists: false } },
+                    { 'extracted.typeName': '' },
+                    { 'extracted.typeName': 'gewerkte_uren' },
+                    { 'extracted.typeName': 'Gewerkte Uren' }
+                  ]
+                },
+                // rawApiResponse.type_name (snake_case) must be null, empty, gewerkte_uren, or not exist
                 {
                   $or: [
                 { 'rawApiResponse.type_name': null },
@@ -1295,11 +1941,28 @@ export const resolvers = {
                 { 'rawApiResponse.type_name': 'Gewerkte Uren' }
                   ]
                 },
+                // rawApiResponse.typeName (camelCase) must be null, empty, gewerkte_uren, or not exist
+                {
+                  $or: [
+                    { 'rawApiResponse.typeName': null },
+                    { 'rawApiResponse.typeName': { $exists: false } },
+                    { 'rawApiResponse.typeName': '' },
+                    { 'rawApiResponse.typeName': 'gewerkte_uren' },
+                    { 'rawApiResponse.typeName': 'Gewerkte Uren' }
+                  ]
+                },
                 // Explicitly exclude leave types from extracted.type_name
                 {
                   $or: [
                     { 'extracted.type_name': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
                     { 'extracted.type_name': { $exists: false } }
+                  ]
+                },
+                // Explicitly exclude leave types from extracted.typeName (camelCase)
+                {
+                  $or: [
+                    { 'extracted.typeName': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
+                    { 'extracted.typeName': { $exists: false } }
                   ]
                 },
                 // Explicitly exclude leave types from rawApiResponse.type_name
@@ -1308,33 +1971,45 @@ export const resolvers = {
                     { 'rawApiResponse.type_name': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
                     { 'rawApiResponse.type_name': { $exists: false } }
                   ]
+                },
+                // Explicitly exclude leave types from rawApiResponse.typeName (camelCase)
+                {
+                  $or: [
+                    { 'rawApiResponse.typeName': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
+                    { 'rawApiResponse.typeName': { $exists: false } }
+                  ]
                 }
               ]
             });
           } else {
             // Filter for specific leave type (verlof, ziek, bijzonder)
-            const typeValue = String(filters.typeName).toLowerCase();
+            // Check both snake_case (type_name) and camelCase (typeName) variants
+            const typeValue = String(safeFilters.typeName).toLowerCase();
             andConditions.push({
               $or: [
                 { 'extracted.type_name': typeValue },
                 { 'extracted.type_name': typeValue.replace(' ', '_') },
+                { 'extracted.typeName': typeValue },
+                { 'extracted.typeName': typeValue.replace(' ', '_') },
                 { 'rawApiResponse.type_name': typeValue },
-                { 'rawApiResponse.type_name': typeValue.replace(' ', '_') }
+                { 'rawApiResponse.type_name': typeValue.replace(' ', '_') },
+                { 'rawApiResponse.typeName': typeValue },
+                { 'rawApiResponse.typeName': typeValue.replace(' ', '_') }
               ]
             });
           }
         } else {
-          console.log('[GraphQL Resolver] No typeName filter applied');
+          logger.log('[GraphQL Resolver] No typeName filter applied');
         }
 
         // User filter
-        if (filters.userId) {
+        if (safeFilters.userId) {
           andConditions.push({
             $or: [
-              { 'extracted.userId': parseInt(String(filters.userId)) },
-              { 'extracted.user_id': parseInt(String(filters.userId)) },
-              { 'rawApiResponse.user_id': parseInt(String(filters.userId)) },
-              { 'rawApiResponse.userId': parseInt(String(filters.userId)) }
+              { 'extracted.userId': parseInt(String(safeFilters.userId)) },
+              { 'extracted.user_id': parseInt(String(safeFilters.userId)) },
+              { 'rawApiResponse.user_id': parseInt(String(safeFilters.userId)) },
+              { 'rawApiResponse.userId': parseInt(String(safeFilters.userId)) }
             ]
           });
         }
@@ -1385,71 +2060,114 @@ export const resolvers = {
               }
             });
           } catch (error) {
-            console.warn('[GraphQL Resolver] Error fetching hourly wages:', error);
+            logger.warn('[GraphQL Resolver] Error fetching hourly wages:', error);
           }
         }
 
         // Transform records
-        const processedRecords = records.map((record, index) => {
-          const extracted = record.extracted || {};
-          const raw = record.rawApiResponse || {};
-          const userId = extracted.userId || extracted.user_id || raw.user_id || raw.userId;
-          const hourlyWage = userId ? hourlyWageMap.get(parseInt(String(userId))) || null : null;
-          
-          // Calculate worked hours from start/end times minus breaks
-          const startTime = extracted.start || extracted.start_time || raw.start || raw.start_time;
-          const endTime = extracted.end || extracted.end_time || raw.end || raw.end_time;
-          const breakMinutes = extracted.breakMinutes || extracted.break_minutes || raw.break_minutes || raw.breakMinutes || 0;
-          
-          let calculatedWorkedHours = null;
-          if (startTime && endTime) {
+        const processedRecords = records
+          .filter((record) => record !== null && record !== undefined && record.date)
+          .map((record, index) => {
             try {
-              const start = new Date(startTime);
-              const end = new Date(endTime);
-              const diffMs = end.getTime() - start.getTime();
-              const diffHours = diffMs / (1000 * 60 * 60); // Convert to hours
-              calculatedWorkedHours = Math.max(0, diffHours - (breakMinutes / 60)); // Subtract break time
-            } catch (e) {
-              console.warn('[GraphQL processedHours] Error calculating worked hours:', e);
+              const extracted = record.extracted || {};
+              const raw = record.rawApiResponse || {};
+              const userId = extracted.userId || extracted.user_id || raw.user_id || raw.userId;
+              const hourlyWage = userId ? hourlyWageMap.get(parseInt(String(userId))) || null : null;
+              
+              // Calculate worked hours from start/end times minus breaks
+              const startTime = extracted.start || extracted.start_time || raw.start || raw.start_time;
+              const endTime = extracted.end || extracted.end_time || raw.end || raw.end_time;
+              const breakMinutes = extracted.breakMinutes || extracted.break_minutes || raw.break_minutes || raw.breakMinutes || 0;
+              
+              let calculatedWorkedHours = null;
+              if (startTime && endTime) {
+                try {
+                  const start = new Date(startTime);
+                  const end = new Date(endTime);
+                  const diffMs = end.getTime() - start.getTime();
+                  const diffHours = diffMs / (1000 * 60 * 60); // Convert to hours
+                  calculatedWorkedHours = Math.max(0, diffHours - (breakMinutes / 60)); // Subtract break time
+                } catch (e) {
+                  logger.warn('[GraphQL processedHours] Error calculating worked hours:', e);
+                }
+              }
+              
+              // Use calculated hours, fallback to extracted hours
+              const workedHours = calculatedWorkedHours !== null 
+                ? calculatedWorkedHours 
+                : (extracted.workedHours || extracted.worked_hours || extracted.hours_worked || raw.hours_worked || raw.worked_hours || null);
+              
+              // Calculate wage_cost = hourly_wage × worked_hours
+              const wageCost = (hourlyWage !== null && hourlyWage !== undefined && workedHours !== null && workedHours !== undefined)
+                ? hourlyWage * workedHours
+                : (extracted.wageCost || extracted.wage_cost || raw.wage_cost || raw.wageCost || null);
+              
+              // Safely handle date
+              let dateStr = '';
+              try {
+                if (record.date) {
+                  dateStr = new Date(record.date).toISOString().split('T')[0];
+                }
+              } catch (e) {
+                logger.warn('[GraphQL processedHours] Error parsing date:', e, record);
+                dateStr = new Date().toISOString().split('T')[0]; // Fallback to today
+              }
+              
+              return {
+                id: record._id?.toString() || `${index}`,
+                eitje_id: extracted.eitje_id || raw.id || null,
+                date: dateStr,
+                user_id: userId ? parseInt(String(userId)) : null,
+                user_name: extracted.userName || extracted.user_name || raw.user_name || raw.userName || null,
+                environment_id: extracted.environmentId || extracted.environment_id || raw.environment_id || raw.environmentId || null,
+                environment_name: extracted.environmentName || extracted.environment_name || raw.environment_name || raw.environmentName || null,
+                team_id: extracted.teamId || extracted.team_id || raw.team_id || raw.teamId || null,
+                team_name: extracted.teamName || extracted.team_name || raw.team_name || raw.teamName || null,
+                start: startTime || null,
+                end: endTime || null,
+                break_minutes: breakMinutes || null,
+                worked_hours: workedHours,
+                hourly_wage: hourlyWage,
+                wage_cost: wageCost,
+                type_name: extracted.type_name || extracted.typeName || raw.type_name || raw.typeName || null,
+                shift_type: extracted.shift_type || extracted.shiftType || raw.shift_type || raw.shiftType || null,
+                remarks: extracted.remarks || raw.remarks || null,
+                approved: extracted.approved || raw.approved || null,
+                planning_shift_id: extracted.planning_shift_id || extracted.planningShiftId || raw.planning_shift_id || raw.planningShiftId || null,
+                exported_to_hr_integration: extracted.exported_to_hr_integration || extracted.exportedToHrIntegration || raw.exported_to_hr_integration || raw.exportedToHrIntegration || null,
+                updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : null,
+                created_at: record.createdAt ? new Date(record.createdAt).toISOString() : null,
+              };
+            } catch (error: any) {
+              logger.error('[GraphQL processedHours] Error processing record:', error, record);
+              // Return a minimal valid record to prevent breaking the response
+              return {
+                id: record._id?.toString() || `${index}`,
+                eitje_id: null,
+                date: record.date ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                user_id: null,
+                user_name: null,
+                environment_id: null,
+                environment_name: null,
+                team_id: null,
+                team_name: null,
+                start: null,
+                end: null,
+                break_minutes: null,
+                worked_hours: null,
+                hourly_wage: null,
+                wage_cost: null,
+                type_name: null,
+                shift_type: null,
+                remarks: null,
+                approved: null,
+                planning_shift_id: null,
+                exported_to_hr_integration: null,
+                updated_at: null,
+                created_at: null,
+              };
             }
-          }
-          
-          // Use calculated hours, fallback to extracted hours
-          const workedHours = calculatedWorkedHours !== null 
-            ? calculatedWorkedHours 
-            : (extracted.workedHours || extracted.worked_hours || extracted.hours_worked || raw.hours_worked || raw.worked_hours || null);
-          
-          // Calculate wage_cost = hourly_wage × worked_hours
-          const wageCost = (hourlyWage !== null && hourlyWage !== undefined && workedHours !== null && workedHours !== undefined)
-            ? hourlyWage * workedHours
-            : (extracted.wageCost || extracted.wage_cost || raw.wage_cost || raw.wageCost || null);
-          
-          return {
-            id: record._id?.toString() || `${index}`,
-            eitje_id: extracted.eitje_id || raw.id || null,
-            date: new Date(record.date).toISOString().split('T')[0],
-            user_id: userId ? parseInt(String(userId)) : null,
-            user_name: extracted.userName || extracted.user_name || raw.user_name || raw.userName || null,
-            environment_id: extracted.environmentId || extracted.environment_id || raw.environment_id || raw.environmentId || null,
-            environment_name: extracted.environmentName || extracted.environment_name || raw.environment_name || raw.environmentName || null,
-            team_id: extracted.teamId || extracted.team_id || raw.team_id || raw.teamId || null,
-            team_name: extracted.teamName || extracted.team_name || raw.team_name || raw.teamName || null,
-            start: startTime || null,
-            end: endTime || null,
-            break_minutes: breakMinutes || null,
-            worked_hours: workedHours,
-            hourly_wage: hourlyWage,
-            wage_cost: wageCost,
-            type_name: extracted.type_name || extracted.typeName || raw.type_name || raw.typeName || null,
-            shift_type: extracted.shift_type || extracted.shiftType || raw.shift_type || raw.shiftType || null,
-            remarks: extracted.remarks || raw.remarks || null,
-            approved: extracted.approved || raw.approved || null,
-            planning_shift_id: extracted.planning_shift_id || extracted.planningShiftId || raw.planning_shift_id || raw.planningShiftId || null,
-            exported_to_hr_integration: extracted.exported_to_hr_integration || extracted.exportedToHrIntegration || raw.exported_to_hr_integration || raw.exportedToHrIntegration || null,
-            updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : null,
-            created_at: record.createdAt ? new Date(record.createdAt).toISOString() : null,
-          };
-        });
+          });
 
         const totalPages = Math.ceil(total / limit);
 
@@ -1461,7 +2179,7 @@ export const resolvers = {
           totalPages,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] processedHours error:', error);
+        logger.error('[GraphQL Resolver] processedHours error:', error);
         return {
           success: false,
           records: [],
@@ -1496,6 +2214,11 @@ export const resolvers = {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
 
+        // Check if we can use hierarchical data
+        const queryType = detectQueryType(startDate, endDate);
+        const periods = extractTimePeriods(startDate, endDate);
+        
+        // Build base query
         const query: any = {
           date: {
             $gte: start,
@@ -1508,10 +2231,93 @@ export const resolvers = {
           try {
             query.locationId = new ObjectId(filters.locationId);
           } catch (e) {
-            console.warn(`Invalid locationId: ${filters.locationId}`);
+            logger.warn(`Invalid locationId: ${filters.locationId}`);
           }
         }
 
+        // Try to use hierarchical data if available and querying a specific year
+        if (queryType === 'year' && periods.year && filters.locationId && filters.locationId !== 'all') {
+          const recordsWithHierarchical = await db.collection('eitje_aggregated')
+            .find({
+              locationId: new ObjectId(filters.locationId),
+              'hoursByYear.year': periods.year,
+            })
+            .toArray();
+          
+          if (recordsWithHierarchical.length > 0) {
+            // Extract hierarchical data
+            const hierarchicalRecords: any[] = [];
+            
+            for (const record of recordsWithHierarchical) {
+              if (!record || !record.locationId) continue;
+              
+              const yearData = record.hoursByYear?.find((y: any) => y.year === periods.year);
+              if (!yearData) continue;
+              
+              const locationData = yearData.byLocation?.find((loc: any) => 
+                loc?.locationId && loc.locationId.toString() === filters.locationId
+              );
+              
+              if (!locationData) continue;
+              
+              // Filter by team if specified
+              let teams = locationData.byTeam;
+              if (filters.teamName && filters.teamName !== 'all') {
+                teams = teams.filter((team: any) => team.teamName === filters.teamName);
+              }
+              
+              // Filter by worker if specified
+              if (filters.userId) {
+                teams = teams.map((team: any) => ({
+                  ...team,
+                  byWorker: team.byWorker.filter((worker: any) => 
+                    worker.unifiedUserId.toString() === filters.userId
+                  ),
+                })).filter((team: any) => team.byWorker.length > 0);
+              }
+              
+              // Build records from hierarchical data
+              teams.forEach((team: any) => {
+                team.byWorker.forEach((worker: any) => {
+                  hierarchicalRecords.push({
+                    id: `${record._id?.toString()}_${team.teamId}_${worker.unifiedUserId.toString()}`,
+                    date: record.date.toISOString().split('T')[0],
+                    user_id: worker.unifiedUserId.toString(),
+                    user_name: worker.workerName,
+                    environment_id: null,
+                    environment_name: null,
+                    team_id: team.teamId,
+                    team_name: team.teamName,
+                    hours_worked: worker.totalHoursWorked || 0,
+                    hourly_rate: null,
+                    hourly_cost: worker.totalWageCost / (worker.totalHoursWorked || 1),
+                    labor_cost: worker.totalWageCost || null,
+                    shift_count: 0,
+                    total_breaks_minutes: null,
+                    updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : null,
+                    created_at: record.createdAt ? new Date(record.createdAt).toISOString() : null,
+                  });
+                });
+              });
+            }
+            
+            if (hierarchicalRecords.length > 0) {
+              const total = hierarchicalRecords.length;
+              const skip = (page - 1) * limit;
+              const paginated = hierarchicalRecords.slice(skip, skip + limit);
+              
+              return {
+                success: true,
+                records: paginated,
+                total,
+                page,
+                totalPages: Math.ceil(total / limit),
+              };
+            }
+          }
+        }
+
+        // Fallback to existing query logic
         // Environment filter
         if (filters.environmentId) {
           query.environmentId = parseInt(String(filters.environmentId));
@@ -1567,7 +2373,7 @@ export const resolvers = {
           totalPages,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] aggregatedHours error:', error);
+        logger.error('[GraphQL Resolver] aggregatedHours error:', error);
         return {
           success: false,
           records: [],
@@ -1615,6 +2421,9 @@ export const resolvers = {
           end = endDateObj;
         }
 
+        // ✅ Ensure filters is an object (handle null/undefined)
+        const safeFilters = filters || {};
+
         const query: any = {
           date: {
             $gte: start,
@@ -1622,11 +2431,11 @@ export const resolvers = {
           },
         };
 
-        if (filters.locationId && filters.locationId !== 'all') {
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
           try {
-            query.locationId = new ObjectId(filters.locationId);
+            query.locationId = new ObjectId(safeFilters.locationId);
           } catch (e) {
-            console.warn(`Invalid locationId: ${filters.locationId}`);
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`);
           }
         }
 
@@ -1639,7 +2448,7 @@ export const resolvers = {
         // Get location names
         const locationIds = new Set<string>();
         rawDataRecords.forEach((record) => {
-          if (record.locationId) {
+          if (record && record.locationId) {
             const locId = record.locationId instanceof ObjectId 
               ? record.locationId.toString() 
               : typeof record.locationId === 'string' 
@@ -1684,6 +2493,8 @@ export const resolvers = {
         let salesRecordCounter = 0;
 
         for (const record of rawDataRecords) {
+          if (!record) continue;
+          
           const recordId = record._id?.toString() || 'unknown';
           const rawApiResponse = record.rawApiResponse;
           const locationIdStr = record.locationId?.toString() || '';
@@ -1738,15 +2549,22 @@ export const resolvers = {
                 orderLines.forEach((line: any, lineIndex: number) => {
                   if (!line || typeof line !== 'object') return;
 
-                  if (filters.category && filters.category !== 'all') {
+                  if (safeFilters.category && safeFilters.category !== 'all') {
                     const lineCategory = line.GroupName || line.groupName || line.Category || line.category;
-                    if (!lineCategory || lineCategory !== filters.category) return;
+                    if (!lineCategory || lineCategory !== safeFilters.category) return;
                   }
 
                   const lineProductName = line.ProductName || line.productName || line.Name || line.name || null;
                   
-                  if (filters.productName) {
-                    if (!lineProductName || !lineProductName.toLowerCase().includes(filters.productName.toLowerCase())) return;
+                  if (safeFilters.productName) {
+                    if (!lineProductName || !lineProductName.toLowerCase().includes(safeFilters.productName.toLowerCase())) return;
+                  }
+
+                  // Filter by waiter name (case-insensitive)
+                  if (safeFilters.waiterName) {
+                    const waiterNameLower = (waiterName || '').toLowerCase();
+                    const filterWaiterNameLower = safeFilters.waiterName.toLowerCase();
+                    if (!waiterNameLower || !waiterNameLower.includes(filterWaiterNameLower)) return;
                   }
 
                   createdFromLines = true;
@@ -1787,12 +2605,21 @@ export const resolvers = {
           }
         }
 
-        // Filter by date range and sort
+        // Filter by date range and waiter name (if not already filtered in loop)
         // Note: record.date is in YYYY-MM-DD format (string), compare as strings
         const filteredRecords = allSalesRecords.filter(record => {
           const recordDateStr = record.date; // Should be YYYY-MM-DD format
           // Ensure we're comparing dates correctly (YYYY-MM-DD format)
-          return recordDateStr >= startDate && recordDateStr <= endDate;
+          if (recordDateStr < startDate || recordDateStr > endDate) return false;
+          
+          // Filter by waiter name if specified (case-insensitive)
+          if (safeFilters.waiterName) {
+            const recordWaiterName = (record.waiter_name || '').toLowerCase();
+            const filterWaiterName = safeFilters.waiterName.toLowerCase();
+            if (!recordWaiterName || !recordWaiterName.includes(filterWaiterName)) return false;
+          }
+          
+          return true;
         });
 
         filteredRecords.sort((a, b) => {
@@ -1819,7 +2646,7 @@ export const resolvers = {
           totalPages,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] dailySales error:', error);
+        logger.error('[GraphQL Resolver] dailySales error:', error);
         return {
           success: false,
           records: [],
@@ -1872,7 +2699,7 @@ export const resolvers = {
             locationObjectId = new ObjectId(filters.locationId);
             query['locationDetails.locationId'] = locationObjectId;
           } catch (e) {
-            console.warn(`Invalid locationId: ${filters.locationId}`);
+            logger.warn(`Invalid locationId: ${filters.locationId}`);
           }
         }
 
@@ -1911,10 +2738,7 @@ export const resolvers = {
           .find(query)
           .toArray();
 
-        // Log in development only
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[categoriesProductsAggregate] Found ${products.length} products from products_aggregated`);
-        }
+        logger.log(`[categoriesProductsAggregate] Found ${products.length} products from products_aggregated`);
 
         // ✅ Process pre-aggregated products data
         // Group products by category and main category
@@ -1931,40 +2755,21 @@ export const resolvers = {
           const mainCategory = product.mainCategory || null;
           const productName = product.productName;
 
-          // Filter salesByDate, salesByWeek, salesByMonth by date range
+          // Use hierarchical data if available, otherwise fallback to calculation
           const startDateStr = startDate; // Already in YYYY-MM-DD format
           const endDateStr = endDate; // Already in YYYY-MM-DD format
           
-          const filteredDaily = (product.salesByDate || []).filter((sale: any) => {
-            const saleDate = sale.date; // Should be YYYY-MM-DD string
-            return saleDate >= startDateStr && saleDate <= endDateStr;
-          });
-
-          const filteredWeekly = (product.salesByWeek || []); // Keep all for now, can filter by week range if needed
-
-          const filteredMonthly = (product.salesByMonth || []).filter((sale: any) => {
-            const monthDate = sale.month; // Should be YYYY-MM format
-            const startMonth = startDateStr.substring(0, 7); // YYYY-MM
-            const endMonth = endDateStr.substring(0, 7);
-            return monthDate >= startMonth && monthDate <= endMonth;
-          });
-
-          // Calculate totals from filtered data
-          const productDaily = initTotals();
-          const productWeekly = initTotals();
-          const productMonthly = initTotals();
-          const productTotal = initTotals();
-
-          for (const sale of filteredDaily) {
-            addTotals(productDaily, sale);
-            addTotals(productTotal, sale);
-          }
-          for (const sale of filteredWeekly) {
-            addTotals(productWeekly, sale);
-          }
-          for (const sale of filteredMonthly) {
-            addTotals(productMonthly, sale);
-          }
+          const salesData = getProductSalesData(
+            product,
+            startDateStr,
+            endDateStr,
+            locationObjectId?.toString()
+          );
+          
+          const productDaily = salesData.daily;
+          const productWeekly = salesData.weekly;
+          const productMonthly = salesData.monthly;
+          const productTotal = salesData.total;
 
           // Create product aggregate
           // Serialize locationDetails (convert ObjectId to string, Date to ISO string)
@@ -2011,10 +2816,7 @@ export const resolvers = {
           }
         }
         
-        // Log in development only
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[categoriesProductsAggregate] Processed ${productsProcessed} products: ${productsWithMainCategory} with mainCategory, ${productsWithoutMainCategory} without`);
-        }
+        logger.log(`[categoriesProductsAggregate] Processed ${productsProcessed} products: ${productsWithMainCategory} with mainCategory, ${productsWithoutMainCategory} without`);
 
         // ✅ Deduplicate products within each category BEFORE building response
         // This ensures each product appears only once per category, even if it exists multiple times in DB
@@ -2291,10 +3093,7 @@ export const resolvers = {
         const categories = Array.from(categoriesMap.values())
           .filter(cat => cat.categoryName && cat.categoryName.trim() !== '');
 
-        // Log in development only
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[categoriesProductsAggregate] Returning ${categories.length} unified categories, ${mainCategories.length} main categories, ${categories.reduce((sum, cat) => sum + cat.products.length, 0)} total products`);
-        }
+        logger.log(`[categoriesProductsAggregate] Returning ${categories.length} unified categories, ${mainCategories.length} main categories, ${categories.reduce((sum, cat) => sum + cat.products.length, 0)} total products`);
 
         return {
           success: true,
@@ -2303,7 +3102,7 @@ export const resolvers = {
           totals: grandTotals,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] categoriesProductsAggregate error:', error);
+        logger.error('[GraphQL Resolver] categoriesProductsAggregate error:', error);
         return {
           success: false,
           categories: [],
@@ -2354,7 +3153,7 @@ export const resolvers = {
             locationObjectId = new ObjectId(filters.locationId);
             query['locationDetails.locationId'] = locationObjectId;
           } catch (e) {
-            console.warn(`Invalid locationId: ${filters.locationId}`);
+            logger.warn(`Invalid locationId: ${filters.locationId}`);
           }
         }
         if (filters && filters.category && filters.category !== 'all') {
@@ -2460,7 +3259,7 @@ export const resolvers = {
           totals: grandTotals,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] categoriesMetadata error:', error);
+        logger.error('[GraphQL Resolver] categoriesMetadata error:', error);
         return {
           success: false,
           categories: [],
@@ -2516,7 +3315,7 @@ export const resolvers = {
             locationObjectId = new ObjectId(filters.locationId);
             query['locationDetails.locationId'] = locationObjectId;
           } catch (e) {
-            console.warn(`Invalid locationId: ${filters.locationId}`);
+            logger.warn(`Invalid locationId: ${filters.locationId}`);
           }
         }
         if (filters && filters.productName) {
@@ -2555,36 +3354,18 @@ export const resolvers = {
         const productAggregates: any[] = [];
 
         for (const product of products) {
-          // Filter salesByDate, salesByWeek, salesByMonth by date range
-          const filteredDaily = (product.salesByDate || []).filter((sale: any) => {
-            const saleDate = sale.date;
-            return saleDate >= startDateStr && saleDate <= endDateStr;
-          });
-
-          const filteredWeekly = (product.salesByWeek || []);
-          const filteredMonthly = (product.salesByMonth || []).filter((sale: any) => {
-            const monthDate = sale.month;
-            const startMonth = startDateStr.substring(0, 7);
-            const endMonth = endDateStr.substring(0, 7);
-            return monthDate >= startMonth && monthDate <= endMonth;
-          });
-
-          // Calculate totals
-          const productDaily = initTotals();
-          const productWeekly = initTotals();
-          const productMonthly = initTotals();
-          const productTotal = initTotals();
-
-          for (const sale of filteredDaily) {
-            addTotals(productDaily, sale);
-            addTotals(productTotal, sale);
-          }
-          for (const sale of filteredWeekly) {
-            addTotals(productWeekly, sale);
-          }
-          for (const sale of filteredMonthly) {
-            addTotals(productMonthly, sale);
-          }
+          // Use hierarchical data if available, otherwise fallback to calculation
+          const salesData = getProductSalesData(
+            product,
+            startDateStr,
+            endDateStr,
+            locationObjectId?.toString()
+          );
+          
+          const productDaily = salesData.daily;
+          const productWeekly = salesData.weekly;
+          const productMonthly = salesData.monthly;
+          const productTotal = salesData.total;
 
           // Serialize locationDetails
           const serializedLocationDetails = (product.locationDetails || []).map((loc: any) => ({
@@ -2653,7 +3434,7 @@ export const resolvers = {
           total: categoryTotals.total,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] categoryProducts error:', error);
+        logger.error('[GraphQL Resolver] categoryProducts error:', error);
         throw new Error(error.message || 'Failed to fetch category products');
       }
     },
@@ -3275,12 +4056,36 @@ export const resolvers = {
     updateWorkerProfile: async (_: any, { id, input }: { id: string; input: any }) => {
       try {
         const db = await getDatabase();
+        
+        // If id is not a valid ObjectId, try to find worker profile by eitje_user_id
+        let workerProfileId = id;
+        if (!ObjectId.isValid(id)) {
+          // Assume it's an eitje_user_id, find the worker profile
+          const profile = await db.collection('worker_profiles').findOne({
+            eitje_user_id: parseInt(id, 10)
+          });
+          if (profile && profile._id) {
+            workerProfileId = profile._id.toString();
+          } else {
+            throw new Error(`Worker profile not found for eitje_user_id: ${id}`);
+          }
+        }
+        
         const update: any = {
           updated_at: new Date(),
         };
         
         if (input.eitjeUserId !== undefined) update.eitje_user_id = input.eitjeUserId;
-        if (input.locationId !== undefined) update.location_id = input.locationId;
+        if (input.locationIds !== undefined) {
+          // Support multiple locations - store as array
+          update.location_ids = input.locationIds && input.locationIds.length > 0 ? input.locationIds : [];
+          // Also keep location_id for backward compatibility (use first location)
+          update.location_id = input.locationIds && input.locationIds.length > 0 ? input.locationIds[0] : null;
+        } else if (input.locationId !== undefined) {
+          // Backward compatibility: single location
+          update.location_id = input.locationId;
+          update.location_ids = input.locationId ? [input.locationId] : [];
+        }
         if (input.contractType !== undefined) update.contract_type = input.contractType;
         if (input.contractHours !== undefined) update.contract_hours = input.contractHours;
         if (input.hourlyWage !== undefined) update.hourly_wage = input.hourlyWage;
@@ -3290,11 +4095,11 @@ export const resolvers = {
         if (input.notes !== undefined) update.notes = input.notes;
         
         await db.collection('worker_profiles').updateOne(
-          { _id: toObjectId(id) },
+          { _id: toObjectId(workerProfileId) },
           { $set: update }
         );
         
-        const updated = await db.collection('worker_profiles').findOne({ _id: toObjectId(id) });
+        const updated = await db.collection('worker_profiles').findOne({ _id: toObjectId(workerProfileId) });
         
         if (!updated) throw new Error('Worker profile not found after update');
         
@@ -3535,30 +4340,41 @@ export const resolvers = {
   // Field resolvers for relationships
   Location: {
     id: (parent: any) => {
-      // ✅ Handle null/undefined _id gracefully
-      if (!parent || !parent._id) {
-        console.warn('[GraphQL] Location.id resolver called with null/undefined _id');
-        return '';
+      // ✅ If id is already set (from query resolver), return it
+      if (parent?.id) {
+        return parent.id;
       }
-      return toId(parent._id);
+      // ✅ Otherwise, try to get it from _id
+      if (parent?._id) {
+        return toId(parent._id);
+      }
+      // ✅ Handle null/undefined gracefully
+      console.warn('[GraphQL] Location.id resolver called with null/undefined _id and no id field', parent);
+      return '';
     },
     users: async (parent: any) => {
       const db = await getDatabase();
+      const locationId = getLocationId(parent);
+      if (!locationId) return [];
       return db.collection('unified_users').find({
-        locationIds: parent._id,
+        locationIds: locationId,
         isActive: true,
       }).toArray();
     },
     teams: async (parent: any) => {
       const db = await getDatabase();
+      const locationId = getLocationId(parent);
+      if (!locationId) return [];
       return db.collection('unified_teams').find({
-        locationIds: parent._id,
+        locationIds: locationId,
         isActive: true,
       }).toArray();
     },
     salesData: async (parent: any, { dateRange }: { dateRange?: { start: string; end: string } }) => {
       const db = await getDatabase();
-      const query: any = { locationId: parent._id };
+      const locationId = getLocationId(parent);
+      if (!locationId) return [];
+      const query: any = { locationId };
       if (dateRange) {
         query.date = {
           $gte: new Date(dateRange.start),
@@ -3569,7 +4385,9 @@ export const resolvers = {
     },
     laborData: async (parent: any, { dateRange }: { dateRange?: { start: string; end: string } }) => {
       const db = await getDatabase();
-      const query: any = { locationId: parent._id };
+      const locationId = getLocationId(parent);
+      if (!locationId) return [];
+      const query: any = { locationId };
       if (dateRange) {
         query.date = {
           $gte: new Date(dateRange.start),
@@ -3580,8 +4398,10 @@ export const resolvers = {
     },
     dashboard: async (parent: any, { date }: { date: string }) => {
       const db = await getDatabase();
+      const locationId = getLocationId(parent);
+      if (!locationId) return null;
       return db.collection('daily_dashboard').findOne({
-        locationId: parent._id,
+        locationId,
         date: new Date(date),
       });
     },
@@ -3850,6 +4670,13 @@ async function extractSalesRecords(
               if (!lineProductName || !lineProductName.toLowerCase().includes(filters.productName.toLowerCase())) return;
             }
 
+            // Filter by waiter name (case-insensitive)
+            if (filters.waiterName) {
+              const waiterNameLower = (waiterName || '').toLowerCase();
+              const filterWaiterNameLower = filters.waiterName.toLowerCase();
+              if (!waiterNameLower || !waiterNameLower.includes(filterWaiterNameLower)) return;
+            }
+
             salesRecordCounter++;
             const lineKey = line.Key || line.key || line.LineKey || line.lineKey || null;
             const uniqueId = `${recordId}_${ticketKey || 'ticket'}_${orderKey || 'order'}_${lineKey || lineIndex}_${salesRecordCounter}`;
@@ -3887,10 +4714,19 @@ async function extractSalesRecords(
     }
   }
 
-  // Filter by date range
+  // Filter by date range and waiter name
   const filteredRecords = allSalesRecords.filter(record => {
     const recordDateStr = record.date;
-    return recordDateStr >= startDate && recordDateStr <= endDate;
+    if (recordDateStr < startDate || recordDateStr > endDate) return false;
+    
+    // Filter by waiter name if specified (case-insensitive)
+    if (filters.waiterName) {
+      const recordWaiterName = (record.waiter_name || '').toLowerCase();
+      const filterWaiterName = filters.waiterName.toLowerCase();
+      if (!recordWaiterName || !recordWaiterName.includes(filterWaiterName)) return false;
+    }
+    
+    return true;
   });
 
   return filteredRecords;

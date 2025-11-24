@@ -16,6 +16,8 @@ import { useTransactionAnalysisViewModel } from "@/viewmodels/sales/useTransacti
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatDateDDMMYY } from "@/lib/dateFormatters";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
+import { ClickableWorkerName } from "@/components/workforce/ClickableWorkerName";
 
 function formatTimeString(time: string | null | undefined): string {
   if (!time) return "-";
@@ -34,6 +36,22 @@ export default function TransactionAnalysisPage() {
   const viewModel = useTransactionAnalysisViewModel();
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from transaction data
+  const transactionTotals = viewModel.transactionData ? (() => {
+    const data = viewModel.transactionData;
+    const totalTransactions = data.length;
+    const totalRevenue = data.reduce((sum, t) => sum + (t.total_revenue || 0), 0);
+    const totalItems = data.reduce((sum, t) => sum + (t.total_items || 0), 0);
+    const avgTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+    
+    return {
+      totalTransactions,
+      totalRevenue,
+      totalItems,
+      avgTransactionValue,
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -102,7 +120,17 @@ export default function TransactionAnalysisPage() {
                       <TableCell>{formatTimeString(transaction.time)}</TableCell>
                       <TableCell>{transaction.location_name || '-'}</TableCell>
                       <TableCell>{transaction.table_number || '-'}</TableCell>
-                      <TableCell>{transaction.waiter_name || '-'}</TableCell>
+                      <TableCell>
+                        {transaction.waiter_name ? (
+                          <ClickableWorkerName 
+                            worker={{
+                              user_name: transaction.waiter_name,
+                            }}
+                          />
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
                       <TableCell>{transaction.payment_method || '-'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(transaction.total_revenue)}</TableCell>
                       <TableCell className="text-right">{transaction.item_count}</TableCell>
@@ -111,6 +139,19 @@ export default function TransactionAnalysisPage() {
                 )}
               </TableBody>
             </UITable>
+
+            {/* Transaction Totals Summary */}
+            {transactionTotals && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Transactions", value: transactionTotals.totalTransactions, format: "number", decimals: 0 },
+                  { label: "Total Revenue", value: transactionTotals.totalRevenue, format: "currency" },
+                  { label: "Total Items", value: transactionTotals.totalItems, format: "number", decimals: 0 },
+                  { label: "Avg Transaction Value", value: transactionTotals.avgTransactionValue, format: "currency" },
+                ]}
+              />
+            )}
 
             {viewModel.totalPages > 1 && (
               <SimplePagination

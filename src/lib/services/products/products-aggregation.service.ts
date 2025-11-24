@@ -14,6 +14,7 @@
 
 import { getDatabase } from '@/lib/mongodb/v2-connection';
 import { ObjectId } from 'mongodb';
+import { getYearKey, getMonthKey, getWeekKey, getISOWeek, isOlderThanOneMonth, isOlderThanOneWeek, isCurrentWeek, isToday } from '@/lib/utils/time-helpers';
 
 interface ProductGroup {
   groupId?: string | number;
@@ -144,26 +145,501 @@ async function loadMenus(): Promise<Menu[]> {
   }));
 }
 
-/**
- * Get ISO week string
- */
-function getISOWeek(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  const year = d.getUTCFullYear();
-  return `${year}-W${String(weekNo).padStart(2, '0')}`;
-}
 
 /**
- * Get month key
+ * Build hierarchical time-series sales data from daily sales map
  */
-function getMonthKey(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
+function buildHierarchicalSalesData(
+  salesByDate: Map<string, { quantity: number; revenueExVat: number; revenueIncVat: number; transactionCount: number; locations: Set<string> }>,
+  locationDetails: Map<string, { locationId: ObjectId; locationName: string; lastSoldDate: Date; totalQuantity: number; totalRevenue: number }>,
+  locationMap: Map<string, { id: ObjectId; name: string }>
+): {
+  salesByYear: Array<{
+    year: string;
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>;
+  salesByMonth: Array<{
+    year: string;
+    month: string;
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>;
+  salesByWeek: Array<{
+    year: string;
+    week: string;
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>;
+  salesByDay: Array<{
+    year: string;
+    week: string;
+    date: string;
+    quantity: number;
+    revenueExVat: number;
+    revenueIncVat: number;
+    transactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }>;
+} {
+  // Build hierarchical structure: year -> month -> week -> day -> location
+  const yearMap = new Map<string, Map<string, Map<string, Map<string, Map<string, {
+    quantity: number;
+    revenueExVat: number;
+    revenueIncVat: number;
+    transactions: Set<string>;
+  }>>>>>>();
+
+  // Process each daily sales record
+  for (const [dateStr, dailyData] of salesByDate.entries()) {
+    const date = new Date(dateStr + 'T00:00:00.000Z');
+    const year = getYearKey(date);
+    const month = getMonthKey(date);
+    const week = getWeekKey(date);
+    const isoWeek = getISOWeek(date); // Full week key for reference
+
+    // Initialize year
+    if (!yearMap.has(year)) {
+      yearMap.set(year, new Map());
+    }
+    const monthMap = yearMap.get(year)!;
+
+    // Initialize month
+    if (!monthMap.has(month)) {
+      monthMap.set(month, new Map());
+    }
+    const weekMap = monthMap.get(month)!;
+
+    // Initialize week
+    if (!weekMap.has(isoWeek)) {
+      weekMap.set(isoWeek, new Map());
+    }
+    const dayMap = weekMap.get(isoWeek)!;
+
+    // Initialize day
+    if (!dayMap.has(dateStr)) {
+      dayMap.set(dateStr, new Map());
+    }
+    const locationMap = dayMap.get(dateStr)!;
+
+    // Process locations for this day
+    for (const locIdStr of dailyData.locations) {
+      if (!locationMap.has(locIdStr)) {
+        locationMap.set(locIdStr, {
+          quantity: 0,
+          revenueExVat: 0,
+          revenueIncVat: 0,
+          transactions: new Set(),
+        });
+      }
+      const locData = locationMap.get(locIdStr)!;
+      locData.quantity += dailyData.quantity;
+      locData.revenueExVat += dailyData.revenueExVat;
+      locData.revenueIncVat += dailyData.revenueIncVat;
+      // Note: transactionCount is approximate (we don't track per-location transactions in daily data)
+      // We'll use a simple division approach
+    }
+  }
+
+  // Build salesByYear array
+  const salesByYear: Array<{
+    year: string;
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }> = [];
+
+  for (const [year, monthMap] of yearMap.entries()) {
+    const yearTotals = {
+      totalQuantity: 0,
+      totalRevenueExVat: 0,
+      totalRevenueIncVat: 0,
+      totalTransactions: 0,
+    };
+    const yearLocationMap = new Map<string, {
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>();
+
+    // Aggregate across all months/weeks/days
+    for (const [month, weekMap] of monthMap.entries()) {
+      for (const [week, dayMap] of weekMap.entries()) {
+        for (const [dateStr, locMap] of dayMap.entries()) {
+          const date = new Date(dateStr + 'T00:00:00.000Z');
+          const dailyData = salesByDate.get(dateStr);
+          if (!dailyData) continue;
+
+          yearTotals.totalQuantity += dailyData.quantity;
+          yearTotals.totalRevenueExVat += dailyData.revenueExVat;
+          yearTotals.totalRevenueIncVat += dailyData.revenueIncVat;
+          yearTotals.totalTransactions += dailyData.transactionCount;
+
+          // Aggregate by location
+          for (const [locIdStr, locData] of locMap.entries()) {
+            const loc = locationMap.get(locIdStr);
+            if (!loc) continue;
+
+            if (!yearLocationMap.has(locIdStr)) {
+              yearLocationMap.set(locIdStr, {
+                locationId: loc.id,
+                locationName: loc.name,
+                quantity: 0,
+                revenueExVat: 0,
+                revenueIncVat: 0,
+                transactions: 0,
+              });
+            }
+            const yearLoc = yearLocationMap.get(locIdStr)!;
+            yearLoc.quantity += locData.quantity;
+            yearLoc.revenueExVat += locData.revenueExVat;
+            yearLoc.revenueIncVat += locData.revenueIncVat;
+            // Approximate transactions per location
+            yearLoc.transactions += Math.round(dailyData.transactionCount / dailyData.locations.size);
+          }
+        }
+      }
+    }
+
+    salesByYear.push({
+      year,
+      ...yearTotals,
+      byLocation: Array.from(yearLocationMap.values()),
+    });
+  }
+
+  // Build salesByMonth array (only for months older than 1 month)
+  const salesByMonth: Array<{
+    year: string;
+    month: string;
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }> = [];
+
+  for (const [year, monthMap] of yearMap.entries()) {
+    for (const [month, weekMap] of monthMap.entries()) {
+      // Extract year and month from "YYYY-MM" format
+      const [monthYear, monthNum] = month.split('-');
+      const monthDate = new Date(parseInt(monthYear), parseInt(monthNum) - 1, 1);
+
+      // Only include months older than 1 month
+      if (!isOlderThanOneMonth(monthDate)) continue;
+
+      const monthTotals = {
+        totalQuantity: 0,
+        totalRevenueExVat: 0,
+        totalRevenueIncVat: 0,
+        totalTransactions: 0,
+      };
+      const monthLocationMap = new Map<string, {
+        locationId: ObjectId;
+        locationName: string;
+        quantity: number;
+        revenueExVat: number;
+        revenueIncVat: number;
+        transactions: number;
+      }>();
+
+      // Aggregate across all weeks/days in this month
+      for (const [week, dayMap] of weekMap.entries()) {
+        for (const [dateStr, locMap] of dayMap.entries()) {
+          const dailyData = salesByDate.get(dateStr);
+          if (!dailyData) continue;
+
+          monthTotals.totalQuantity += dailyData.quantity;
+          monthTotals.totalRevenueExVat += dailyData.revenueExVat;
+          monthTotals.totalRevenueIncVat += dailyData.revenueIncVat;
+          monthTotals.totalTransactions += dailyData.transactionCount;
+
+          // Aggregate by location
+          for (const [locIdStr, locData] of locMap.entries()) {
+            const loc = locationMap.get(locIdStr);
+            if (!loc) continue;
+
+            if (!monthLocationMap.has(locIdStr)) {
+              monthLocationMap.set(locIdStr, {
+                locationId: loc.id,
+                locationName: loc.name,
+                quantity: 0,
+                revenueExVat: 0,
+                revenueIncVat: 0,
+                transactions: 0,
+              });
+            }
+            const monthLoc = monthLocationMap.get(locIdStr)!;
+            monthLoc.quantity += locData.quantity;
+            monthLoc.revenueExVat += locData.revenueExVat;
+            monthLoc.revenueIncVat += locData.revenueIncVat;
+            monthLoc.transactions += Math.round(dailyData.transactionCount / dailyData.locations.size);
+          }
+        }
+      }
+
+      salesByMonth.push({
+        year: monthYear,
+        month: monthNum,
+        ...monthTotals,
+        byLocation: Array.from(monthLocationMap.values()),
+      });
+    }
+  }
+
+  // Build salesByWeek array (only for weeks older than 1 week)
+  const salesByWeek: Array<{
+    year: string;
+    week: string;
+    totalQuantity: number;
+    totalRevenueExVat: number;
+    totalRevenueIncVat: number;
+    totalTransactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }> = [];
+
+  for (const [year, monthMap] of yearMap.entries()) {
+    for (const [month, weekMap] of monthMap.entries()) {
+      for (const [isoWeek, dayMap] of weekMap.entries()) {
+        // Extract week start date from ISO week string
+        const [weekYear, weekNum] = isoWeek.split('-W');
+        const weekStart = new Date(parseInt(weekYear), 0, 1);
+        const daysToAdd = (parseInt(weekNum) - 1) * 7;
+        weekStart.setDate(weekStart.getDate() + daysToAdd);
+
+        // Only include weeks older than 1 week
+        if (!isOlderThanOneWeek(weekStart)) continue;
+
+        const weekTotals = {
+          totalQuantity: 0,
+          totalRevenueExVat: 0,
+          totalRevenueIncVat: 0,
+          totalTransactions: 0,
+        };
+        const weekLocationMap = new Map<string, {
+          locationId: ObjectId;
+          locationName: string;
+          quantity: number;
+          revenueExVat: number;
+          revenueIncVat: number;
+          transactions: number;
+        }>();
+
+        // Aggregate across all days in this week
+        for (const [dateStr, locMap] of dayMap.entries()) {
+          const dailyData = salesByDate.get(dateStr);
+          if (!dailyData) continue;
+
+          weekTotals.totalQuantity += dailyData.quantity;
+          weekTotals.totalRevenueExVat += dailyData.revenueExVat;
+          weekTotals.totalRevenueIncVat += dailyData.revenueIncVat;
+          weekTotals.totalTransactions += dailyData.transactionCount;
+
+          // Aggregate by location
+          for (const [locIdStr, locData] of locMap.entries()) {
+            const loc = locationMap.get(locIdStr);
+            if (!loc) continue;
+
+            if (!weekLocationMap.has(locIdStr)) {
+              weekLocationMap.set(locIdStr, {
+                locationId: loc.id,
+                locationName: loc.name,
+                quantity: 0,
+                revenueExVat: 0,
+                revenueIncVat: 0,
+                transactions: 0,
+              });
+            }
+            const weekLoc = weekLocationMap.get(locIdStr)!;
+            weekLoc.quantity += locData.quantity;
+            weekLoc.revenueExVat += locData.revenueExVat;
+            weekLoc.revenueIncVat += locData.revenueIncVat;
+            weekLoc.transactions += Math.round(dailyData.transactionCount / dailyData.locations.size);
+          }
+        }
+
+        salesByWeek.push({
+          year: weekYear,
+          week: weekNum,
+          ...weekTotals,
+          byLocation: Array.from(weekLocationMap.values()),
+        });
+      }
+    }
+  }
+
+  // Build salesByDay array (only for current week, excluding today)
+  const salesByDay: Array<{
+    year: string;
+    week: string;
+    date: string;
+    quantity: number;
+    revenueExVat: number;
+    revenueIncVat: number;
+    transactions: number;
+    byLocation: Array<{
+      locationId: ObjectId;
+      locationName: string;
+      quantity: number;
+      revenueExVat: number;
+      revenueIncVat: number;
+      transactions: number;
+    }>;
+  }> = [];
+
+  const now = new Date();
+  const currentYear = getYearKey(now);
+  const currentWeek = getWeekKey(now);
+
+  for (const [year, monthMap] of yearMap.entries()) {
+    if (year !== currentYear) continue;
+
+    for (const [month, weekMap] of monthMap.entries()) {
+      for (const [isoWeek, dayMap] of weekMap.entries()) {
+        const [weekYear, weekNum] = isoWeek.split('-W');
+        if (weekNum !== currentWeek) continue;
+
+        // Only process current week
+        for (const [dateStr, locMap] of dayMap.entries()) {
+          const date = new Date(dateStr + 'T00:00:00.000Z');
+          
+          // Exclude today
+          if (isToday(date)) continue;
+
+          const dailyData = salesByDate.get(dateStr);
+          if (!dailyData) continue;
+
+          const dayLocations: Array<{
+            locationId: ObjectId;
+            locationName: string;
+            quantity: number;
+            revenueExVat: number;
+            revenueIncVat: number;
+            transactions: number;
+          }> = [];
+
+          // Build location array for this day
+          for (const [locIdStr, locData] of locMap.entries()) {
+            const loc = locationMap.get(locIdStr);
+            if (!loc) continue;
+
+            dayLocations.push({
+              locationId: loc.id,
+              locationName: loc.name,
+              quantity: locData.quantity,
+              revenueExVat: locData.revenueExVat,
+              revenueIncVat: locData.revenueIncVat,
+              transactions: Math.round(dailyData.transactionCount / dailyData.locations.size),
+            });
+          }
+
+          salesByDay.push({
+            year: currentYear,
+            week: currentWeek,
+            date: dateStr,
+            quantity: dailyData.quantity,
+            revenueExVat: dailyData.revenueExVat,
+            revenueIncVat: dailyData.revenueIncVat,
+            transactions: dailyData.transactionCount,
+            byLocation: dayLocations,
+          });
+        }
+      }
+    }
+  }
+
+  // Sort arrays
+  salesByYear.sort((a, b) => b.year.localeCompare(a.year));
+  salesByMonth.sort((a, b) => {
+    const aKey = `${a.year}-${a.month}`;
+    const bKey = `${b.year}-${b.month}`;
+    return bKey.localeCompare(aKey);
+  });
+  salesByWeek.sort((a, b) => {
+    const aKey = `${a.year}-W${a.week}`;
+    const bKey = `${b.year}-W${b.week}`;
+    return bKey.localeCompare(aKey);
+  });
+  salesByDay.sort((a, b) => b.date.localeCompare(a.date));
+
+  console.log(`[Products Aggregation] Hierarchical data built: ${salesByYear.length} years, ${salesByMonth.length} months, ${salesByWeek.length} weeks, ${salesByDay.length} days`);
+  
+  return {
+    salesByYear,
+    salesByMonth,
+    salesByWeek,
+    salesByDay,
+  };
+  
+  return {
+    salesByYear,
+    salesByMonth,
+    salesByWeek,
+    salesByDay,
+  };
 }
 
 /**
@@ -178,12 +654,11 @@ export async function aggregateProductsData(
   let updated = 0;
 
   try {
-    // Default to last 90 days if no date range provided
+    // Default behavior:
+    // - If date range provided: use that range (for specific date filtering)
+    // - If NO date range provided: use ALL historical data (from 2020 to now) to process all products
     const now = new Date();
-    const defaultStartDate = new Date(now);
-    defaultStartDate.setDate(defaultStartDate.getDate() - 90);
-
-    const queryStartDate = startDate || defaultStartDate;
+    const queryStartDate = startDate || new Date('2020-01-01');
     const queryEndDate = endDate || now;
 
     console.log(`[Products Aggregation] Starting aggregation from ${queryStartDate.toISOString()} to ${queryEndDate.toISOString()}`);
@@ -200,17 +675,16 @@ export async function aggregateProductsData(
       locationMap.set(loc._id.toString(), { id: loc._id, name: loc.name });
     });
 
-    // Query raw sales data
-    const rawData = await db.collection('bork_raw_data')
-      .find({
-        date: {
-          $gte: queryStartDate,
-          $lte: queryEndDate,
-        },
-      })
-      .toArray();
-
-    console.log(`[Products Aggregation] Processing ${rawData.length} raw sales records`);
+    // Query raw sales data - use ALL data if no specific date range provided
+    // Get count for progress tracking
+    const totalRecords = await db.collection('bork_raw_data').countDocuments({
+      date: {
+        $gte: queryStartDate,
+        $lte: queryEndDate,
+      },
+    });
+    
+    console.log(`[Products Aggregation] Processing ${totalRecords} raw sales records from ${queryStartDate.toISOString()} to ${queryEndDate.toISOString()}`);
 
     // Process raw data and aggregate by product
     const productAggregates = new Map<
@@ -234,8 +708,32 @@ export async function aggregateProductsData(
       }
     >();
 
-    // Process each raw record
-    for (const record of rawData) {
+    // ✅ BATCH PROCESSING: Process records in batches to avoid memory issues
+    const BATCH_SIZE = 1000;
+    let processedCount = 0;
+    const cursor = db.collection('bork_raw_data')
+      .find({
+        date: {
+          $gte: queryStartDate,
+          $lte: queryEndDate,
+        },
+      })
+      .sort({ date: 1 })
+      .batchSize(BATCH_SIZE);
+
+    // Process each record one at a time (cursor.next() returns single document)
+    while (await cursor.hasNext()) {
+      const record = await cursor.next();
+      if (!record) continue;
+      
+      processedCount++;
+      
+      // Log progress every 5000 records
+      if (processedCount % 5000 === 0 || processedCount === totalRecords) {
+        console.log(`[Products Aggregation] Processed ${processedCount}/${totalRecords} records (${Math.round((processedCount / totalRecords) * 100)}%)...`);
+      }
+      
+      // Process the record
       const rawApiResponse = record.rawApiResponse;
       if (!rawApiResponse) continue;
 
@@ -405,7 +903,7 @@ export async function aggregateProductsData(
       }
     }
 
-    console.log(`[Products Aggregation] Aggregated ${productAggregates.size} unique products`);
+    console.log(`[Products Aggregation] Completed processing ${processedCount} records, aggregated ${productAggregates.size} unique products`);
 
     // Load existing products_aggregated to merge with catalog data
     const existingProducts = await db.collection('products_aggregated').find({}).toArray();
@@ -465,8 +963,19 @@ export async function aggregateProductsData(
         if (aggregate.categories.size > 0) {
           // Use the category with most sales (simplified - use first for now)
           const firstCategory = Array.from(aggregate.categories.values())[0];
-          primaryCategory = firstCategory.category;
+          primaryCategory = firstCategory.category || 'Uncategorized';
           primaryMainCategory = firstCategory.mainCategory;
+          
+          // Debug logging for products that should have categories
+          if (!primaryCategory || primaryCategory === 'Uncategorized') {
+            console.log(`[Products Aggregation] Product "${productName}" has categories map but primaryCategory is "${primaryCategory}"`);
+            console.log(`[Products Aggregation] Categories in map:`, Array.from(aggregate.categories.keys()));
+          }
+        } else if (aggregate.totalQuantity > 0) {
+          // Product has sales but no category data - explicitly set to Uncategorized
+          primaryCategory = 'Uncategorized';
+          primaryMainCategory = null;
+          console.log(`[Products Aggregation] Product "${productName}" has ${aggregate.totalQuantity} sales but no category data - setting to Uncategorized`);
         }
 
         // Convert time-series Maps to Arrays (keep last 90 days/12 weeks/12 months)
@@ -506,6 +1015,94 @@ export async function aggregateProductsData(
 
         const locationDetailsArray = Array.from(aggregate.locationDetails.values());
 
+        // Build hierarchical time-series data
+        const hierarchicalData = buildHierarchicalSalesData(
+          aggregate.salesByDate,
+          aggregate.locationDetails,
+          locationMap
+        );
+
+        // Merge with existing hierarchical data if it exists
+        let mergedHierarchicalData = hierarchicalData;
+        if (existing?.salesByYear || existing?.salesByMonth || existing?.salesByWeek || existing?.salesByDay) {
+          // Merge years
+          const existingYearsMap = new Map<string, any>();
+          if (existing.salesByYear) {
+            existing.salesByYear.forEach((y: any) => existingYearsMap.set(y.year, y));
+          }
+          hierarchicalData.salesByYear.forEach((y) => {
+            const existingYear = existingYearsMap.get(y.year);
+            if (existingYear) {
+              // Merge locations
+              const locMap = new Map<string, any>();
+              existingYear.byLocation.forEach((loc: any) => locMap.set(loc.locationId.toString(), loc));
+              y.byLocation.forEach((loc) => {
+                const existingLoc = locMap.get(loc.locationId.toString());
+                if (existingLoc) {
+                  // Merge totals
+                  existingLoc.quantity += loc.quantity;
+                  existingLoc.revenueExVat += loc.revenueExVat;
+                  existingLoc.revenueIncVat += loc.revenueIncVat;
+                  existingLoc.transactions += loc.transactions;
+                } else {
+                  locMap.set(loc.locationId.toString(), loc);
+                }
+              });
+              y.byLocation = Array.from(locMap.values());
+              y.totalQuantity = y.byLocation.reduce((sum, loc) => sum + loc.quantity, 0);
+              y.totalRevenueExVat = y.byLocation.reduce((sum, loc) => sum + loc.revenueExVat, 0);
+              y.totalRevenueIncVat = y.byLocation.reduce((sum, loc) => sum + loc.revenueIncVat, 0);
+              y.totalTransactions = y.byLocation.reduce((sum, loc) => sum + loc.transactions, 0);
+            } else {
+              existingYearsMap.set(y.year, y);
+            }
+          });
+          mergedHierarchicalData.salesByYear = Array.from(existingYearsMap.values());
+
+          // Similar merging logic for months, weeks, and days (simplified for now - can enhance later)
+          // For now, we'll prioritize new data but keep existing if no overlap
+          if (existing.salesByMonth) {
+            const existingMonthsMap = new Map<string, any>();
+            existing.salesByMonth.forEach((m: any) => {
+              const key = `${m.year}-${m.month}`;
+              existingMonthsMap.set(key, m);
+            });
+            hierarchicalData.salesByMonth.forEach((m) => {
+              const key = `${m.year}-${m.month}`;
+              if (!existingMonthsMap.has(key)) {
+                existingMonthsMap.set(key, m);
+              }
+            });
+            mergedHierarchicalData.salesByMonth = Array.from(existingMonthsMap.values());
+          }
+
+          if (existing.salesByWeek) {
+            const existingWeeksMap = new Map<string, any>();
+            existing.salesByWeek.forEach((w: any) => {
+              const key = `${w.year}-W${w.week}`;
+              existingWeeksMap.set(key, w);
+            });
+            hierarchicalData.salesByWeek.forEach((w) => {
+              const key = `${w.year}-W${w.week}`;
+              if (!existingWeeksMap.has(key)) {
+                existingWeeksMap.set(key, w);
+              }
+            });
+            mergedHierarchicalData.salesByWeek = Array.from(existingWeeksMap.values());
+          }
+
+          if (existing.salesByDay) {
+            const existingDaysMap = new Map<string, any>();
+            existing.salesByDay.forEach((d: any) => existingDaysMap.set(d.date, d));
+            hierarchicalData.salesByDay.forEach((d) => {
+              if (!existingDaysMap.has(d.date)) {
+                existingDaysMap.set(d.date, d);
+              }
+            });
+            mergedHierarchicalData.salesByDay = Array.from(existingDaysMap.values());
+          }
+        }
+
         // Merge with existing product data (preserve catalog fields)
         const updateDoc: any = {
           // Update sales statistics
@@ -527,10 +1124,6 @@ export async function aggregateProductsData(
             locationId: ph.locationId,
           })),
 
-          // Update category (if not set or if we have better data)
-          ...(primaryCategory && { category: primaryCategory }),
-          ...(primaryMainCategory && { mainCategory: primaryMainCategory }),
-
           // Update menu associations
           menuIds,
           menuPrices,
@@ -538,15 +1131,37 @@ export async function aggregateProductsData(
           // Update location details
           locationDetails: locationDetailsArray,
 
-          // Update time-series data
+          // Update time-series data (deprecated, kept for backward compatibility)
           salesByDate: salesByDateArray,
           salesByWeek: salesByWeekArray,
           salesByMonth: salesByMonthArray,
+
+          // Update hierarchical time-series data (NEW)
+          salesByYear: mergedHierarchicalData.salesByYear,
+          salesByMonth: mergedHierarchicalData.salesByMonth,
+          salesByWeek: mergedHierarchicalData.salesByWeek,
+          salesByDay: mergedHierarchicalData.salesByDay,
 
           // Update timestamps
           updatedAt: now,
           lastAggregated: now,
         };
+
+        // Update category (always update if we have category data from raw_data)
+        // IMPORTANT: Always set category if we have sales data
+        // If primaryCategory is null but we have sales, set to 'Uncategorized'
+        // If primaryCategory exists (even if 'Uncategorized'), use it
+        if (primaryCategory !== null) {
+          updateDoc.category = primaryCategory;
+          if (primaryMainCategory !== null) {
+            updateDoc.mainCategory = primaryMainCategory;
+          }
+        } else if (aggregate.totalQuantity > 0) {
+          // Product has sales but no category data - explicitly set to Uncategorized
+          updateDoc.category = 'Uncategorized';
+          updateDoc.mainCategory = null;
+        }
+        // If primaryCategory is null AND no sales, don't set category (preserve existing or leave null)
 
         if (existing) {
           // ✅ Merge locationDetails instead of overwriting (preserve historical data)

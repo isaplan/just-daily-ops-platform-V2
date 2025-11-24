@@ -20,6 +20,7 @@ import { useCategoriesProductsViewModel, TimePeriod } from "@/viewmodels/sales/u
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { ProductAggregate, CategoryAggregate, TimePeriodTotals, MainCategoryAggregate } from "@/models/sales/categories-products.model";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 // Helper to get totals for a specific time period
 function getPeriodTotals(
@@ -356,31 +357,6 @@ export function CategoriesProductsClient({ initialData }: CategoriesProductsClie
         {/* Aggregated Data Table - Always show, even if no data */}
         {!viewModel.isLoading && !viewModel.error && (
           <div className="space-y-4">
-            {/* Grand Totals Summary */}
-            {grandTotals && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-2">Grand Totals ({viewModel.activeTimePeriod})</h3>
-                <div className="grid grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Total Quantity: </span>
-                    <span className="font-semibold">{formatNumber(grandTotals.quantity, 0, false)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Revenue Ex VAT: </span>
-                    <span className="font-semibold">{formatCurrency(grandTotals.revenueExVat)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Revenue Inc VAT: </span>
-                    <span className="font-semibold">{formatCurrency(grandTotals.revenueIncVat)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Transactions: </span>
-                    <span className="font-semibold">{grandTotals.transactionCount}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Tabs for Daily/Weekly/Monthly */}
             <Tabs 
               value={viewModel.activeTimePeriod} 
@@ -491,6 +467,19 @@ export function CategoriesProductsClient({ initialData }: CategoriesProductsClie
                 </UITable>
               </TabsContent>
             </Tabs>
+
+            {/* Grand Totals Summary */}
+            {grandTotals && (
+              <AggregatedCostsSummary
+                title={`Grand Totals (${viewModel.activeTimePeriod})`}
+                metrics={[
+                  { label: "Total Quantity", value: grandTotals.quantity, format: "number", decimals: 0 },
+                  { label: "Revenue Ex VAT", value: grandTotals.revenueExVat, format: "currency" },
+                  { label: "Revenue Inc VAT", value: grandTotals.revenueIncVat, format: "currency" },
+                  { label: "Transactions", value: grandTotals.transactionCount, format: "number", decimals: 0 },
+                ]}
+              />
+            )}
           </div>
         )}
       </div>

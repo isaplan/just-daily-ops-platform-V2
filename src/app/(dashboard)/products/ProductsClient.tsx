@@ -15,21 +15,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/view-data/LoadingState";
 import { ErrorState } from "@/components/view-data/ErrorState";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { AutocompleteSearch, AutocompleteOption } from "@/components/view-data/AutocompleteSearch";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { CategoryAggregate, ProductAggregate } from "@/models/sales/categories-products.model";
 import { CourseType } from "@/models/products/product.model";
 import { useCategoriesProductsViewModel } from "@/viewmodels/sales/useCategoriesProductsViewModel";
-
-// Helper to format currency
-function formatCurrency(value: number): string {
-  return `€${value.toFixed(2)}`;
-}
-
-// Helper to format number
-function formatNumber(value: number): string {
-  return value.toFixed(0);
-}
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 interface ProductsClientProps {
   initialData?: {
@@ -199,6 +191,31 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
     
     return categories;
   }, [allCategories, groupedCategories, selectedMainCategory, selectedSubCategory, selectedMenu, searchQuery, menus]);
+
+  // Search options for autocomplete (categories and products)
+  const searchOptions = useMemo<AutocompleteOption[]>(() => {
+    const options: AutocompleteOption[] = [];
+    // Add categories
+    allCategories.forEach(cat => {
+      options.push({
+        value: cat.categoryName,
+        label: cat.categoryName,
+        type: 'category',
+      });
+    });
+    // Add products from filtered categories
+    filteredCategories.forEach(cat => {
+      cat.products.forEach(prod => {
+        options.push({
+          value: prod.productName,
+          label: prod.productName,
+          type: 'product',
+          category: cat.categoryName,
+        });
+      });
+    });
+    return options;
+  }, [allCategories, filteredCategories]);
   
   // Get unique sub-categories for selected main category
   const subCategories = useMemo(() => {
@@ -463,18 +480,22 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
             </div>
             
             {/* Search */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
+            <AutocompleteSearch
+              options={searchOptions}
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              placeholder="Search products..."
+              label="Search"
+              emptyMessage="No products found."
+              renderOption={(option) => (
+                <div>
+                  <div className="font-medium">{option.label}</div>
+                  {option.category && (
+                    <div className="text-xs text-muted-foreground">{option.category}</div>
+                  )}
+                </div>
+              )}
+            />
           </div>
         </CardContent>
       </Card>

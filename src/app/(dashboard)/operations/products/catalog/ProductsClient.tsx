@@ -20,7 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/view-data/LoadingState";
 import { ErrorState } from "@/components/view-data/ErrorState";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronRight, Search, Loader2 } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
+import { AutocompleteSearch, AutocompleteOption } from "@/components/view-data/AutocompleteSearch";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { CategoryAggregate, ProductAggregate } from "@/models/sales/categories-products.model";
 import { CourseType } from "@/models/products/product.model";
@@ -30,6 +31,8 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useLazyCategoryProducts } from "@/hooks/useLazyCategoryProducts";
 import { CategoryMetadata } from "@/lib/services/graphql/queries";
+import { fetchCategoriesMetadata } from "@/lib/services/sales/categories-products.service";
+import { LocationFilterButtons } from "@/components/view-data/LocationFilterButtons";
 
 interface ProductsClientProps {
   initialData?: {
@@ -63,7 +66,9 @@ const courseTypeOptions: { value: CourseType; label: string }[] = [
 ];
 
 // Main category mapping (category -> main category)
+// This is a fallback when mainCategoryName is not available in the database
 const categoryToMainCategoryMap: Record<string, "Bar" | "Keuken" | "Other"> = {
+  // Bar categories
   "Tap Bier": "Bar",
   "Fles Bier": "Bar",
   "Cocktails": "Bar",
@@ -73,6 +78,13 @@ const categoryToMainCategoryMap: Record<string, "Bar" | "Keuken" | "Other"> = {
   "Koffie": "Bar",
   "Thee": "Bar",
   "Warme Dranken": "Bar",
+  "Bier": "Bar",
+  "Drank": "Bar",
+  "Dranken": "Bar",
+  "Alcohol": "Bar",
+  "Non-alcohol": "Bar",
+  "Non-alcoholisch": "Bar",
+  // Keuken categories
   "Lunch": "Keuken",
   "Diner": "Keuken",
   "Voorgerecht": "Keuken",
@@ -81,86 +93,232 @@ const categoryToMainCategoryMap: Record<string, "Bar" | "Keuken" | "Other"> = {
   "Bijgerecht": "Keuken",
   "Snacks": "Keuken",
   "Brood": "Keuken",
+  "Gerecht": "Keuken",
+  "Gerechten": "Keuken",
+  "Eten": "Keuken",
+  "Food": "Keuken",
 };
 
+// Bar-related keywords
+const barKeywords = ["bier", "cocktail", "wijn", "spirit", "frisdrank", "koffie", "thee", "drank", "alcohol"];
+
+// Keuken-related keywords
+const keukenKeywords = ["lunch", "diner", "gerecht", "voorgerecht", "hoofdgerecht", "nagerecht", "bijgerecht", "snack", "brood", "eten", "food"];
+
 function getMainCategory(categoryName: string): "Bar" | "Keuken" | "Other" {
-  return categoryToMainCategoryMap[categoryName] || "Other";
+  // Check exact match first
+  if (categoryToMainCategoryMap[categoryName]) {
+    return categoryToMainCategoryMap[categoryName];
+  }
+  
+  // Check case-insensitive match by checking all keys
+  const lowerName = categoryName.toLowerCase();
+  for (const [key, value] of Object.entries(categoryToMainCategoryMap)) {
+    if (key.toLowerCase() === lowerName) {
+      return value;
+    }
+  }
+  
+  // Check for Bar keywords
+  for (const keyword of barKeywords) {
+    if (lowerName.includes(keyword)) {
+      return "Bar";
+    }
+  }
+  
+  // Check for Keuken keywords
+  for (const keyword of keukenKeywords) {
+    if (lowerName.includes(keyword)) {
+      return "Keuken";
+    }
+  }
+  
+  return "Other";
 }
 
 export function ProductsClient({ initialData }: ProductsClientProps) {
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
   
-  // Get date range from initialData or use current week
-  const dateRange = useMemo(() => {
-    if (initialData?.dateRange) {
-      return initialData.dateRange;
-    }
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() + diffToMonday);
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
-    return {
-      startDate: startOfWeek.toISOString().split('T')[0],
-      endDate: endOfWeek.toISOString().split('T')[0],
-    };
-  }, [initialData?.dateRange]);
-
-  // Get categories metadata from initialData (lightweight - no products)
-  const categoriesMetadata = initialData?.categoriesMetadata;
-  
-  // Fetch locations
-  const { data: locations = initialData?.locations || [] } = useQuery({
-    queryKey: ["locations"],
-    queryFn: getLocations,
-    initialData: initialData?.locations,
-    staleTime: 60 * 60 * 1000, // 60 minutes
-  });
-
-  // Lazy loading hook for products
-  const lazyProducts = useLazyCategoryProducts({
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-    filters: {
-      locationId: 'all', // Will be filtered client-side
-    },
-  });
-
   // Filter state (all client-side)
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1; // getMonth() returns 0-11, we need 1-12
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(currentMonth); // Start with current month
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedMainCategory, setSelectedMainCategory] = useState<"all" | "Bar" | "Keuken" | "Other">("all");
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>("all");
   const [selectedMenu, setSelectedMenu] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedWorkloadLevel, setSelectedWorkloadLevel] = useState<string>("all");
   const [selectedMEPLevel, setSelectedMEPLevel] = useState<string>("all");
-  const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false);
+  const [activeFilter, setActiveFilter] = useState<"active" | "all" | "inactive">("all"); // Default to all - show all products
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [loadingCategories, setLoadingCategories] = useState<Set<string>>(new Set());
   const [menus, setMenus] = useState<any[]>([]);
 
+  // Month options
+  const MONTHS = [
+    { value: 1, label: "Jan" },
+    { value: 2, label: "Feb" },
+    { value: 3, label: "Mar" },
+    { value: 4, label: "Apr" },
+    { value: 5, label: "May" },
+    { value: 6, label: "Jun" },
+    { value: 7, label: "Jul" },
+    { value: 8, label: "Aug" },
+    { value: 9, label: "Sep" },
+    { value: 10, label: "Oct" },
+    { value: 11, label: "Nov" },
+    { value: 12, label: "Dec" },
+  ];
+
+  // Year options (only show 2024, 2025 - not 2026 until we're in 2026)
+  const yearOptions = useMemo(() => {
+    const years = [currentYear - 1, currentYear]; // 2024, 2025
+    // Only add next year if we're already in it or past it
+    if (currentYear >= 2026) {
+      years.push(currentYear + 1);
+    }
+    return years;
+  }, [currentYear]);
+
+  // Get date range from initialData or use full year/month for selected year
+  const dateRange = useMemo(() => {
+    // If month is selected, use that month
+    if (selectedMonth) {
+      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
+      const endOfMonth = new Date(selectedYear, selectedMonth, 0); // Last day of selected month
+      endOfMonth.setHours(23, 59, 59, 999);
+      
+      return {
+        startDate: startOfMonth.toISOString().split('T')[0],
+        endDate: endOfMonth.toISOString().split('T')[0],
+      };
+    }
+    
+    // Otherwise, use the full year (January 1 to December 31)
+    // This applies when no month is selected, regardless of whether it's the current year
+    const startOfYear = new Date(selectedYear, 0, 1); // January 1
+    startOfYear.setHours(0, 0, 0, 0);
+    
+    const endOfYear = new Date(selectedYear, 11, 31); // December 31
+    endOfYear.setHours(23, 59, 59, 999);
+    
+    return {
+      startDate: startOfYear.toISOString().split('T')[0],
+      endDate: endOfYear.toISOString().split('T')[0],
+    };
+  }, [selectedYear, selectedMonth]);
+
+  // Check if filters have changed from initial data
+  const filtersChanged = useMemo(() => {
+    if (!initialData?.dateRange) return true;
+    const initialLocation = 'all'; // Server always fetches with 'all'
+    const initialYear = new Date(initialData.dateRange.startDate).getFullYear();
+    const initialMonth = new Date(initialData.dateRange.startDate).getMonth() + 1; // 1-12
+    
+    return (
+      dateRange.startDate !== initialData.dateRange.startDate ||
+      dateRange.endDate !== initialData.dateRange.endDate ||
+      selectedLocation !== initialLocation ||
+      selectedYear !== initialYear ||
+      selectedMonth !== initialMonth // Compare with initial month instead of null
+    );
+  }, [dateRange, selectedLocation, selectedYear, selectedMonth, initialData?.dateRange]);
+
+  // Fetch categories metadata (refetch when filters change)
+  // Don't use initialData when filters have changed - force a fresh fetch
+  const { data: categoriesMetadataResponse, isLoading: categoriesLoading, error: categoriesError } = useQuery({
+    queryKey: ['categories-metadata', dateRange.startDate, dateRange.endDate, selectedLocation],
+    queryFn: async () => {
+      console.log('[ProductsClient] Fetching categories metadata with filters:', {
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        locationId: selectedLocation,
+      });
+      try {
+        const result = await fetchCategoriesMetadata({
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          locationId: selectedLocation,
+          category: 'all',
+        });
+        console.log('[ProductsClient] Fetched categories metadata:', {
+          filters: { startDate: dateRange.startDate, endDate: dateRange.endDate, locationId: selectedLocation },
+          categoriesCount: result.categories?.length || 0,
+          success: result.success,
+        });
+        return result;
+      } catch (error: any) {
+        // Ignore AbortError - expected when requests are cancelled
+        if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+          throw error; // Re-throw so React Query handles it
+        }
+        console.error('[ProductsClient] Error fetching categories metadata:', error);
+        throw error;
+      }
+    },
+    // Only use initialData if filters haven't changed
+    initialData: !filtersChanged ? initialData?.categoriesMetadata : undefined,
+    placeholderData: initialData?.categoriesMetadata,
+    staleTime: 0, // Always consider data stale - refetch when query key changes
+    gcTime: 0, // Don't cache - always fetch fresh data
+    enabled: true,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+  });
+  
+  // Use query data if available, otherwise fall back to initialData
+  const categoriesMetadata = categoriesMetadataResponse || initialData?.categoriesMetadata;
+  
+  // Use initialData locations directly, or fetch if not available
+  // This ensures we use server-fetched data immediately
+  const locationsFromInitialData = initialData?.locations || [];
+  const hasInitialLocations = locationsFromInitialData.length > 0;
+  
+  const { data: locationsFromQuery, error: locationsError, isLoading: locationsLoading } = useQuery({
+    queryKey: ["locations"],
+    queryFn: getLocations,
+    enabled: !hasInitialLocations, // Only fetch if we don't have initial data
+    initialData: locationsFromInitialData,
+    placeholderData: locationsFromInitialData,
+    staleTime: 60 * 60 * 1000, // 60 minutes
+    retry: 1, // Only retry once if it fails
+  });
+  
+  // Use initialData if available, otherwise use query data
+  const locations = hasInitialLocations ? locationsFromInitialData : (locationsFromQuery || []);
+
+
+  // Lazy loading hook for products
+  const lazyProducts = useLazyCategoryProducts({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    filters: {
+      locationId: selectedLocation,
+    },
+  });
+
+  // Clear cache and refetch when year, month, or location changes
+  useEffect(() => {
+    console.log('[ProductsClient] Filters changed:', {
+      selectedYear,
+      selectedMonth,
+      selectedLocation,
+      dateRange,
+    });
+    const { clearCache } = lazyProducts;
+    clearCache();
+    // Collapse all categories when filters change
+    setExpandedCategories(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, selectedMonth, selectedLocation, dateRange.startDate, dateRange.endDate]);
+
   // Debounce search query (300ms delay)
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-
-  // Load menus
-  useEffect(() => {
-    const loadMenus = async () => {
-      try {
-        const response = await fetch('/api/menus?activeOnly=true');
-        const data = await response.json();
-        if (data.success) {
-          setMenus(data.menus);
-        }
-      } catch (error) {
-        console.error('Error loading menus:', error);
-      }
-    };
-    loadMenus();
-  }, []);
 
   // Convert metadata to category-like structure for filtering
   const allCategories = useMemo(() => {
@@ -178,6 +336,53 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
       }));
   }, [categoriesMetadata]);
 
+  // Category search options for autocomplete
+  const categorySearchOptions = useMemo<AutocompleteOption[]>(() => {
+    return allCategories.map((cat) => ({
+      value: cat.categoryName,
+      label: cat.categoryName,
+      category: cat,
+    }));
+  }, [allCategories]);
+
+  // Load menus
+  useEffect(() => {
+    const loadMenus = async () => {
+      try {
+        const response = await fetch('/api/menus?activeOnly=true');
+        const data = await response.json();
+        if (data.success) {
+          setMenus(data.menus);
+        }
+      } catch (error) {
+        console.error('Error loading menus:', error);
+      }
+    };
+    loadMenus();
+  }, []);
+
+  // Helper to get main category from metadata or fallback to mapping
+  const getMainCategoryFromMetadata = useCallback((category: typeof allCategories[0]): "Bar" | "Keuken" | "Other" => {
+    // Use mainCategoryName from metadata if available
+    if (category.mainCategoryName) {
+      const mainCat = category.mainCategoryName.trim();
+      // Normalize: check case-insensitive and handle variations
+      const lowerMainCat = mainCat.toLowerCase();
+      if (lowerMainCat === "bar" || lowerMainCat === "drank" || lowerMainCat === "dranken") {
+        return "Bar";
+      }
+      if (lowerMainCat === "keuken" || lowerMainCat === "kitchen" || lowerMainCat === "eten" || lowerMainCat === "food" || lowerMainCat === "gerecht" || lowerMainCat === "gerechten") {
+        return "Keuken";
+      }
+      // If it's a valid main category name, use it
+      if (mainCat === "Bar" || mainCat === "Keuken") {
+        return mainCat;
+      }
+    }
+    // Fallback to intelligent mapping based on category name
+    return getMainCategory(category.categoryName);
+  }, []);
+
   // Group categories by main category
   const groupedCategories = useMemo(() => {
     const grouped: Record<"Bar" | "Keuken" | "Other", typeof allCategories> = {
@@ -187,38 +392,66 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
     };
     
     for (const category of allCategories) {
-      const mainCat = getMainCategory(category.categoryName);
+      const mainCat = getMainCategoryFromMetadata(category);
       grouped[mainCat].push(category);
     }
     
     return grouped;
-  }, [allCategories]);
+  }, [allCategories, getMainCategoryFromMetadata]);
 
   // ✅ CLIENT-SIDE FILTERING (no API calls)
   const filteredCategories = useMemo(() => {
+    console.log('[ProductsClient] Filtering categories with:', {
+      allCategoriesCount: allCategories.length,
+      selectedMainCategory,
+      selectedSubCategory,
+      searchQuery: debouncedSearchQuery,
+    });
+    
     let categories = allCategories;
     
     // Main category filter
     if (selectedMainCategory !== "all") {
-      categories = groupedCategories[selectedMainCategory];
+      categories = groupedCategories[selectedMainCategory] || [];
+      console.log('[ProductsClient] After main category filter:', categories.length);
     }
     
     // Sub category filter
     if (selectedSubCategory !== "all") {
+      const beforeCount = categories.length;
       categories = categories.filter((cat) => cat.categoryName === selectedSubCategory);
+      console.log('[ProductsClient] After sub category filter:', { before: beforeCount, after: categories.length });
     }
     
-    // Search filter (on category name and product count)
+    // Search filter (on main category, sub category name, and product names)
+    // Note: Product name search happens in getCategoryWithProducts when products are loaded
+    // For now, we show categories that match main/sub category names
+    // Users can expand categories to see products that match the search query
     if (debouncedSearchQuery) {
+      const beforeCount = categories.length;
       const query = debouncedSearchQuery.toLowerCase();
-      categories = categories.filter((cat) =>
-        cat.categoryName.toLowerCase().includes(query)
-      );
+      categories = categories.filter((cat) => {
+        // Search in sub category name (e.g., "Tap Bier", "Lunch")
+        if (cat.categoryName.toLowerCase().includes(query)) {
+          return true;
+        }
+        // Search in main category name (e.g., "Bar", "Keuken", "Other")
+        const mainCat = getMainCategoryFromMetadata(cat);
+        if (mainCat.toLowerCase().includes(query)) {
+          return true;
+        }
+        // Note: Product name search happens in getCategoryWithProducts
+        // We don't filter out categories here if only products match,
+        // because products are lazy-loaded and we can't check them at this stage
+        return false;
+      });
+      console.log('[ProductsClient] After search filter:', { before: beforeCount, after: categories.length, query });
     }
     
     // Workload/MEP/Active filters will be applied when products are loaded
     // (we can't filter by product properties until products are loaded)
     
+    console.log('[ProductsClient] Final filtered categories:', categories.length);
     return categories;
   }, [allCategories, groupedCategories, selectedMainCategory, selectedSubCategory, debouncedSearchQuery]);
 
@@ -235,25 +468,47 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
 
   // Location options
   const locationOptions = useMemo(() => {
-    const validLocations = locations.filter(
-      (loc: any) => loc && loc.id && loc.id.trim() !== '' && loc.name && loc.name.trim() !== ''
-    ).filter(
-      (loc: any) => 
-        loc.name !== "All HNHG Locations" && 
-        loc.name !== "All HNG Locations" &&
-        loc.name !== "Default Location"
-    );
-    return [
+    if (!locations || locations.length === 0) {
+      return [{ value: "all", label: "All Locations" }];
+    }
+    
+    // First pass: filter out invalid locations
+    const validLocations = locations.filter((loc: any) => {
+      if (!loc) return false;
+      
+      // Check if location has id (can be string or number)
+      const hasId = loc.id !== null && loc.id !== undefined && loc.id !== '';
+      if (!hasId) return false;
+      
+      // Check if location has name
+      const hasName = loc.name !== null && loc.name !== undefined && String(loc.name).trim() !== '';
+      if (!hasName) return false;
+      
+      return true;
+    });
+    
+    // Second pass: filter out aggregate/system locations
+    const filteredLocations = validLocations.filter((loc: any) => {
+      const name = String(loc.name).trim();
+      return (
+        name !== "All HNHG Locations" && 
+        name !== "All HNG Locations" &&
+        name !== "Default Location"
+      );
+    });
+    
+    // Build options array
+    const options = [
       { value: "all", label: "All Locations" },
-      ...validLocations.map((loc: any) => ({ value: loc.id, label: loc.name })),
+      ...filteredLocations.map((loc: any) => ({
+        value: String(loc.id).trim(),
+        label: String(loc.name).trim(),
+      })),
     ];
+    
+    return options;
   }, [locations]);
 
-  // Year options
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-  }, []);
 
   // Toggle category expansion with lazy loading
   const toggleCategory = useCallback(async (categoryName: string) => {
@@ -320,6 +575,18 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
     // Filter products client-side
     let products = categoryData.products || [];
 
+    // ✅ For Uncategorized, skip ALL filters - show all products immediately
+    if (categoryMetadata.categoryName === 'Uncategorized') {
+      return {
+        ...categoryMetadata,
+        products, // Show all products without any filtering
+        daily: categoryData.daily || { quantity: 0, revenueExVat: 0, revenueIncVat: 0, transactionCount: 0 },
+        weekly: categoryData.weekly || { quantity: 0, revenueExVat: 0, revenueIncVat: 0, transactionCount: 0 },
+        monthly: categoryData.monthly || { quantity: 0, revenueExVat: 0, revenueIncVat: 0, transactionCount: 0 },
+        total: categoryData.total || categoryMetadata.total,
+      };
+    }
+
     // Menu filter
     if (selectedMenu !== "all") {
       const menu = menus.find((m) => m._id === selectedMenu);
@@ -330,32 +597,55 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
       }
     }
 
-    // Search filter (on product names)
+    // Search filter (on product names) - searches Main Category, Sub Category, and Product names
     if (debouncedSearchQuery) {
       const query = debouncedSearchQuery.toLowerCase();
-      products = products.filter((prod) =>
+      // Check if category matches (main or sub)
+      const mainCat = getMainCategoryFromMetadata(categoryMetadata);
+      const categoryMatches = 
+        categoryMetadata.categoryName.toLowerCase().includes(query) ||
+        mainCat.toLowerCase().includes(query);
+      
+      // Filter products by name
+      const matchingProducts = products.filter((prod) =>
         prod.productName.toLowerCase().includes(query)
       );
+      
+      // If category matches OR has matching products, show all products (category is already shown)
+      // If only products match, show only matching products
+      if (categoryMatches) {
+        // Category matches - show all products (category filter already handled this)
+        products = products;
+      } else {
+        // Only product names match - show only matching products
+        products = matchingProducts;
+      }
     }
 
     // Workload Level filter
+    // Note: Only filter if workloadLevel is set - don't exclude products without workloadLevel
     if (selectedWorkloadLevel !== "all") {
       products = products.filter((prod) =>
-        prod.workloadLevel === selectedWorkloadLevel
+        prod.workloadLevel === selectedWorkloadLevel || !prod.workloadLevel
       );
     }
 
     // MEP Level filter
+    // Note: Only filter if mepLevel is set - don't exclude products without mepLevel
     if (selectedMEPLevel !== "all") {
       products = products.filter((prod) =>
-        prod.mepLevel === selectedMEPLevel
+        prod.mepLevel === selectedMEPLevel || !prod.mepLevel
       );
     }
 
-    // Active Only filter
-    if (showActiveOnly) {
-      products = products.filter((prod) => prod.isActive === true);
+    // Active filter
+    // Note: Handle null/undefined isActive values - treat them as "active" for display purposes
+    if (activeFilter === "active") {
+      products = products.filter((prod) => prod.isActive === true || prod.isActive === null || prod.isActive === undefined);
+    } else if (activeFilter === "inactive") {
+      products = products.filter((prod) => prod.isActive === false);
     }
+    // "all" shows both active, inactive, and null/undefined
 
     return {
       ...categoryMetadata,
@@ -365,7 +655,7 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
       monthly: categoryData.monthly || { quantity: 0, revenueExVat: 0, revenueIncVat: 0, transactionCount: 0 },
       total: categoryData.total || categoryMetadata.total,
     };
-  }, [expandedCategories, lazyProducts, selectedMenu, menus, debouncedSearchQuery, selectedWorkloadLevel, selectedMEPLevel, showActiveOnly]);
+  }, [expandedCategories, lazyProducts, selectedMenu, menus, debouncedSearchQuery, selectedWorkloadLevel, selectedMEPLevel, activeFilter]);
 
   // Handle workload update
   const handleUpdateWorkload = useCallback(async (
@@ -490,10 +780,89 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
     alert(`Updated course type to ${courseType} for all products in ${category.categoryName}`);
   }, [handleUpdateCourseType]);
 
-  if (!categoriesMetadata?.success) {
+  // Handle category assignment (for Uncategorized products)
+  const handleUpdateCategory = useCallback(async (
+    productName: string,
+    category: string
+  ) => {
+    try {
+      // Update product category via API
+      const response = await fetch('/api/products/update-category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName,
+          category,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update category');
+      }
+
+      // Refresh the page data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error updating category:', error);
+      alert(`Failed to update category: ${error.message}`);
+    }
+  }, []);
+
+  // Handle location assignment (for Uncategorized products)
+  const handleUpdateLocation = useCallback(async (
+    productName: string,
+    locationId: string
+  ) => {
+    try {
+      // Update product location via API
+      const response = await fetch('/api/products/update-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName,
+          locationId: locationId === 'all' ? null : locationId,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update location');
+      }
+
+      // Refresh the page data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error updating location:', error);
+      alert(`Failed to update location: ${error.message}`);
+    }
+  }, []);
+
+  // Get all available categories for dropdown (excluding Uncategorized)
+  const availableCategories = useMemo(() => {
+    return allCategories
+      .filter(cat => cat.categoryName !== 'Uncategorized')
+      .map(cat => cat.categoryName)
+      .sort();
+  }, [allCategories]);
+
+  // Show loading state while fetching categories metadata
+  if (categoriesLoading && !categoriesMetadata) {
     return (
       <div className="container mx-auto py-6">
-        <ErrorState error={new Error('Failed to load categories metadata')} message="Failed to load product catalog" />
+        <LoadingState message="Loading product catalog..." />
+      </div>
+    );
+  }
+
+  // Show error state if categories metadata failed to load
+  if (categoriesError || !categoriesMetadata?.success) {
+    return (
+      <div className="container mx-auto py-6">
+        <ErrorState 
+          error={categoriesError || new Error(categoriesMetadata?.error || 'Failed to load categories metadata')} 
+          message="Failed to load product catalog" 
+        />
       </div>
     );
   }
@@ -511,56 +880,93 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
       )}
       
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-9 gap-4">
-            {/* Year Filter - TODO: Implement year selection */}
+      <div className="space-y-6">
+        {/* Year and Month Filters */}
+        <div className="space-y-4">
+          {/* Year Filter - Buttons */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Year</label>
-              <Select value={new Date().getFullYear().toString()} disabled>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
+            <span className="text-sm font-bold text-foreground">Year</span>
+            <div className="flex gap-2 flex-wrap">
+              {yearOptions.map((year) => {
+                const isActive = selectedYear === year;
+                return (
+                  <Button
+                    key={year}
+                    variant="outline"
+                    size="sm"
+                    className={`border rounded-sm ${
+                      isActive
+                        ? "bg-blue-500 border-blue-500 text-white"
+                        : "bg-white border-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
+                    }`}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setSelectedMonth(null); // Clear month when changing year
+                    }}
+                  >
                       {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  </Button>
+                );
+              })}
+            </div>
             </div>
             
-            {/* Location Filter - TODO: Implement location filtering */}
+          {/* Month Filter - Buttons */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Location</label>
-              <Select value="all" disabled>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {locationOptions
-                    .filter(option => option.value && option.value.trim() !== '')
-                    .map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+            <span className="text-sm font-bold text-foreground">Month</span>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                className={`border rounded-sm ${
+                  selectedMonth === null
+                    ? "bg-blue-500 border-blue-500 text-white"
+                    : "bg-white border-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
+                }`}
+                onClick={() => setSelectedMonth(null)}
+              >
+                All Months
+              </Button>
+              {MONTHS.map((month) => {
+                const isActive = selectedMonth === month.value;
+                return (
+                  <Button
+                    key={month.value}
+                    variant="outline"
+                    size="sm"
+                    className={`border rounded-sm ${
+                      isActive
+                        ? "bg-blue-500 border-blue-500 text-white"
+                        : "bg-white border-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
+                    }`}
+                    onClick={() => setSelectedMonth(month.value)}
+                  >
+                    {month.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
             </div>
             
-            {/* Main Category Filter */}
+        {/* Location Filter - Buttons */}
+        <LocationFilterButtons
+          options={locationOptions}
+          selectedValue={selectedLocation}
+          onValueChange={setSelectedLocation}
+          label="Location"
+        />
+
+        {/* Other Filters - Grid Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Main Category Filter - Dropdown */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Main Category</label>
               <Select value={selectedMainCategory} onValueChange={(val) => {
                 setSelectedMainCategory(val as any);
                 setSelectedSubCategory("all");
               }}>
-                <SelectTrigger>
+              <SelectTrigger className="border rounded-sm bg-white border-black">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -572,11 +978,11 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
               </Select>
             </div>
             
-            {/* Sub Category Filter */}
+          {/* Sub Category Filter - Dropdown */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Sub Category</label>
               <Select value={selectedSubCategory} onValueChange={setSelectedSubCategory}>
-                <SelectTrigger>
+              <SelectTrigger className="border rounded-sm bg-white border-black">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -592,11 +998,11 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
               </Select>
             </div>
             
-            {/* Menu Filter */}
+          {/* Menu Filter - Dropdown */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Menu</label>
               <Select value={selectedMenu} onValueChange={setSelectedMenu}>
-                <SelectTrigger>
+                <SelectTrigger className="border rounded-sm bg-white border-black">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -612,25 +1018,22 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
               </Select>
             </div>
             
-            {/* Search */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
+          {/* Search - Input with Autocomplete */}
+          <AutocompleteSearch
+            options={categorySearchOptions}
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+            placeholder="Search products..."
+            label="Search"
+            emptyMessage="No products found."
+            className="space-y-2"
+          />
             
-            {/* Workload Level Filter */}
+          {/* Workload Level Filter - Dropdown */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Workload Level</label>
               <Select value={selectedWorkloadLevel} onValueChange={setSelectedWorkloadLevel}>
-                <SelectTrigger>
+              <SelectTrigger className="border rounded-sm bg-white border-black">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -642,11 +1045,11 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
               </Select>
             </div>
             
-            {/* MEP Level Filter */}
+          {/* MEP Level Filter - Dropdown */}
             <div className="space-y-2">
               <label className="text-sm font-medium">MEP Level</label>
               <Select value={selectedMEPLevel} onValueChange={setSelectedMEPLevel}>
-                <SelectTrigger>
+              <SelectTrigger className="border rounded-sm bg-white border-black">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -658,19 +1061,36 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
               </Select>
             </div>
             
-            {/* Active Only Toggle */}
-            <div className="space-y-2 flex items-end">
+          {/* Active Filter - Buttons */}
+          <div className="space-y-2">
+            <span className="text-sm font-bold text-foreground">Status</span>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: "active", label: "Active" },
+                { value: "all", label: "All" },
+                { value: "inactive", label: "Inactive" },
+              ].map((option) => {
+                const isActive = activeFilter === option.value;
+                return (
               <Button
-                variant={showActiveOnly ? "default" : "outline"}
-                onClick={() => setShowActiveOnly(!showActiveOnly)}
-                className="w-full"
-              >
-                {showActiveOnly ? "Active Only" : "Show All"}
+                    key={option.value}
+                    variant="outline"
+                    size="sm"
+                    className={`border rounded-sm ${
+                      isActive
+                        ? "bg-blue-500 border-blue-500 text-white"
+                        : "bg-white border-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
+                    }`}
+                    onClick={() => setActiveFilter(option.value as "active" | "all" | "inactive")}
+                  >
+                    {option.label}
               </Button>
+                );
+              })}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
       
       {/* Categories & Products */}
       <div className="space-y-4">
@@ -686,7 +1106,7 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
             .map((categoryMetadata, index) => {
               const isExpanded = expandedCategories.has(categoryMetadata.categoryName);
               const isLoading = loadingCategories.has(categoryMetadata.categoryName);
-              const mainCat = getMainCategory(categoryMetadata.categoryName);
+              const mainCat = getMainCategoryFromMetadata(categoryMetadata);
               const mainCatColor = mainCat === "Bar" ? "blue" : mainCat === "Keuken" ? "green" : "gray";
               
               const categoryKey = categoryMetadata.categoryName && categoryMetadata.categoryName.trim() !== '' 
@@ -716,30 +1136,132 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             )}
                           </div>
+                          {/* Hide totals for Uncategorized */}
+                          {category.categoryName !== 'Uncategorized' && (
                           <div className="text-sm text-muted-foreground">
                             Total: {formatNumber(category.total.quantity, 0, false)} items • {formatCurrency(category.total.revenueIncVat)}
                           </div>
+                          )}
                         </div>
                       </CardHeader>
                     </CollapsibleTrigger>
                     
                     <CollapsibleContent>
                       <CardContent className="space-y-4">
-                        {isLoading ? (
-                          <div className="py-8 text-center text-muted-foreground">
-                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                            Loading products...
+                        {/* ✅ Show different actions for Uncategorized vs regular categories */}
+                        {category.categoryName === 'Uncategorized' ? (
+                          /* Uncategorized: Show bulk assignment and reaggregate */
+                          <div className="space-y-3 pb-4 border-b">
+                            <div className="flex gap-2 flex-wrap items-center">
+                              <span className="text-sm font-medium">Bulk Actions:</span>
+                              <Select 
+                                onValueChange={async (selectedCategory) => {
+                                  if (!selectedCategory || selectedCategory === 'none') return;
+                                  if (!confirm(`Assign all ${category.products.length} products to category "${selectedCategory}"?`)) return;
+                                  
+                                  try {
+                                    const updates = category.products.map((product) =>
+                                      handleUpdateCategory(product.productName, selectedCategory)
+                                    );
+                                    await Promise.all(updates);
+                                    alert(`Assigned ${category.products.length} products to "${selectedCategory}"`);
+                                    window.location.reload();
+                                  } catch (error: any) {
+                                    console.error('Error bulk updating category:', error);
+                                    alert(`Failed to update: ${error.message}`);
+                                  }
+                                }}
+                                disabled={isLoading || category.products.length === 0}
+                              >
+                                <SelectTrigger className="w-48 border rounded-sm bg-white border-black">
+                                  <SelectValue placeholder="Assign All to Category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Select category...</SelectItem>
+                                  {availableCategories.map((cat) => (
+                                    <SelectItem key={cat} value={cat}>
+                                      {cat}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              
+                              <Select 
+                                onValueChange={async (selectedLocation) => {
+                                  if (!selectedLocation || selectedLocation === 'all') return;
+                                  if (!confirm(`Assign all ${category.products.length} products to location "${locationOptions.find(l => l.value === selectedLocation)?.label}"?`)) return;
+                                  
+                                  try {
+                                    const updates = category.products.map((product) =>
+                                      handleUpdateLocation(product.productName, selectedLocation)
+                                    );
+                                    await Promise.all(updates);
+                                    alert(`Assigned ${category.products.length} products to location`);
+                                    window.location.reload();
+                                  } catch (error: any) {
+                                    console.error('Error bulk updating location:', error);
+                                    alert(`Failed to update: ${error.message}`);
+                                  }
+                                }}
+                                disabled={isLoading || category.products.length === 0}
+                              >
+                                <SelectTrigger className="w-48 border rounded-sm bg-white border-black">
+                                  <SelectValue placeholder="Assign All to Location" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All Locations</SelectItem>
+                                  {locationOptions.filter(loc => loc.value !== 'all').map((loc) => (
+                                    <SelectItem key={loc.value} value={loc.value}>
+                                      {loc.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                           </div>
-                        ) : category.products.length === 0 ? (
-                          <div className="py-8 text-center text-muted-foreground">
-                            No products found matching your filters.
+                            
+                            <div className="flex gap-2 flex-wrap items-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  if (!confirm(`Re-process raw data to update categories for ${category.products.length} uncategorized products? This will only update uncategorized products, not all products.`)) return;
+                                  
+                                  try {
+                                    const response = await fetch('/api/products/reaggregate-uncategorized', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                    });
+                                    const result = await response.json();
+                                    if (result.success) {
+                                      alert(`Reaggregation complete: ${result.updated} products updated${result.errors ? ` (${result.errors.length} errors)` : ''}`);
+                                      // Refresh the page data
+                                      window.location.reload();
+                                    } else {
+                                      throw new Error(result.error || 'Reaggregation failed');
+                                    }
+                                  } catch (error: any) {
+                                    console.error('Error reaggregating products:', error);
+                                    alert(`Failed to reaggregate: ${error.message}`);
+                                  }
+                                }}
+                                disabled={loadingCategories.has(category.categoryName)}
+                              >
+                                <Loader2 className={`h-4 w-4 mr-2 ${loadingCategories.has(category.categoryName) ? 'animate-spin' : ''}`} />
+                                Reaggregate Uncategorized
+                              </Button>
+                              <span className="text-xs text-muted-foreground">
+                                Re-process raw data to update categories for uncategorized products only
+                              </span>
+                            </div>
                           </div>
                         ) : (
-                          <>
-                            {/* Bulk Actions */}
+                          /* Regular categories: Show bulk actions */
                             <div className="flex gap-2 pb-4 border-b">
                               <span className="text-sm font-medium self-center">Bulk Actions:</span>
-                              <Select onValueChange={(val) => handleBulkUpdateWorkload(category, val as any)}>
+                            <Select 
+                              onValueChange={(val) => handleBulkUpdateWorkload(category, val as any)}
+                              disabled={isLoading}
+                            >
                                 <SelectTrigger className="w-40">
                                   <SelectValue placeholder="Set All Workload" />
                                 </SelectTrigger>
@@ -750,7 +1272,10 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
                                 </SelectContent>
                               </Select>
                               
-                              <Select onValueChange={(val) => handleBulkUpdateMEP(category, val as any)}>
+                            <Select 
+                              onValueChange={(val) => handleBulkUpdateMEP(category, val as any)}
+                              disabled={isLoading}
+                            >
                                 <SelectTrigger className="w-40">
                                   <SelectValue placeholder="Set All MEP" />
                                 </SelectTrigger>
@@ -761,7 +1286,10 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
                                 </SelectContent>
                               </Select>
                               
-                              <Select onValueChange={(val) => handleBulkUpdateCourseType(category, val as any)}>
+                            <Select 
+                              onValueChange={(val) => handleBulkUpdateCourseType(category, val as any)}
+                              disabled={isLoading}
+                            >
                                 <SelectTrigger className="w-48">
                                   <SelectValue placeholder="Set All Course Type" />
                                 </SelectTrigger>
@@ -774,17 +1302,53 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
                                 </SelectContent>
                               </Select>
                             </div>
+                        )}
+
+                        {/* ✅ Show loading message while data is being fetched */}
+                        {isLoading ? (
+                          <div className="py-8 text-center text-muted-foreground">
+                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                            <p>Loading the data, one moment.</p>
+                          </div>
+                        ) : category.products.length === 0 ? (
+                          <div className="py-8 text-center text-muted-foreground">
+                            <p>No products found matching your filters.</p>
+                            {categoryMetadata.productCount > 0 && (
+                              <p className="text-xs mt-2">
+                                Note: {categoryMetadata.productCount} products exist in this category, but none match the current filters.
+                                Try adjusting your filters (Status, Workload Level, MEP Level, Menu, or Search).
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
                             
                             {/* Products Table */}
                             <div className="space-y-2">
                               {/* Header */}
-                              <div className="grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground pb-2 border-b">
+                              <div className={`grid gap-4 text-sm font-medium text-muted-foreground pb-2 border-b ${
+                                category.categoryName === 'Uncategorized' 
+                                  ? 'grid-cols-12' 
+                                  : 'grid-cols-12'
+                              }`}>
                                 <div className="col-span-3">Product Name</div>
+                                {category.categoryName === 'Uncategorized' ? (
+                                  <>
+                                    <div className="col-span-2">Assign Category</div>
+                                    <div className="col-span-2">Assign Location</div>
+                                    <div className="col-span-2">Workload</div>
+                                    <div className="col-span-2">MEP Time</div>
+                                    <div className="col-span-1">Course Type</div>
+                                  </>
+                                ) : (
+                                  <>
                                 <div className="col-span-1 text-right">Quantity</div>
                                 <div className="col-span-2 text-right">Revenue (Inc VAT)</div>
                                 <div className="col-span-2">Workload</div>
                                 <div className="col-span-2">MEP Time</div>
                                 <div className="col-span-2">Course Type</div>
+                                  </>
+                                )}
                               </div>
                               
                               {/* Product Rows */}
@@ -800,9 +1364,14 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
                                       key={productKey}
                                       product={product}
                                       categoryName={category.categoryName}
+                                      isUncategorized={category.categoryName === 'Uncategorized'}
+                                      availableCategories={availableCategories}
+                                      locationOptions={locationOptions}
                                       onUpdateWorkload={handleUpdateWorkload}
                                       onUpdateMEP={handleUpdateMEP}
                                       onUpdateCourseType={handleUpdateCourseType}
+                                      onUpdateCategory={handleUpdateCategory}
+                                      onUpdateLocation={handleUpdateLocation}
                                     />
                                   );
                                 })}
@@ -825,15 +1394,25 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
 const ProductRow = React.memo(({
   product,
   categoryName,
+  isUncategorized = false,
+  availableCategories = [],
+  locationOptions = [],
   onUpdateWorkload,
   onUpdateMEP,
   onUpdateCourseType,
+  onUpdateCategory,
+  onUpdateLocation,
 }: {
   product: ProductAggregate;
   categoryName: string;
+  isUncategorized?: boolean;
+  availableCategories?: string[];
+  locationOptions?: Array<{ value: string; label: string }>;
   onUpdateWorkload: (productName: string, level: 'low' | 'mid' | 'high', minutes: number) => void;
   onUpdateMEP: (productName: string, level: 'low' | 'mid' | 'high', minutes: number) => void;
   onUpdateCourseType: (productName: string, courseType: CourseType | null) => void;
+  onUpdateCategory?: (productName: string, category: string) => void;
+  onUpdateLocation?: (productName: string, locationId: string) => void;
 }) => {
   const handleWorkloadChange = useCallback((val: string) => {
     const level = val as 'low' | 'mid' | 'high';
@@ -851,9 +1430,118 @@ const ProductRow = React.memo(({
     onUpdateCourseType(product.productName, val === "none" ? null : val as CourseType);
   }, [product.productName, onUpdateCourseType]);
 
+  const handleCategoryChange = useCallback((val: string) => {
+    if (onUpdateCategory && val) {
+      onUpdateCategory(product.productName, val);
+    }
+  }, [product.productName, onUpdateCategory]);
+
+  const handleLocationChange = useCallback((val: string) => {
+    if (onUpdateLocation) {
+      onUpdateLocation(product.productName, val);
+    }
+  }, [product.productName, onUpdateLocation]);
+
   return (
     <div className="grid grid-cols-12 gap-4 items-center py-2 hover:bg-gray-50">
       <div className="col-span-3 font-medium">{product.productName}</div>
+      
+      {isUncategorized ? (
+        <>
+          {/* Category Assignment */}
+          <div className="col-span-2">
+            <Select
+              value=""
+              onValueChange={handleCategoryChange}
+            >
+              <SelectTrigger className="h-8 border rounded-sm bg-white border-black">
+                <SelectValue placeholder="Select category..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Location Assignment */}
+          <div className="col-span-2">
+            <Select
+              value=""
+              onValueChange={handleLocationChange}
+            >
+              <SelectTrigger className="h-8 border rounded-sm bg-white border-black">
+                <SelectValue placeholder="Select location..." />
+              </SelectTrigger>
+              <SelectContent>
+                {locationOptions.map((loc) => (
+                  <SelectItem key={loc.value} value={loc.value}>
+                    {loc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Workload Select */}
+          <div className="col-span-2">
+            <Select
+              value={product.workloadLevel || 'mid'}
+              onValueChange={handleWorkloadChange}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="mid">Mid</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* MEP Select */}
+          <div className="col-span-2">
+            <Select
+              value={product.mepLevel || 'low'}
+              onValueChange={handleMEPChange}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low (1m)</SelectItem>
+                <SelectItem value="mid">Mid (2m)</SelectItem>
+                <SelectItem value="high">High (4m)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Course Type Select */}
+          <div className="col-span-1">
+            <Select
+              value={product.courseType && product.courseType.trim() !== "" ? product.courseType : "none"}
+              onValueChange={handleCourseTypeChange}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {courseTypeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      ) : (
+        <>
       <div className="col-span-1 text-right">{formatNumber(product.total.quantity, 0, false)}</div>
       <div className="col-span-2 text-right">{formatCurrency(product.total.revenueIncVat)}</div>
       
@@ -910,6 +1598,8 @@ const ProductRow = React.memo(({
           </SelectContent>
         </Select>
       </div>
+        </>
+      )}
     </div>
   );
 }, (prev, next) => {
@@ -921,7 +1611,10 @@ const ProductRow = React.memo(({
     prev.product.courseType === next.product.courseType &&
     prev.product.total.quantity === next.product.total.quantity &&
     prev.product.total.revenueIncVat === next.product.total.revenueIncVat &&
-    prev.categoryName === next.categoryName
+    prev.categoryName === next.categoryName &&
+    prev.isUncategorized === next.isUncategorized &&
+    prev.availableCategories.length === next.availableCategories.length &&
+    prev.locationOptions.length === next.locationOptions.length
   );
 });
 

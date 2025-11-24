@@ -2,7 +2,7 @@
  * Workers V2 View Layer (Merged with Locations-Teams functionality)
  * Pure presentational component - all business logic is in ViewModel
  * Uses GraphQL for data operations
- * Features: CRUD operations, Tabs (All, Active, Inactive, No Team, Duplicates, Ghost), Team filter
+ * Features: CRUD operations, Tabs (All, Active, Inactive, No Team, Duplicates, Ghost, Missing Wage), Team filter
  */
 
 "use client";
@@ -23,8 +23,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkersV2ViewModel } from "@/viewmodels/workforce/useWorkersV2ViewModel";
 import { WorkerProfile } from "@/models/workforce/workers-v2.model";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
-import { Edit, Trash2, Save, X, Users, UserCheck, UserX, Copy, Ghost as GhostIcon, Search } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Edit, Trash2, Save, X, Users, UserCheck, UserX, Copy, Ghost as GhostIcon, AlertCircle } from "lucide-react";
+import { AutocompleteSearch, AutocompleteOption } from "@/components/view-data/AutocompleteSearch";
+import { ClickableWorkerName } from "@/components/workforce/ClickableWorkerName";
 
 export default function WorkersV2Page() {
   const viewModel = useWorkersV2ViewModel();
@@ -33,6 +34,7 @@ export default function WorkersV2Page() {
   const [activeTab, setActiveTab] = useState<string>("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [workerSearch, setWorkerSearch] = useState<string>("");
+  const [workerEditSearch, setWorkerEditSearch] = useState<string>("");
 
   // Get all unique teams from workers data
   const allTeams = useMemo(() => {
@@ -83,6 +85,17 @@ export default function WorkersV2Page() {
     });
     return options;
   }, [allTeams]);
+
+  // Worker search options for autocomplete
+  const workerSearchOptions = useMemo<AutocompleteOption[]>(() => {
+    if (!viewModel.sortedRecords) return [];
+    return viewModel.sortedRecords.map((w: WorkerProfile) => ({
+      value: w.userName || `User ${w.eitjeUserId}`,
+      label: w.userName || `User ${w.eitjeUserId}`,
+      eitjeUserId: w.eitjeUserId,
+      id: w.id,
+    }));
+  }, [viewModel.sortedRecords]);
 
   // Filter workers based on active tab, team filter, and search
   const filteredWorkers = useMemo(() => {
@@ -150,6 +163,13 @@ export default function WorkersV2Page() {
           return !hasTeams && !w.teamName;
         });
         break;
+      
+      case "missing-wage":
+        // Workers with missing hourly wage
+        workers = workers.filter((w: WorkerProfile) => {
+          return !w.hourlyWage || w.hourlyWage === 0;
+        });
+        break;
     }
     
     // Apply team filter
@@ -167,7 +187,7 @@ export default function WorkersV2Page() {
 
   // Count workers for each tab
   const tabCounts = useMemo(() => {
-    if (!viewModel.sortedRecords) return { all: 0, active: 0, inactive: 0, noTeam: 0, ghost: 0 };
+    if (!viewModel.sortedRecords) return { all: 0, active: 0, inactive: 0, noTeam: 0, ghost: 0, missingWage: 0 };
     
     const all = viewModel.sortedRecords.length;
     const active = viewModel.sortedRecords.filter((w: WorkerProfile) => {
@@ -182,8 +202,11 @@ export default function WorkersV2Page() {
       return !hasTeams && !w.teamName;
     }).length;
     const ghost = noTeam; // Same as no-team for now
+    const missingWage = viewModel.sortedRecords.filter((w: WorkerProfile) => {
+      return !w.hourlyWage || w.hourlyWage === 0;
+    }).length;
     
-    return { all, active, inactive, noTeam, ghost };
+    return { all, active, inactive, noTeam, ghost, missingWage };
   }, [viewModel.sortedRecords]);
 
   return (
@@ -216,17 +239,30 @@ export default function WorkersV2Page() {
 
         {/* Filters Row */}
         <div className="flex gap-6 flex-wrap items-end">
-          {/* Worker Search */}
-          <div className="flex flex-col gap-2 min-w-[250px]">
-            <label className="text-sm font-medium">Search Worker</label>
-            <Input
-              type="text"
-              placeholder="Type worker name or ID..."
-              value={workerSearch}
-              onChange={(e) => setWorkerSearch(e.target.value)}
-              className="w-full"
-            />
-          </div>
+          {/* Worker Search with Autocomplete */}
+          <AutocompleteSearch
+            options={workerSearchOptions}
+            value={workerSearch}
+            onValueChange={setWorkerSearch}
+            placeholder="Search worker..."
+            label="Search Worker"
+            emptyMessage="No workers found."
+            filterFn={(option, search) => {
+              const searchLower = search.toLowerCase();
+              const name = option.label.toLowerCase();
+              const eitjeId = String(option.eitjeUserId || '').toLowerCase();
+              return name.includes(searchLower) || eitjeId.includes(searchLower);
+            }}
+            renderOption={(option) => (
+              <div>
+                <div className="font-medium">{option.label}</div>
+                {option.eitjeUserId && (
+                  <div className="text-xs text-muted-foreground">ID: {option.eitjeUserId}</div>
+                )}
+              </div>
+            )}
+            className="min-w-[250px]"
+          />
           
           {/* Team Filter */}
           <LocationFilterButtons
@@ -253,7 +289,7 @@ export default function WorkersV2Page() {
 
         {/* Tabs for Worker Categories */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="all" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               All Workers
@@ -283,6 +319,11 @@ export default function WorkersV2Page() {
               Ghost
               <Badge variant="secondary" className="ml-1">{tabCounts.ghost}</Badge>
             </TabsTrigger>
+            <TabsTrigger value="missing-wage" className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Missing Wage
+              <Badge variant="secondary" className="ml-1">{tabCounts.missingWage}</Badge>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-6 space-y-4">
@@ -300,12 +341,17 @@ export default function WorkersV2Page() {
               </div>
             </div>
             
-            {/* Worker Search Dropdown */}
+            {/* Worker Search Dropdown for Quick Edit */}
             <div className="w-[300px]">
-              <Select
-                value={workerSearch}
+              <AutocompleteSearch
+                options={filteredWorkers.map((w: WorkerProfile) => ({
+                  value: w.id,
+                  label: `${w.userName || `User ${w.eitjeUserId}`} - ${w.locationName || "No Location"}`,
+                  id: w.id,
+                }))}
+                value={workerEditSearch}
                 onValueChange={(value) => {
-                  setWorkerSearch(value);
+                  setWorkerEditSearch(value);
                   if (value) {
                     // Find the worker and start editing
                     const worker = filteredWorkers.find((w: WorkerProfile) => w.id === value);
@@ -318,24 +364,15 @@ export default function WorkersV2Page() {
                           rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
                       }, 100);
+                      // Clear the search after selection
+                      setWorkerEditSearch("");
                     }
                   }
                 }}
-              >
-                <SelectTrigger>
-                  <div className="flex items-center gap-2">
-                    <Search className="h-4 w-4" />
-                    <SelectValue placeholder="Search worker..." />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {filteredWorkers.map((worker: WorkerProfile) => (
-                    <SelectItem key={worker.id} value={worker.id}>
-                      {worker.userName || `User ${worker.eitjeUserId}`} - {worker.locationName || "No Location"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Search worker to edit..."
+                emptyMessage="No workers found."
+                className="min-w-[300px]"
+              />
             </div>
         </div>
 
@@ -773,7 +810,9 @@ export default function WorkersV2Page() {
                             </TableCell>
                           )}
                           
-                          <TableCell>{record.userName || `User ${record.eitjeUserId}`}</TableCell>
+                          <TableCell>
+                            <ClickableWorkerName worker={record} />
+                          </TableCell>
                           <TableCell>{record.locationName || record.locationId || "-"}</TableCell>
                           <TableCell>
                             {record.teams && Array.isArray(record.teams) && record.teams.length > 0 ? (

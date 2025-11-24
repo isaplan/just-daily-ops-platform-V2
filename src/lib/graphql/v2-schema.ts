@@ -234,6 +234,8 @@ export const typeDefs = `#graphql
     teams: [TeamMembership!]
     locationId: String
     locationName: String
+    locationIds: [String!]
+    locationNames: [String!]
     contractType: String
     contractHours: Float
     hourlyWage: Float
@@ -258,6 +260,7 @@ export const typeDefs = `#graphql
   input WorkerProfileInput {
     eitjeUserId: Int!
     locationId: String
+    locationIds: [String!]
     contractType: String
     contractHours: Float
     hourlyWage: Float
@@ -466,6 +469,7 @@ export const typeDefs = `#graphql
     locationId: String
     category: String
     productName: String
+    waiterName: String
   }
 
   input CategoriesProductsFilters {
@@ -872,6 +876,7 @@ export const typeDefs = `#graphql
     ): WorkerProfilesResponse!
     
     workerProfile(id: ID!): WorkerProfile
+    workerProfileByName(userName: String!): WorkerProfile
     
     # API Credentials
     apiCredentials(provider: String, locationId: ID): [ApiCredential!]!

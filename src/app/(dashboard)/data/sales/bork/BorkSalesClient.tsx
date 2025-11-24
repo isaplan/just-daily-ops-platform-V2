@@ -22,6 +22,7 @@ import { Ban, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 // Helper to format time string (HH:MM or HH:MM:SS format)
 // Converts UTC time to Amsterdam timezone (UTC+1, currently CET)
@@ -141,6 +142,25 @@ export function BorkSalesClient({ initialData }: BorkSalesClientProps) {
   const viewModel = useBorkSalesV2ViewModel(initialData);
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from sales data
+  const salesTotals = viewModel.salesData?.records ? (() => {
+    const records = viewModel.salesData.records;
+    const totalRevenue = records.reduce((sum, r) => {
+      const revenue = r.price_inc_vat ? Number(r.price_inc_vat) * (r.quantity || 0) : 0;
+      return sum + (isCancelled(r) ? 0 : revenue); // Exclude cancelled items
+    }, 0);
+    const totalQuantity = records.reduce((sum, r) => sum + (isCancelled(r) ? 0 : Math.abs(r.quantity || 0)), 0);
+    const totalTransactions = new Set(records.filter(r => !isCancelled(r)).map(r => r.ticket_key)).size;
+    const avgTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+    
+    return {
+      totalRevenue,
+      totalQuantity,
+      totalTransactions,
+      avgTransactionValue,
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -306,6 +326,19 @@ export function BorkSalesClient({ initialData }: BorkSalesClientProps) {
             )}
           </TableBody>
         </UITable>
+
+        {/* Sales Totals Summary */}
+        {salesTotals && (
+          <AggregatedCostsSummary
+            title="Summary"
+            metrics={[
+              { label: "Total Revenue", value: salesTotals.totalRevenue, format: "currency" },
+              { label: "Total Quantity", value: salesTotals.totalQuantity, format: "number", decimals: 0 },
+              { label: "Total Transactions", value: salesTotals.totalTransactions, format: "number", decimals: 0 },
+              { label: "Avg Transaction Value", value: salesTotals.avgTransactionValue, format: "currency" },
+            ]}
+          />
+        )}
 
         {/* Pagination */}
         <SimplePagination

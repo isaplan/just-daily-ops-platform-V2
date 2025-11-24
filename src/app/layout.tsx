@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToasterProvider } from "@/components/toaster-provider";
 import { QueryProvider } from "@/components/providers/query-client-provider";
+import { WorkerProfileSheetProviderWithSheet } from "@/components/providers/worker-profile-sheet-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,8 +33,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         <QueryProvider>
-          {children}
-          <ToasterProvider />
+          <WorkerProfileSheetProviderWithSheet>
+            {children}
+            <ToasterProvider />
+          </WorkerProfileSheetProviderWithSheet>
         </QueryProvider>
       </body>
     </html>

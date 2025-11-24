@@ -43,7 +43,12 @@ export function useLazyCategoryProducts({ startDate, endDate, filters }: UseLazy
       // Cache with React Query (30 minute stale time)
       queryClient.setQueryData(queryKey, categoryData);
       return categoryData;
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore AbortError - expected when requests are cancelled (e.g., by React Query)
+      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+        // Return null - the request was cancelled, which is fine
+        return null;
+      }
       console.error(`Error loading products for category ${categoryName}:`, error);
       return null;
     }
@@ -73,8 +78,13 @@ export function useLazyCategoryProducts({ startDate, endDate, filters }: UseLazy
               productName: filters?.productName,
             }),
             staleTime: 30 * 60 * 1000, // 30 minutes
-          }).catch(() => {
+          }).catch((error: any) => {
             // Silently fail - prefetch is best effort
+            // Ignore AbortError - expected when requests are cancelled
+            if (error?.name !== 'AbortError' && !error?.message?.includes('aborted')) {
+              // Only log non-abort errors
+              console.debug(`Prefetch cancelled for ${categoryName}`);
+            }
           });
         }
       });

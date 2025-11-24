@@ -14,11 +14,31 @@ import { UITable } from "@/components/view-data/UITable";
 import { useTimeBasedAnalysisViewModel } from "@/viewmodels/sales/useTimeBasedAnalysisViewModel";
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
 
 export default function TimeBasedAnalysisPage() {
   const viewModel = useTimeBasedAnalysisViewModel();
   const pathname = usePathname();
   const pageMetadata = getBreadcrumb(pathname);
+
+  // Calculate totals from time data
+  const timeTotals = viewModel.timeData ? (() => {
+    const data = viewModel.timeData;
+    const totalRevenue = data.reduce((sum, t) => sum + (t.total_revenue || 0), 0);
+    const totalTransactions = data.reduce((sum, t) => sum + (t.total_transactions || 0), 0);
+    const peakHour = data.length > 0 ? data.reduce((max, t) => 
+      (t.total_revenue || 0) > (max.total_revenue || 0) ? t : max
+    ) : null;
+    const avgHourlyRevenue = data.length > 0 ? totalRevenue / data.length : 0;
+    
+    return {
+      totalRevenue,
+      totalTransactions,
+      peakHour: peakHour ? `${peakHour.hour}:00` : '-',
+      peakRevenue: peakHour?.total_revenue || 0,
+      avgHourlyRevenue,
+    };
+  })() : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -90,6 +110,20 @@ export default function TimeBasedAnalysisPage() {
                 )}
               </TableBody>
             </UITable>
+
+            {/* Time-Based Totals Summary */}
+            {timeTotals && (
+              <AggregatedCostsSummary
+                title="Summary"
+                metrics={[
+                  { label: "Total Revenue", value: timeTotals.totalRevenue, format: "currency" },
+                  { label: "Total Transactions", value: timeTotals.totalTransactions, format: "number", decimals: 0 },
+                  { label: "Peak Hour", value: timeTotals.peakHour, format: "text" },
+                  { label: "Peak Revenue", value: timeTotals.peakRevenue, format: "currency" },
+                  { label: "Avg Hourly Revenue", value: timeTotals.avgHourlyRevenue, format: "currency" },
+                ]}
+              />
+            )}
           </div>
         )}
       </div>

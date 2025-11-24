@@ -167,61 +167,32 @@ export function useBorkSalesV2ViewModel(initialData?: { salesData?: any; locatio
     };
   }, [categoriesData]);
 
-  // Build query params (without location - fetch all locations, filter client-side)
+  // Build query params with database-level pagination and filtering
   const baseQueryParams = useMemo<BorkSalesQueryParams>(() => {
     return {
       startDate: dateRangeFilters.startDate,
       endDate: dateRangeFilters.endDate,
-      // No locationId - fetch all locations
+      locationId: selectedLocation !== "all" ? selectedLocation : undefined,
       category: selectedCategory !== "all" ? selectedCategory : undefined,
-      page: 1,
-      limit: 10000, // Fetch all records for client-side filtering/pagination
+      page: currentPage,
+      limit: ITEMS_PER_PAGE, // ✅ Database-level pagination
     };
-  }, [dateRangeFilters, selectedCategory]);
+  }, [dateRangeFilters, selectedCategory, selectedLocation, currentPage]);
 
-  // Fetch sales data for ALL locations (no location filter) - use initialData if provided
+  // Fetch sales data with database-level pagination - use initialData if provided
   const { 
-    data: allSalesData, 
+    data: salesData, 
     isLoading, 
     error 
   } = useQuery({
-    queryKey: ["bork-v2-sales", baseQueryParams.startDate, baseQueryParams.endDate, baseQueryParams.category],
+    queryKey: ["bork-v2-sales", baseQueryParams.startDate, baseQueryParams.endDate, baseQueryParams.category, baseQueryParams.locationId, baseQueryParams.page],
     queryFn: () => fetchBorkSales(baseQueryParams),
     initialData: initialData?.salesData,
     enabled: !!baseQueryParams.startDate && !!baseQueryParams.endDate,
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
-  // Filter by location and paginate client-side
-  const { salesData, totalPages } = useMemo(() => {
-    if (!allSalesData?.records) {
-      return { salesData: null, totalPages: 0 };
-    }
-
-    // Filter by location
-    let filtered = allSalesData.records;
-    if (selectedLocation !== "all") {
-      filtered = filtered.filter((record: any) => 
-        record.location_id === selectedLocation
-      );
-    }
-
-    // Paginate client-side
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginated = filtered.slice(startIndex, endIndex);
-
-    return {
-      salesData: {
-        ...allSalesData,
-        records: paginated,
-        total: filtered.length,
-        page: currentPage,
-        totalPages: Math.ceil(filtered.length / ITEMS_PER_PAGE),
-      },
-      totalPages: Math.ceil(filtered.length / ITEMS_PER_PAGE),
-    };
-  }, [allSalesData, selectedLocation, currentPage]);
+  const totalPages = salesData?.totalPages || 0;
 
   return {
     // State

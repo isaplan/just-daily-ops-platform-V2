@@ -16,6 +16,7 @@ import { useTransactionAnalysisViewModel } from "@/viewmodels/sales/useTransacti
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { formatDateDDMMYY } from "@/lib/dateFormatters";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { ClickableWorkerName } from "@/components/workforce/ClickableWorkerName";
 
 function formatTimeString(time: string | null | undefined): string {
   if (!time) return "-";
@@ -102,7 +103,17 @@ export default function TransactionAnalysisPage() {
                       <TableCell>{formatTimeString(transaction.time)}</TableCell>
                       <TableCell>{transaction.location_name || '-'}</TableCell>
                       <TableCell>{transaction.table_number || '-'}</TableCell>
-                      <TableCell>{transaction.waiter_name || '-'}</TableCell>
+                      <TableCell>
+                        {transaction.waiter_name ? (
+                          <ClickableWorkerName 
+                            worker={{
+                              user_name: transaction.waiter_name,
+                            }}
+                          />
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
                       <TableCell>{transaction.payment_method || '-'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(transaction.total_revenue)}</TableCell>
                       <TableCell className="text-right">{transaction.item_count}</TableCell>

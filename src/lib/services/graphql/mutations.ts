@@ -117,6 +117,7 @@ export async function deleteApiCredential(id: string): Promise<boolean> {
 export interface WorkerProfileInput {
   eitjeUserId: number;
   locationId?: string | null;
+  locationIds?: string[] | null;
   contractType?: string | null;
   contractHours?: number | null;
   hourlyWage?: number | null;
