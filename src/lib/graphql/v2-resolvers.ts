@@ -1153,13 +1153,18 @@ export const resolvers = {
         
         const result = await fetchProductivityEnhanced(params);
         
+        // ✅ Ensure result and nested arrays exist
+        if (!result) {
+          throw new Error('fetchProductivityEnhanced returned null or undefined');
+        }
+        
         // Transform to GraphQL response format
         return {
-          success: result.success,
-          records: result.records.map(r => ({
-            id: `${r.period}_${r.locationId || 'all'}_${r.teamId || 'total'}_${r.teamCategory || 'all'}`,
+          success: result.success || false,
+          records: (result.records || []).filter((r: any) => r != null).map((r: any) => ({
+            id: `${r.period || 'unknown'}_${r.locationId || 'all'}_${r.teamId || 'total'}_${r.teamCategory || 'all'}`,
             period: r.period,
-            periodType: r.periodType.toUpperCase(),
+            periodType: r.periodType?.toUpperCase() || 'DAY',
             locationId: r.locationId,
             locationName: r.locationName,
             teamId: r.teamId,
@@ -1170,8 +1175,8 @@ export const resolvers = {
             revenuePerHour: r.revenuePerHour,
             laborCostPercentage: r.laborCostPercentage,
             recordCount: r.recordCount,
-            division: r.division?.toUpperCase(),
-            teamCategory: r.teamCategory?.toUpperCase(),
+            division: r.division?.toUpperCase() || null,
+            teamCategory: r.teamCategory?.toUpperCase() || null,
             subTeam: r.subTeam,
             workerId: r.workerId,
             workerName: r.workerName,
@@ -1180,14 +1185,14 @@ export const resolvers = {
             productivityScore: r.productivityScore,
             goalStatus: r.goalStatus,
           })),
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages,
-          error: result.error,
-          byDivision: result.byDivision?.map(d => ({
-            id: `${d.period}_${d.division}_${d.locationId || 'all'}`,
+          total: result.total || 0,
+          page: result.page || 1,
+          totalPages: result.totalPages || 0,
+          error: result.error || null,
+          byDivision: (result.byDivision || []).filter((d: any) => d != null).map((d: any) => ({
+            id: `${d.period || 'unknown'}_${d.division || 'all'}_${d.locationId || 'all'}`,
             period: d.period,
-            periodType: d.periodType.toUpperCase(),
+            periodType: d.periodType?.toUpperCase() || 'DAY',
             locationId: d.locationId,
             locationName: d.locationName,
             totalHoursWorked: d.totalHoursWorked,
@@ -1196,13 +1201,13 @@ export const resolvers = {
             revenuePerHour: d.revenuePerHour,
             laborCostPercentage: d.laborCostPercentage,
             recordCount: 0,
-            division: d.division.toUpperCase(),
+            division: d.division?.toUpperCase() || 'ALL',
             goalStatus: d.goalStatus,
           })),
-          byTeamCategory: result.byTeamCategory?.map(tc => ({
-            id: `${tc.period}_${tc.teamCategory}_${tc.locationId || 'all'}`,
+          byTeamCategory: (result.byTeamCategory || []).filter((tc: any) => tc != null).map((tc: any) => ({
+            id: `${tc.period || 'unknown'}_${tc.teamCategory || 'all'}_${tc.locationId || 'all'}`,
             period: tc.period,
-            periodType: tc.periodType.toUpperCase(),
+            periodType: tc.periodType?.toUpperCase() || 'DAY',
             locationId: tc.locationId,
             locationName: tc.locationName,
             totalHoursWorked: tc.totalHoursWorked,
@@ -1211,14 +1216,14 @@ export const resolvers = {
             revenuePerHour: tc.revenuePerHour,
             laborCostPercentage: tc.laborCostPercentage,
             recordCount: 0,
-            teamCategory: tc.teamCategory.toUpperCase(),
+            teamCategory: tc.teamCategory?.toUpperCase() || 'OTHER',
             subTeam: tc.subTeam,
             goalStatus: tc.goalStatus,
           })),
-          byWorker: result.byWorker?.map(w => ({
-            id: `${w.period}_${w.workerId}_${w.locationId || 'all'}`,
+          byWorker: (result.byWorker || []).filter((w: any) => w != null).map((w: any) => ({
+            id: `${w.period || 'unknown'}_${w.workerId || 'unknown'}_${w.locationId || 'all'}`,
             period: w.period,
-            periodType: w.periodType.toUpperCase(),
+            periodType: w.periodType?.toUpperCase() || 'DAY',
             locationId: w.locationId,
             locationName: w.locationName,
             totalHoursWorked: w.totalHoursWorked,
@@ -1227,7 +1232,7 @@ export const resolvers = {
             revenuePerHour: w.revenuePerHour,
             laborCostPercentage: w.laborCostPercentage,
             recordCount: 0,
-            teamCategory: w.teamCategory?.toUpperCase(),
+            teamCategory: w.teamCategory?.toUpperCase() || null,
             subTeam: w.subTeam,
             workerId: w.workerId,
             workerName: w.workerName,
@@ -3928,7 +3933,7 @@ export const resolvers = {
         return {
           success: true,
           records: paginatedResult,
-          total: result.length,
+          total: sorted.length,
           page,
           totalPages,
           error: null,
@@ -4224,8 +4229,8 @@ export const resolvers = {
 
         return {
           success: true,
-          records: paginatedResult,
-          total: result.length,
+          records: result,
+          total,
           page,
           totalPages,
           error: null,
