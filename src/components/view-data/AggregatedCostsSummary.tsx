@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatDateDDMMYY } from "@/lib/dateFormatters";
 import { cn } from "@/lib/utils";
 
 export interface MetricItem {
@@ -17,9 +18,11 @@ export interface MetricItem {
 interface AggregatedCostsSummaryProps {
   metrics: MetricItem[];
   title?: string; // Optional custom title (default: "Summary")
+  startDate?: string; // Optional start date (YYYY-MM-DD format)
+  endDate?: string; // Optional end date (YYYY-MM-DD format)
 }
 
-export function AggregatedCostsSummary({ metrics, title = "Summary" }: AggregatedCostsSummaryProps) {
+export function AggregatedCostsSummary({ metrics, title = "Summary", startDate, endDate }: AggregatedCostsSummaryProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const formatValue = (item: MetricItem): string => {
@@ -58,7 +61,14 @@ export function AggregatedCostsSummary({ metrics, title = "Summary" }: Aggregate
             variant="ghost"
             className="w-full justify-between p-0 h-auto hover:bg-transparent"
           >
-            <h3 className="text-sm font-semibold">{title}</h3>
+            <div className="flex flex-col items-start">
+              <h3 className="text-sm font-semibold">{title}</h3>
+              {startDate && endDate && (
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  Data range: {formatDateDDMMYY(startDate)} to {formatDateDDMMYY(endDate)}
+                </span>
+              )}
+            </div>
             <ChevronDown
               className={cn(
                 "h-4 w-4 transition-transform duration-200",

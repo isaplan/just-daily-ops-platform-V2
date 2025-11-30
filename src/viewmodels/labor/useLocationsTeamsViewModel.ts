@@ -23,7 +23,7 @@ import {
 const CURRENT_YEAR = new Date().getFullYear();
 const ITEMS_PER_PAGE = 50;
 
-export function useLocationsTeamsViewModel() {
+export function useLocationsTeamsViewModel(initialData?: { workersData?: any; locations?: any[]; teams?: any[] }) {
   // Filter state
   const [selectedYear, setSelectedYear] = useState<number>(CURRENT_YEAR);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -46,29 +46,31 @@ export function useLocationsTeamsViewModel() {
     [selectedYear, selectedMonth, selectedLocation, selectedTeam, selectedContractType]
   );
 
-  // Fetch locations
+  // Fetch locations - use initialData if provided
   const {
-    data: locations = [],
+    data: locations = initialData?.locations || [],
     isLoading: locationsLoading,
     error: locationsError,
   } = useQuery({
     queryKey: ['locations'],
     queryFn: fetchLocations,
+    initialData: initialData?.locations,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Fetch teams (all teams or filtered by location)
+  // Fetch teams (all teams or filtered by location) - use initialData if provided
   const {
-    data: teams = [],
+    data: teams = initialData?.teams || [],
     isLoading: teamsLoading,
     error: teamsError,
   } = useQuery({
     queryKey: ['teams', selectedLocation],
     queryFn: () => fetchTeams(selectedLocation === 'all' ? undefined : selectedLocation),
+    initialData: selectedLocation === 'all' ? initialData?.teams : undefined,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Fetch workers with filters
+  // Fetch workers with filters - use initialData if provided
   const {
     data: workersData,
     isLoading: workersLoading,
@@ -77,6 +79,7 @@ export function useLocationsTeamsViewModel() {
   } = useQuery({
     queryKey: ['workers-filtered', filters, currentPage],
     queryFn: () => fetchWorkersWithFilters(filters, currentPage, ITEMS_PER_PAGE),
+    initialData: currentPage === 1 && selectedLocation === 'all' && selectedTeam === 'all' && selectedContractType === 'all' ? initialData?.workersData : undefined,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 

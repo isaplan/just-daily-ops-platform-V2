@@ -15,6 +15,152 @@ Raw Data (cron) → Aggregated Database (daily cron) → GraphQL Queries → UI
 
 ---
 
+## 🎯 AGGREGATED COLLECTION PRINCIPLE (CRITICAL)
+
+**Aggregated collections must contain ALL data pre-computed. GraphQL resolvers should NEVER query other collections for enrichment.**
+
+### **What "Aggregated" Means:**
+
+- ✅ **ALL data is pre-fetched and stored** - field:value pairs, no thinking, no querying other databases
+- ✅ **Zero additional queries** - GraphQL resolver reads from aggregated collection and returns directly
+- ✅ **Denormalized data** - Store names, IDs, and all related data together (e.g., `locationName` + `locationId`, `userName` + `eitjeUserId`)
+- ✅ **Pre-computed relationships** - All connected data should be calculated during aggregation, not at query time
+
+### **❌ FORBIDDEN in GraphQL Resolvers:**
+
+```typescript
+// ❌ WRONG: Enrichment queries in GraphQL resolver
+const records = await db.collection('worker_profiles_aggregated').find(query).toArray();
+const enrichedRecords = await enrichWithLocationNames(records); // NO!
+const enrichedRecords = await enrichWithUserNames(enrichedRecords); // NO!
+```
+
+### **✅ CORRECT Pattern:**
+
+```typescript
+// ✅ CORRECT: Aggregated collection has all data pre-computed
+const records = await db.collection('worker_profiles_aggregated').find(query).toArray();
+// Records already contain: locationName, userName, locationNames, etc.
+// Just return directly - no enrichment needed
+return records.map(transformToGraphQLFormat);
+```
+
+### **Aggregation Service Responsibility:**
+
+**During aggregation, the service MUST:**
+
+1. **Denormalize location data:**
+   - Query `locations` collection ONCE during aggregation
+   - Store `locationName` (not just `locationId`)
+   - Store `locationNames[]` (not just `locationIds[]`)
+
+2. **Denormalize user data:**
+   - Query `unified_users` collection ONCE during aggregation
+   - Store `userName` (not just `eitjeUserId`)
+   - Store all needed user fields
+
+3. **Pre-compute relationships:**
+   - Calculate all connected data (hours, sales, labor cost) during aggregation
+   - Store in aggregated collection (e.g., `thisMonth`, `lastMonth`, `total` periods)
+
+4. **Store IDs for fallback only:**
+   - Keep `locationId`, `eitjeUserId` for reference/fallback
+   - But primary data should be names/values, not IDs
+
+### **GraphQL Resolver Responsibility:**
+
+**GraphQL resolvers MUST:**
+
+1. **Query aggregated collection only:**
+   ```typescript
+   const records = await db.collection('worker_profiles_aggregated').find(query).toArray();
+   ```
+
+2. **Return data directly:**
+   ```typescript
+   return records.map(transformToGraphQLFormat);
+   ```
+
+3. **NO enrichment queries:**
+   - ❌ Never call `enrichWithLocationNames()`
+   - ❌ Never call `enrichWithUserNames()`
+   - ❌ Never query `locations` collection
+   - ❌ Never query `unified_users` collection
+
+4. **Fallback pattern (only for backward compatibility):**
+   ```typescript
+   // Only enrich if data is missing (fallback to old collection)
+   if (!record.locationName || !record.userName) {
+     // This is from fallback worker_profiles collection (not aggregated)
+     enrichedRecords = await enrichWithLocationNames(records);
+     enrichedRecords = await enrichWithUserNames(enrichedRecords);
+   }
+   ```
+
+### **Example: products_aggregated (CORRECT Pattern):**
+
+**Schema:**
+```typescript
+export interface ProductsAggregated {
+  productName: string;
+  locationId?: ObjectId; // For reference/fallback
+  locationName?: string; // ✅ Pre-computed during aggregation
+  locationDetails?: Array<{
+    locationId: ObjectId;
+    locationName: string; // ✅ Pre-computed
+    totalQuantitySold: number;
+    totalRevenue: number;
+  }>;
+  // ... all other fields pre-computed
+}
+```
+
+**GraphQL Resolver:**
+```typescript
+// ✅ CORRECT: Just read and return
+const product = await db.collection('products_aggregated').findOne(query);
+return {
+  id: product._id.toString(),
+  productName: product.productName,
+  locationName: product.locationName, // Already there!
+  // ... no enrichment queries
+};
+```
+
+### **Example: worker_profiles_aggregated (TO FIX):**
+
+**Current (WRONG):**
+```typescript
+// ❌ WRONG: Enrichment in resolver
+const records = await db.collection('worker_profiles_aggregated').find(query).toArray();
+let enrichedRecords = await enrichWithLocationNames(records); // NO!
+enrichedRecords = await enrichWithUserNames(enrichedRecords); // NO!
+```
+
+**Should Be (CORRECT):**
+```typescript
+// ✅ CORRECT: All data pre-computed
+const records = await db.collection('worker_profiles_aggregated').find(query).toArray();
+// Records already have: locationName, userName, locationNames, etc.
+return records.map(transformToGraphQLFormat);
+```
+
+### **Verification Checklist:**
+
+When creating/updating aggregated collections:
+
+- [ ] Aggregation service queries `locations` collection and stores `locationName`
+- [ ] Aggregation service queries `unified_users` collection and stores `userName`
+- [ ] All related data is pre-computed and stored (not calculated at query time)
+- [ ] GraphQL resolver reads from aggregated collection only
+- [ ] GraphQL resolver returns data directly (no enrichment functions)
+- [ ] No `enrichWithLocationNames()` calls in resolvers
+- [ ] No `enrichWithUserNames()` calls in resolvers
+- [ ] No queries to `locations` collection in resolvers
+- [ ] No queries to `unified_users` collection in resolvers
+
+---
+
 ## ✅ AGGREGATED COLLECTIONS (USE THESE)
 
 ### **Products:**
@@ -69,12 +215,18 @@ When building a new feature or fixing existing code:
 
 3. **Create/Update daily cron job:**
    - Aggregates raw data → aggregated collection
+   - **Denormalizes data** (queries `locations` and `unified_users` ONCE, stores names)
+   - Stores `locationName` (not just `locationId`)
+   - Stores `userName` (not just `eitjeUserId`)
+   - Pre-computes all relationships and connected data
    - Runs daily (or on-demand via API route)
    - Preserves existing data (merge, don't overwrite)
 
 4. **Verify:**
    - GraphQL queries use aggregated collections
    - No raw_data queries in resolvers (except diagnostics)
+   - No enrichment queries in resolvers (`enrichWithLocationNames`, `enrichWithUserNames`)
+   - Aggregated collection contains all needed data (names, not just IDs)
    - Cron job updates aggregated collection correctly
 
 ---
@@ -132,6 +284,14 @@ grep -r "collection('eitje_raw_data')" src/lib/graphql/
 
 # Find old product collection usage (should be empty)
 grep -r "collection('products')" src/lib/graphql/v2-resolvers.ts
+
+# Find enrichment functions in resolvers (should be empty or only in fallback code)
+grep -r "enrichWithLocationNames" src/lib/graphql/
+grep -r "enrichWithUserNames" src/lib/graphql/
+
+# Find queries to locations/unified_users in resolvers (should be empty)
+grep -r "collection('locations')" src/lib/graphql/
+grep -r "collection('unified_users')" src/lib/graphql/
 ```
 
 ---
@@ -254,7 +414,11 @@ When building a new feature or fixing existing code:
 
 3. **Create/Update daily cron job:**
    - Aggregates raw data → aggregated collection
+   - **Denormalizes data** (queries `locations` and `unified_users` ONCE, stores names)
+   - Stores `locationName` (not just `locationId`)
+   - Stores `userName` (not just `eitjeUserId`)
    - **NEW:** Builds hierarchical time-series structure
+   - Pre-computes all relationships and connected data
    - Runs daily (or on-demand via API route)
    - Preserves existing data (merge, don't overwrite)
 
@@ -267,6 +431,8 @@ When building a new feature or fixing existing code:
    - GraphQL queries use hierarchical data when available
    - Resolvers fallback to calculation if hierarchical data missing
    - No raw_data queries in resolvers (except diagnostics)
+   - No enrichment queries in resolvers (`enrichWithLocationNames`, `enrichWithUserNames`)
+   - Aggregated collection contains all needed data (names, not just IDs)
    - Cron job updates hierarchical data correctly
 
 ---

@@ -1,33 +1,19 @@
 /**
- * Labor Productivity View Layer
- * Pure presentational component - all business logic is in ViewModel
+ * Productivity - Main Page
+ * Shows links to nested pages for each view
  */
 
-"use client";
+import Link from 'next/link';
+import { getBreadcrumb } from '@/lib/navigation/breadcrumb-registry';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-import { usePathname } from "next/navigation";
-import { EitjeDataFilters } from "@/components/view-data/EitjeDataFilters";
-import { LocationFilterButtons } from "@/components/view-data/LocationFilterButtons";
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SimplePagination } from "@/components/view-data/SimplePagination";
-import { LoadingState } from "@/components/view-data/LoadingState";
-import { ErrorState } from "@/components/view-data/ErrorState";
-import { UITable } from "@/components/view-data/UITable";
-import { formatDateDDMMYY } from "@/lib/dateFormatters";
-import { useProductivityViewModel } from "@/viewmodels/workforce/useProductivityViewModel";
-import { ProductivityAggregation } from "@/models/workforce/productivity.model";
-import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AggregatedCostsSummary } from "@/components/view-data/AggregatedCostsSummary";
+export const revalidate = 1800;
 
 export default function ProductivityPage() {
-  const viewModel = useProductivityViewModel();
-  const pathname = usePathname();
-  const pageMetadata = getBreadcrumb(pathname);
+  const pageMetadata = getBreadcrumb('/data/labor/productivity');
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      {/* Page Title */}
       {pageMetadata && (
         <div className="pt-20 space-y-1">
           <h1 className="text-2xl font-semibold">{pageMetadata.label}</h1>
@@ -36,125 +22,64 @@ export default function ProductivityPage() {
           )}
         </div>
       )}
-      
-      <div className="space-y-6">
-        {/* Filters */}
-        <EitjeDataFilters
-          selectedYear={viewModel.selectedYear}
-          selectedMonth={viewModel.selectedMonth}
-          selectedDay={viewModel.selectedDay}
-          selectedLocation={viewModel.selectedLocation}
-          selectedDatePreset={viewModel.selectedDatePreset}
-          onYearChange={viewModel.setSelectedYear}
-          onMonthChange={viewModel.setSelectedMonth}
-          onDayChange={viewModel.setSelectedDay}
-          onLocationChange={viewModel.setSelectedLocation}
-          onDatePresetChange={viewModel.setSelectedDatePreset}
-          locations={viewModel.locationOptions}
-        />
 
-        {/* Team and Period Type Filters */}
-        <div className="flex gap-6 flex-wrap">
-          <LocationFilterButtons
-            options={viewModel.teamOptions}
-            selectedValue={viewModel.selectedTeam}
-            onValueChange={viewModel.setSelectedTeam}
-            label="Team"
-          />
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Period:</label>
-            <Select
-              value={viewModel.selectedPeriodType}
-              onValueChange={(value: "day" | "week" | "month") => viewModel.setSelectedPeriodType(value)}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {viewModel.periodTypeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <Link href="/data/labor/productivity/by-location">
+          <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle>By Location</CardTitle>
+              <CardDescription>Productivity metrics grouped by location</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                View hours, costs, revenue, and productivity metrics per location per day.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* Productivity Table */}
-        {viewModel.isLoading && <LoadingState />}
+        <Link href="/data/labor/productivity/by-division">
+          <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle>By Division</CardTitle>
+              <CardDescription>Productivity metrics grouped by division (Food/Beverage/Management)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                View productivity breakdown by division: Food, Beverage, Management, and Other.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {viewModel.error && (
-          <ErrorState error={viewModel.error} message="Error loading productivity data" />
-        )}
+        <Link href="/data/labor/productivity/by-team">
+          <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle>By Team</CardTitle>
+              <CardDescription>Productivity metrics grouped by team category</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                View productivity by team category: Kitchen, Service, Management, and Other with sub-teams.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {!viewModel.isLoading && !viewModel.error && viewModel.productivityData && (
-          <>
-            <UITable>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-semibold">Period</TableHead>
-                  <TableHead className="font-semibold">Location</TableHead>
-                  <TableHead className="font-semibold">Team</TableHead>
-                  <TableHead className="font-semibold text-right">Hours</TableHead>
-                  <TableHead className="font-semibold text-right">Cost</TableHead>
-                  <TableHead className="font-semibold text-right">Revenue</TableHead>
-                  <TableHead className="font-semibold text-right">Revenue/Hour</TableHead>
-                  <TableHead className="font-semibold text-right">Labor Cost %</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {viewModel.productivityData.length > 0 ? (
-                  viewModel.productivityData.map((record: ProductivityAggregation) => (
-                    <TableRow key={`${record.period}_${record.locationId}_${record.teamId}`}>
-                      <TableCell className="whitespace-nowrap">{record.period}</TableCell>
-                      <TableCell className="whitespace-nowrap">{record.locationName || record.locationId}</TableCell>
-                      <TableCell>{record.teamName || "Total"}</TableCell>
-                      <TableCell className="text-right">{record.totalHoursWorked.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">€{record.totalWageCost.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">€{record.totalRevenue.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">€{record.revenuePerHour.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{record.laborCostPercentage.toFixed(1)}%</TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No productivity data found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </UITable>
-
-            {/* Totals Summary */}
-            {viewModel.productivityData && viewModel.productivityData.length > 0 && (
-              <AggregatedCostsSummary
-                title="Summary"
-                metrics={[
-                  { label: "Total Hours", value: viewModel.totals.totalHoursWorked, format: "number", decimals: 2 },
-                  { label: "Total Cost", value: viewModel.totals.totalWageCost, format: "currency" },
-                  { label: "Total Revenue", value: viewModel.totals.totalRevenue, format: "currency" },
-                  { label: "Revenue/Hour", value: viewModel.totals.revenuePerHour, format: "currency" },
-                  { label: "Labor Cost %", value: viewModel.totals.laborCostPercentage, format: "percentage", decimals: 1 },
-                ]}
-              />
-            )}
-
-            {/* Pagination */}
-            <SimplePagination
-              currentPage={viewModel.currentPage}
-              totalPages={viewModel.totalPages}
-              totalRecords={viewModel.productivityData?.length || 0}
-              onPageChange={viewModel.setCurrentPage}
-              isLoading={viewModel.isLoading}
-            />
-          </>
-        )}
+        <Link href="/data/labor/productivity/by-worker">
+          <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+            <CardHeader>
+              <CardTitle>By Worker</CardTitle>
+              <CardDescription>Productivity metrics per worker per day</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                View individual worker productivity: hours, costs, and revenue per worker per day.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   );
 }
-
-
-

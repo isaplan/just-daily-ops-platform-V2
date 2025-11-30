@@ -33,6 +33,7 @@ import { useLazyCategoryProducts } from "@/hooks/useLazyCategoryProducts";
 import { CategoryMetadata } from "@/lib/services/graphql/queries";
 import { fetchCategoriesMetadata } from "@/lib/services/sales/categories-products.service";
 import { LocationFilterButtons } from "@/components/view-data/LocationFilterButtons";
+import { AutoFilterRegistry } from "@/components/navigation/auto-filter-registry";
 
 interface ProductsClientProps {
   initialData?: {
@@ -510,6 +511,43 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
   }, [locations]);
 
 
+  // Auto-generate filter labels from state
+  const filterLabels = useMemo(() => [
+    { key: "year", label: "Year", value: selectedYear },
+    { key: "month", label: "Month", value: selectedMonth },
+    { key: "location", label: "Location", value: selectedLocation !== "all" ? selectedLocation : null },
+    { key: "mainCategory", label: "Main Category", value: selectedMainCategory !== "all" ? selectedMainCategory : null },
+    { key: "subCategory", label: "Sub Category", value: selectedSubCategory !== "all" ? selectedSubCategory : null },
+  ], [
+    selectedYear,
+    selectedMonth,
+    selectedLocation,
+    selectedMainCategory,
+    selectedSubCategory,
+  ]);
+
+  // Filter change handlers - memoized with useCallback for stable reference
+  const handleFilterChange = useCallback((key: string, value: any) => {
+    switch (key) {
+      case "year": setSelectedYear(value); setSelectedMonth(null); break;
+      case "month": setSelectedMonth(value); break;
+      case "location": setSelectedLocation(value); break;
+      case "mainCategory": setSelectedMainCategory(value as "all" | "Bar" | "Keuken" | "Other"); setSelectedSubCategory("all"); break;
+      case "subCategory": setSelectedSubCategory(value); break;
+    }
+  }, []);
+
+  // Filter remove handlers - memoized with useCallback for stable reference
+  const handleFilterRemove = useCallback((key: string) => {
+    switch (key) {
+      case "year": setSelectedYear(currentYear); setSelectedMonth(null); break;
+      case "month": setSelectedMonth(null); break;
+      case "location": setSelectedLocation("all"); break;
+      case "mainCategory": setSelectedMainCategory("all"); setSelectedSubCategory("all"); break;
+      case "subCategory": setSelectedSubCategory("all"); break;
+    }
+  }, [currentYear]);
+
   // Toggle category expansion with lazy loading
   const toggleCategory = useCallback(async (categoryName: string) => {
     const isExpanded = expandedCategories.has(categoryName);
@@ -879,10 +917,17 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
         </div>
       )}
       
-      {/* Filters */}
-      <div className="space-y-6">
-        {/* Year and Month Filters */}
-        <div className="space-y-4">
+      {/* Auto-registered Filters - Will show in Sheet/Drawer, hidden in page */}
+      <AutoFilterRegistry
+        filters={{
+          labels: filterLabels,
+          onFilterChange: handleFilterChange,
+          onFilterRemove: handleFilterRemove,
+        }}
+      >
+        <div className="space-y-6">
+          {/* Year and Month Filters */}
+          <div className="space-y-4">
           {/* Year Filter - Buttons */}
             <div className="space-y-2">
             <span className="text-sm font-bold text-foreground">Year</span>
@@ -1090,7 +1135,8 @@ export function ProductsClient({ initialData }: ProductsClientProps) {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </AutoFilterRegistry>
       
       {/* Categories & Products */}
       <div className="space-y-4">

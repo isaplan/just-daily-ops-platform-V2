@@ -76,6 +76,52 @@ export async function createAllIndexes(): Promise<void> {
     { key: { date: -1 } },
   ]);
 
+  // Sales Line Items Aggregated indexes (for dailySales resolver)
+  await db.collection('sales_line_items_aggregated').createIndexes([
+    { key: { locationId: 1, date: -1 } }, // Critical for location + date queries
+    { key: { date: -1, time: -1 } }, // For sorting by date and time
+    { key: { date: -1 } }, // Date-only queries
+    { key: { category: 1 } }, // Category filtering
+    { key: { productName: 1 } }, // Product name filtering
+    { key: { waiterName: 1 } }, // Waiter filtering
+    { key: { locationId: 1, date: -1, category: 1 } }, // Compound for filtered queries
+  ]);
+
+  // Transactions Aggregated indexes (for transactionAnalysis resolver)
+  await db.collection('transactions_aggregated').createIndexes([
+    { key: { locationId: 1, date: -1 } }, // Critical for location + date queries
+    { key: { date: -1, time: -1 } }, // For sorting by date and time
+    { key: { date: -1 } }, // Date-only queries
+    { key: { waiterName: 1 } }, // Waiter filtering
+    { key: { paymentMethod: 1 } }, // Payment method filtering
+    { key: { ticketNumber: 1 } }, // Ticket number lookups
+  ]);
+
+  // Processed Hours Aggregated indexes (for processedHours resolver)
+  await db.collection('processed_hours_aggregated').createIndexes([
+    { key: { locationId: 1, date: -1 } }, // Critical for location + date queries
+    { key: { date: -1, start: -1 } }, // For sorting by date and start time
+    { key: { date: -1 } }, // Date-only queries
+    { key: { userId: 1 } }, // User filtering
+    { key: { userName: 1 } }, // User name filtering
+    { key: { teamName: 1 } }, // Team filtering
+    { key: { typeName: 1 } }, // Type name filtering
+    { key: { locationId: 1, date: -1, userId: 1 } }, // Compound for filtered queries
+  ]);
+
+  // Worker Profiles Aggregated indexes (for workerProfiles resolver)
+  await db.collection('worker_profiles_aggregated').createIndexes([
+    { key: { eitjeUserId: 1 }, unique: true }, // Unique index for fast lookups by eitjeUserId
+    { key: { locationId: 1, isActive: 1 } }, // Compound index for location/active filtering
+    { key: { activeYears: 1 } }, // Index for year filtering
+    { key: { 'activeMonths.year': 1, 'activeMonths.month': 1 } }, // Index for month filtering
+    { key: { contractType: 1 } }, // Index for contract type filtering
+    { key: { 'teams.team_id': 1 } }, // Index for team filtering
+    { key: { userName: 1 } }, // Index for user name lookups
+    { key: { isActive: 1 } }, // Index for active/inactive filtering
+    { key: { locationId: 1, activeYears: 1 } }, // Compound for location + year queries
+  ]);
+
   // PowerBI Raw Data indexes
   await db.collection('powerbi_raw_data').createIndexes([
     { key: { locationId: 1, year: -1, month: -1 } }, // Compound for P&L queries
@@ -137,11 +183,30 @@ export async function createAllIndexes(): Promise<void> {
     { key: { startDate: 1, endDate: 1 } }, // Compound for date range queries
   ]);
 
+  // Events indexes
+  await db.collection('events').createIndexes([
+    { key: { title: 1 } },
+    { key: { locationId: 1 } },
+    { key: { startDate: -1 } }, // Sort by start date
+    { key: { endDate: -1 } },
+    { key: { isActive: 1 } },
+    { key: { isRepeating: 1 } },
+    { key: { locationId: 1, startDate: -1 } }, // Compound for location + date queries
+    { key: { startDate: 1, endDate: 1 } }, // Compound for date range queries
+  ]);
+
   // Daily Dashboard - Kitchen indexes
   await db.collection('daily_dashboard_kitchen').createIndexes([
     { key: { locationId: 1, date: -1, timeRange: 1 } }, // Compound index for queries
     { key: { date: -1 } },
     { key: { locationId: 1, date: -1 } }, // Alternative compound
+  ]);
+
+  // System Status indexes (for pre-computed status cache)
+  await db.collection('system_status').createIndexes([
+    { key: { type: 1, lastUpdated: -1 } }, // Compound for fast lookups by type
+    { key: { expiresAt: 1 } }, // TTL index for automatic cleanup
+    { key: { type: 1 } }, // Single field for type queries
   ]);
 
   console.log('✅ All MongoDB indexes created successfully');

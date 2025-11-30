@@ -5,7 +5,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useRef } from "react";
 import { WorkerProfile } from "@/lib/services/graphql/queries";
 
 // Extend WorkerProfile to include teams field
@@ -24,6 +24,8 @@ interface WorkerProfileSheetContextType {
   isSheetOpen: boolean;
   openWorkerSheet: (worker: WorkerProfileWithTeams) => void;
   closeWorkerSheet: () => void;
+  saveCurrentWorker: () => Promise<void>;
+  registerSaveCallback: (callback: () => Promise<void>) => void;
 }
 
 const WorkerProfileSheetContext = createContext<WorkerProfileSheetContextType | undefined>(undefined);
@@ -31,18 +33,34 @@ const WorkerProfileSheetContext = createContext<WorkerProfileSheetContextType | 
 export function WorkerProfileSheetProvider({ children }: { children: React.ReactNode }) {
   const [selectedWorker, setSelectedWorker] = useState<WorkerProfileWithTeams | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const saveCallbackRef = useRef<(() => Promise<void>) | null>(null);
 
-  const openWorkerSheet = useCallback((worker: WorkerProfileWithTeams) => {
+  const saveCurrentWorker = useCallback(async () => {
+    if (saveCallbackRef.current) {
+      await saveCallbackRef.current();
+    }
+  }, []);
+
+  const openWorkerSheet = useCallback(async (worker: WorkerProfileWithTeams) => {
+    // Don't auto-save when switching workers - user must click Save button
+    // Just switch to the new worker
     setSelectedWorker(worker);
     setIsSheetOpen(true);
   }, []);
 
   const closeWorkerSheet = useCallback(() => {
+    // Don't auto-save on close - only save when user clicks Save button
     setIsSheetOpen(false);
     // Keep selectedWorker until sheet animation completes
     setTimeout(() => {
       setSelectedWorker(null);
+      saveCallbackRef.current = null;
     }, 300);
+  }, []);
+
+  // Register save callback (called from ViewModel)
+  const registerSaveCallback = useCallback((callback: () => Promise<void>) => {
+    saveCallbackRef.current = callback;
   }, []);
 
   return (
@@ -52,6 +70,8 @@ export function WorkerProfileSheetProvider({ children }: { children: React.React
         isSheetOpen,
         openWorkerSheet,
         closeWorkerSheet,
+        saveCurrentWorker,
+        registerSaveCallback, // Internal use only
       }}
     >
       {children}

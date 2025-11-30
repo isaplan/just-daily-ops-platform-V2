@@ -125,6 +125,14 @@ export interface LaborData {
     hours: number;
     cost: number;
   }>;
+  workerStats?: Array<{
+    workerId: string;
+    workerName: string;
+    teamId?: string;
+    teamName?: string;
+    hours: number;
+    cost: number;
+  }>;
   createdAt: string;
 }
 
@@ -158,6 +166,14 @@ export async function getLaborAggregated(
               id
               name
             }
+            hours
+            cost
+          }
+          workerStats {
+            workerId
+            workerName
+            teamId
+            teamName
             hours
             cost
           }
@@ -405,12 +421,27 @@ export async function getAggregatedHours(
 
 export interface WorkerProfile {
   id: string;
+  // User IDs and Names (denormalized for fast queries - 100x faster!)
   eitjeUserId: number;
-  userName?: string | null;
+  userName?: string | null; // Prefer unifiedUserName if available
+  unifiedUserId?: string | null; // unified_users._id
+  unifiedUserName?: string | null; // unified_users.name (primary source of truth)
+  borkUserId?: string | null; // bork system mapping externalId
+  borkUserName?: string | null; // Usually same as unifiedUserName
+  // Teams (names already denormalized)
+  teamName?: string | null;
+  teams?: Array<{
+    team_id: string;
+    team_name: string;
+    team_type?: string;
+    is_active?: boolean;
+  }> | null;
+  // Locations (names already denormalized)
   locationId?: string | null;
   locationName?: string | null;
   locationIds?: string[] | null;
   locationNames?: string[] | null;
+  // Contract data
   contractType?: string | null;
   contractHours?: number | null;
   hourlyWage?: number | null;
@@ -1904,6 +1935,405 @@ export async function getKeukenAnalyses(
     records: [],
     total: 0,
     error: 'Failed to fetch keuken analyses data',
+  };
+}
+
+// ============================================
+// WORKER METRICS QUERIES
+// ============================================
+
+export interface WorkerSalesSummary {
+  totalRevenue: number;
+  totalTransactions: number;
+  averageTicketValue: number;
+  totalItems: number;
+}
+
+export interface WorkerHoursBreakdown {
+  gewerkt: number;
+  ziek: number;
+  verlof: number;
+  total: number;
+}
+
+export interface WorkerLaborCost {
+  totalCost: number;
+  totalHours: number;
+  averageHourlyCost: number;
+}
+
+export interface WorkerHoursSummary {
+  totalHours: number;
+  workedHours: number;
+  leaveHours: number;
+  sickHours: number;
+  averageHoursPerDay: number;
+}
+
+/**
+ * Get worker sales summary
+ */
+export async function getWorkerSales(
+  workerName: string,
+  startDate: string,
+  endDate: string
+): Promise<WorkerSalesSummary> {
+  const query = `
+    query GetWorkerSales($workerName: String!, $startDate: String!, $endDate: String!) {
+      workerSales(workerName: $workerName, startDate: $startDate, endDate: $endDate) {
+        totalRevenue
+        totalTransactions
+        averageTicketValue
+        totalItems
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ workerSales: WorkerSalesSummary }>(
+    query,
+    { workerName, startDate, endDate }
+  );
+
+  return result.data?.workerSales || {
+    totalRevenue: 0,
+    totalTransactions: 0,
+    averageTicketValue: 0,
+    totalItems: 0,
+  };
+}
+
+/**
+ * Get worker hours breakdown
+ */
+export async function getWorkerHours(
+  eitjeUserId: number,
+  startDate: string,
+  endDate: string
+): Promise<WorkerHoursBreakdown> {
+  const query = `
+    query GetWorkerHours($eitjeUserId: Int!, $startDate: String!, $endDate: String!) {
+      workerHours(eitjeUserId: $eitjeUserId, startDate: $startDate, endDate: $endDate) {
+        gewerkt
+        ziek
+        verlof
+        total
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ workerHours: WorkerHoursBreakdown }>(
+    query,
+    { eitjeUserId, startDate, endDate }
+  );
+
+  return result.data?.workerHours || {
+    gewerkt: 0,
+    ziek: 0,
+    verlof: 0,
+    total: 0,
+  };
+}
+
+/**
+ * Get worker labor cost
+ */
+export async function getWorkerLaborCost(
+  eitjeUserId: number,
+  startDate: string,
+  endDate: string
+): Promise<WorkerLaborCost> {
+  const query = `
+    query GetWorkerLaborCost($eitjeUserId: Int!, $startDate: String!, $endDate: String!) {
+      workerLaborCost(eitjeUserId: $eitjeUserId, startDate: $startDate, endDate: $endDate) {
+        totalCost
+        totalHours
+        averageHourlyCost
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ workerLaborCost: WorkerLaborCost }>(
+    query,
+    { eitjeUserId, startDate, endDate }
+  );
+
+  return result.data?.workerLaborCost || {
+    totalCost: 0,
+    totalHours: 0,
+    averageHourlyCost: 0,
+  };
+}
+
+/**
+ * Get worker hours summary
+ */
+export async function getWorkerHoursSummary(
+  eitjeUserId: number,
+  contractHours: number | null,
+  contractStartDate: string,
+  contractEndDate: string | null,
+  startDate: string,
+  endDate: string
+): Promise<WorkerHoursSummary> {
+  const query = `
+    query GetWorkerHoursSummary(
+      $eitjeUserId: Int!
+      $contractHours: Float
+      $contractStartDate: String
+      $contractEndDate: String
+      $startDate: String!
+      $endDate: String!
+    ) {
+      workerHoursSummary(
+        eitjeUserId: $eitjeUserId
+        contractHours: $contractHours
+        contractStartDate: $contractStartDate
+        contractEndDate: $contractEndDate
+        startDate: $startDate
+        endDate: $endDate
+      ) {
+        totalHours
+        workedHours
+        leaveHours
+        sickHours
+        averageHoursPerDay
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ workerHoursSummary: WorkerHoursSummary }>(
+    query,
+    { eitjeUserId, contractHours, contractStartDate, contractEndDate, startDate, endDate }
+  );
+
+  return result.data?.workerHoursSummary || {
+    totalHours: 0,
+    workedHours: 0,
+    leaveHours: 0,
+    sickHours: 0,
+    averageHoursPerDay: 0,
+  };
+}
+
+// ============================================
+// LABOR PRODUCTIVITY ENHANCED (GraphQL ONLY)
+// ============================================
+
+export interface LaborProductivityEnhancedResponse {
+  success: boolean;
+  records: Array<{
+    id: string;
+    period: string;
+    periodType: string;
+    locationId?: string;
+    locationName?: string;
+    teamId?: string;
+    teamName?: string;
+    totalHoursWorked: number;
+    totalWageCost: number;
+    totalRevenue: number;
+    revenuePerHour: number;
+    laborCostPercentage: number;
+    recordCount: number;
+    division?: string;
+    teamCategory?: string;
+    subTeam?: string;
+    workerId?: string;
+    workerName?: string;
+    ordersCount?: number;
+    salesCount?: number;
+    productivityScore?: number;
+    goalStatus?: string;
+  }>;
+  total: number;
+  page: number;
+  totalPages: number;
+  error?: string;
+  byDivision?: any[];
+  byTeamCategory?: any[];
+  byWorker?: Array<{
+    id: string;
+    period: string;
+    periodType: string;
+    locationId?: string;
+    locationName?: string;
+    totalHoursWorked: number;
+    totalWageCost: number;
+    totalRevenue: number;
+    revenuePerHour: number;
+    laborCostPercentage: number;
+    teamCategory?: string;
+    subTeam?: string;
+    workerId?: string;
+    workerName?: string;
+    productivityScore?: number;
+    goalStatus?: string;
+  }>;
+}
+
+/**
+ * Get labor productivity enhanced data via GraphQL
+ * ✅ Uses aggregated collections only
+ */
+export async function getLaborProductivityEnhanced(
+  startDate: string,
+  endDate: string,
+  periodType: 'YEAR' | 'MONTH' | 'WEEK' | 'DAY' | 'HOUR',
+  locationId?: string,
+  filters?: {
+    division?: 'TOTAL' | 'FOOD' | 'BEVERAGE';
+    teamCategory?: 'KITCHEN' | 'SERVICE' | 'MANAGEMENT' | 'OTHER';
+    subTeam?: string;
+    workerId?: string;
+  },
+  page: number = 1,
+  limit: number = 50
+): Promise<LaborProductivityEnhancedResponse> {
+  const query = `
+    query GetLaborProductivityEnhanced(
+      $startDate: String!
+      $endDate: String!
+      $periodType: PeriodType!
+      $locationId: ID
+      $filters: ProductivityEnhancedFilters
+      $page: Int
+      $limit: Int
+    ) {
+      laborProductivityEnhanced(
+        startDate: $startDate
+        endDate: $endDate
+        periodType: $periodType
+        locationId: $locationId
+        filters: $filters
+        page: $page
+        limit: $limit
+      ) {
+        success
+        records {
+          id
+          period
+          periodType
+          locationId
+          locationName
+          teamId
+          teamName
+          totalHoursWorked
+          totalWageCost
+          totalRevenue
+          revenuePerHour
+          laborCostPercentage
+          recordCount
+          division
+          teamCategory
+          subTeam
+          workerId
+          workerName
+          ordersCount
+          salesCount
+          productivityScore
+          goalStatus
+        }
+        total
+        page
+        totalPages
+        error
+        byDivision {
+          id
+          period
+          periodType
+          locationId
+          locationName
+          totalHoursWorked
+          totalWageCost
+          totalRevenue
+          revenuePerHour
+          laborCostPercentage
+          division
+          goalStatus
+        }
+        byTeamCategory {
+          id
+          period
+          periodType
+          locationId
+          locationName
+          totalHoursWorked
+          totalWageCost
+          totalRevenue
+          revenuePerHour
+          laborCostPercentage
+          teamCategory
+          subTeam
+          goalStatus
+        }
+        byWorker {
+          id
+          period
+          periodType
+          locationId
+          locationName
+          totalHoursWorked
+          totalWageCost
+          totalRevenue
+          revenuePerHour
+          laborCostPercentage
+          teamCategory
+          subTeam
+          workerId
+          workerName
+          productivityScore
+          goalStatus
+        }
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ laborProductivityEnhanced: LaborProductivityEnhancedResponse }>(
+    query,
+    { startDate, endDate, periodType, locationId, filters, page, limit }
+  );
+
+  return result.data?.laborProductivityEnhanced || {
+    success: false,
+    records: [],
+    byWorker: [],
+    total: 0,
+    page: 1,
+    totalPages: 0,
+    error: 'Failed to fetch productivity data',
+  };
+}
+
+// ============================================
+// COMPANY SETTINGS
+// ============================================
+
+export interface CompanySettings {
+  id: string;
+  workingDayStartHour: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Get company settings
+ */
+export async function getCompanySettings(): Promise<CompanySettings> {
+  const query = `
+    query GetCompanySettings {
+      companySettings {
+        id
+        workingDayStartHour
+        createdAt
+        updatedAt
+      }
+    }
+  `;
+
+  const result = await executeGraphQL<{ companySettings: CompanySettings }>(query);
+  return result.data?.companySettings || {
+    id: 'default',
+    workingDayStartHour: 6,
   };
 }
 

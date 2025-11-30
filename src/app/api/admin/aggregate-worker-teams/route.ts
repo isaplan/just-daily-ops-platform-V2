@@ -170,7 +170,41 @@ export async function POST(request: NextRequest) {
       console.log(`  Worker ${userId}: ${teams.length} teams, most recent: ${teams[0]?.team_name} (${teams[0]?.shift_count} shifts)`);
     });
     
-    // Step 5: Update ALL worker profiles with team data
+    // Step 5: Fetch user names from eitje_raw_data (batch query, not N+1)
+    const userIdsForNames = new Set<number>();
+    workerProfiles.forEach((profile: any) => {
+      if (profile.eitje_user_id) {
+        userIdsForNames.add(profile.eitje_user_id);
+      }
+    });
+    // Also add user IDs from shifts
+    userTeamsArray.forEach((_, userId) => {
+      userIdsForNames.add(userId);
+    });
+
+    const userMap = new Map<number, string>();
+    if (userIdsForNames.size > 0) {
+      console.log(`[Aggregate Worker Teams] Fetching user names for ${userIdsForNames.size} users...`);
+      const users = await db.collection('eitje_raw_data')
+        .find({
+          endpoint: 'users',
+          'extracted.id': { $in: Array.from(userIdsForNames) }
+        })
+        .toArray();
+
+      users.forEach((user: any) => {
+        const userId = user.extracted?.id;
+        const firstName = user.extracted?.first_name || user.rawApiResponse?.first_name || '';
+        const lastName = user.extracted?.last_name || user.rawApiResponse?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        if (userId && fullName) {
+          userMap.set(userId, fullName);
+        }
+      });
+      console.log(`[Aggregate Worker Teams] Loaded ${userMap.size} user names`);
+    }
+    
+    // Step 6: Update ALL worker profiles with team data and user names
     const bulkOps = [];
     let workersWithTeams = 0;
     let workersWithoutTeams = 0;
@@ -190,13 +224,17 @@ export async function POST(request: NextRequest) {
         console.log(`  ⚠️  Worker ${userId} (${profile.user_name}) has NO teams from ${allShifts.length} shifts!`);
       }
       
+      // Get user name from pre-fetched map
+      const userName = profile.eitje_user_id ? (userMap.get(profile.eitje_user_id) || profile.user_name || null) : profile.user_name || null;
+      
       bulkOps.push({
         updateOne: {
           filter: { _id: profile._id },
           update: {
             $set: {
               teams: teams,
-              teams_updated_at: new Date()
+              teams_updated_at: new Date(),
+              ...(userName && { user_name: userName }) // Only set if we have a name
             }
           }
         }

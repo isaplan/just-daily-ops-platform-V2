@@ -8,6 +8,8 @@ import { LayoutDashboard, X } from "lucide-react";
 import Link from "next/link";
 import { TopnavBreadcrumb } from "@/components/navigation/topnav-breadcrumb";
 import { TopnavFilterDropdownV2 } from "@/components/navigation/topnav-filter-dropdown-v2";
+// V2 (Drawer) removed - using Sheet version only
+// import { TopnavFilterDrawerV2 } from "@/components/navigation/topnav-filter-drawer-v2";
 import { usePageFilters } from "@/contexts/page-filters-context";
 import { cn } from "@/lib/utils";
 
@@ -63,22 +65,24 @@ export function AppTopnavV2({ layoutVersion, onVersionChange }: AppTopnavV2Props
 
   return (
     <>
-      {/* SidebarTrigger and Breadcrumb - fixed left, account for sidebar */}
+      {/* SidebarTrigger and Breadcrumb - absolute left, relative to SidebarInset */}
       <div 
         className={cn(
-          "fixed top-4 z-50 flex items-center gap-2 transition-all duration-200",
-          isCollapsed ? "left-4" : "left-[calc(16rem+1rem)]"
+          "absolute top-4 z-50 flex items-center gap-2 transition-all duration-200",
+          "left-4"
         )}
       >
         <SidebarTrigger className="-ml-1" />
         <TopnavBreadcrumb />
       </div>
       
-      {/* Icons - fixed right with background and border */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2">
+      {/* Icons - absolute right, relative to SidebarInset */}
+      <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-2">
         {/* Icons row */}
         <div className="flex items-center gap-2">
           <TopnavFilterDropdownV2 onActiveFiltersChange={setActiveFilters} />
+          {/* V2 (Drawer) removed - using Sheet version only */}
+          {/* <TopnavFilterDrawerV2 onActiveFiltersChange={setActiveFilters} /> */}
           
           <Link href="/dashboard">
             <Button 

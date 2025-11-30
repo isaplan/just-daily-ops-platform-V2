@@ -151,7 +151,7 @@ export function DateFilterPresets({
                   ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
                   : isActive
                   ? "bg-blue-500 border-blue-500 text-white"
-                  : "bg-white border-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
+                  : "bg-white border-black text-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
               }`}
               onClick={() => onPresetChange(preset.value)}
             >

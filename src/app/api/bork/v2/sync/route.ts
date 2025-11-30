@@ -15,6 +15,7 @@ import { getDatabase } from '@/lib/mongodb/v2-connection';
 import { fetchBorkDataForDateRange } from '@/lib/bork/v2-api-client';
 import { optimizeBorkTickets, calculateStorageReduction } from '@/lib/bork/v2-data-optimizer';
 import { ObjectId } from 'mongodb';
+import { getWorkingDayDate } from '@/lib/utils/working-day';
 
 export const maxDuration = 300; // 5 minutes
 export const runtime = 'nodejs';
@@ -415,7 +416,7 @@ export async function POST(request: NextRequest) {
 
     // Insert or update records for each date
     for (const [dateKey, tickets] of ticketsByDate.entries()) {
-      // dateKey is already validated YYYY-MM-DD format from above
+      // dateKey is already validated YYYY-MM-DD format from above (working day date)
       // Create Date object at midnight UTC for consistent storage
       const date = new Date(dateKey + 'T00:00:00.000Z');
       

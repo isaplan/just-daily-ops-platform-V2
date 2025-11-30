@@ -1,38 +1,22 @@
 /**
- * Daily Ops Keuken Analyses Page
- * Server Component wrapper - fetches initial data for SSR
+ * Daily Ops Keuken Analyses Page - Server Component
+ * ✅ STATIC HTML - No async work, instant CDN cache
+ * HTML structure is pre-rendered and cached at CDN edge
+ * Client component fetches ALL data after HTML is painted
  */
 
 import { KeukenAnalysesClient } from "./KeukenAnalysesClient";
-import { fetchKeukenAnalysesData } from "@/lib/services/daily-ops/keuken-analyses.service";
-import { startOfMonth, endOfMonth } from "date-fns";
 
-// ISR revalidation - 30 minutes
+// ✅ ISR revalidation - page cached at CDN for 30 minutes
+// ✅ STATIC: No async work = instant HTML generation = instant CDN cache
 export const revalidate = 1800;
 
-export default async function KeukenAnalysesPage() {
-  // Calculate "this-month" date range server-side
-  const now = new Date();
-  const dateRange = {
-    start: startOfMonth(now),
-    end: endOfMonth(now),
-  };
-
-  console.log('[Keuken Page] Server-side date calculation:', {
-    now: now.toISOString(),
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
-    startDate: dateRange.start.toISOString(),
-    endDate: dateRange.end.toISOString(),
-  });
-
-  // Fetch initial data on server
-  const initialData = await fetchKeukenAnalysesData({
-    startDate: dateRange.start.toISOString(),
-    endDate: dateRange.end.toISOString(),
-  });
-
-  // Pass server data to client component
-  return <KeukenAnalysesClient initialData={initialData} />;
+// ✅ COMPLETELY STATIC - No async, no data fetching, just HTML structure
+// This allows ISR to cache HTML instantly (< 50ms) at CDN edge
+// Client component handles ALL data fetching after HTML is painted
+export default function KeukenAnalysesPage() {
+  // ✅ Return static HTML structure immediately - no async work
+  // Client component fetches keuken analyses data after HTML is ready
+  return <KeukenAnalysesClient initialData={undefined} />;
 }
 

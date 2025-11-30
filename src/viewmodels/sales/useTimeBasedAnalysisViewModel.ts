@@ -11,7 +11,7 @@ import { getTimeBasedAnalysis } from "@/lib/services/graphql/queries";
 import { getLocations } from "@/lib/services/graphql/queries";
 import { LocationOption } from "@/models/sales/bork-sales-v2.model";
 
-export function useTimeBasedAnalysisViewModel() {
+export function useTimeBasedAnalysisViewModel(initialData?: { timeData?: any; locations?: any[] }) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -20,9 +20,10 @@ export function useTimeBasedAnalysisViewModel() {
 
   const dateRange = useMemo(() => getDateRangeForPreset(selectedDatePreset), [selectedDatePreset]);
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -78,26 +79,26 @@ export function useTimeBasedAnalysisViewModel() {
     };
   }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
 
-  // Fetch time-based analysis for ALL locations
-  const { data: allTimeData, isLoading, error } = useQuery({
-    queryKey: ["time-based-analysis", startDate, endDate],
-    queryFn: () => getTimeBasedAnalysis(startDate, endDate, {}),
+  // Build filters for GraphQL query
+  const filters = useMemo(() => {
+    const filterObj: { locationId?: string } = {};
+    if (selectedLocation !== "all") {
+      filterObj.locationId = selectedLocation;
+    }
+    return filterObj;
+  }, [selectedLocation]);
+
+  // Fetch time-based analysis data
+  const { data: timeBasedAnalysisData, isLoading, error } = useQuery({
+    queryKey: ["time-based-analysis", startDate, endDate, selectedLocation],
+    queryFn: () => getTimeBasedAnalysis(startDate, endDate, filters),
+    initialData: selectedLocation === "all" ? initialData?.timeData : undefined,
     staleTime: 30 * 60 * 1000,
     enabled: !!startDate && !!endDate,
   });
 
-  // Filter data client-side
-  const timeData = useMemo(() => {
-    if (!allTimeData?.records) return [];
-    
-    if (selectedLocation === "all") {
-      return allTimeData.records;
-    }
-    
-    return allTimeData.records.filter((record: any) => 
-      record.location_id === selectedLocation
-    );
-  }, [allTimeData?.records, selectedLocation]);
+  // Get time data from query result
+  const timeData = timeBasedAnalysisData?.records || [];
 
   return {
     selectedYear,
@@ -115,6 +116,8 @@ export function useTimeBasedAnalysisViewModel() {
     timeData,
     isLoading,
     error: error as Error | null,
+    startDate,
+    endDate,
   };
 }
 

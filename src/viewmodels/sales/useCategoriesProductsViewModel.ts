@@ -407,6 +407,10 @@ export function useCategoriesProductsViewModel(initialData?: { aggregatedData?: 
     refetchData: () => {
       refetchAggregatedData();
     },
+    
+    // Date range
+    startDate: queryFilters.startDate || '',
+    endDate: queryFilters.endDate || '',
   };
 }
 

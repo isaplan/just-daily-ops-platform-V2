@@ -72,6 +72,7 @@ export async function executeGraphQL<T = any>(
       if (!apolloServerPromise) {
         apolloServerPromise = (async () => {
           try {
+            console.log('[GraphQL Server] Initializing Apollo Server...');
             const { ApolloServer } = await import('@apollo/server');
             const { typeDefs } = await import('@/lib/graphql/v2-schema');
             const { resolvers } = await import('@/lib/graphql/v2-resolvers');
@@ -83,10 +84,18 @@ export async function executeGraphQL<T = any>(
             });
             
             // Start the server (required before executing operations)
+            console.log('[GraphQL Server] Starting Apollo Server...');
             await server.start();
+            console.log('[GraphQL Server] Apollo Server started successfully');
             
             return server;
-          } catch (error) {
+          } catch (error: any) {
+            console.error('[GraphQL Server] Failed to initialize Apollo Server:', {
+              message: error?.message,
+              stack: error?.stack,
+              name: error?.name,
+              error,
+            });
             // Reset promise on error so next call can retry
             apolloServerPromise = null;
             throw error;
@@ -95,7 +104,18 @@ export async function executeGraphQL<T = any>(
       }
       
       // Wait for server to be ready (or get existing instance)
-      const server = await apolloServerPromise;
+      let server;
+      try {
+        server = await apolloServerPromise;
+      } catch (serverError: any) {
+        console.error('[GraphQL Server] Failed to get Apollo Server instance:', {
+          message: serverError?.message,
+          stack: serverError?.stack,
+          name: serverError?.name,
+          error: serverError,
+        });
+        throw serverError;
+      }
       
       // Store instance for reuse
       if (!apolloServerInstance) {
@@ -103,15 +123,29 @@ export async function executeGraphQL<T = any>(
       }
       
       // Execute the query using Apollo Server's execution engine
-      const result = await server.executeOperation(
-        {
-          query,
-          variables: variables || {},
-        },
-        {
-          contextValue: {},
-        }
-      );
+      let result;
+      try {
+        result = await server.executeOperation(
+          {
+            query,
+            variables: variables || {},
+          },
+          {
+            contextValue: {},
+          }
+        );
+      } catch (execError: any) {
+        console.error('[GraphQL Server] Failed to execute operation:', {
+          message: execError?.message,
+          stack: execError?.stack,
+          name: execError?.name,
+          query: query.substring(0, 100),
+          variables,
+          error: execError,
+        });
+        console.error('[GraphQL Server] Full error details:', JSON.stringify(execError, Object.getOwnPropertyNames(execError)));
+        throw execError;
+      }
       
       // Log in development
       if (process.env.NODE_ENV === 'development') {
@@ -123,16 +157,43 @@ export async function executeGraphQL<T = any>(
       
       // Transform Apollo result to GraphQLResponse format
       if (result.body.kind === 'single') {
+        const singleResult = result.body.singleResult;
+        
+        // Check for errors first
+        if (singleResult.errors && singleResult.errors.length > 0) {
+          const errorMessages = singleResult.errors.map((e: any) => e.message).join(', ');
+          console.error('[GraphQL Server] Apollo execution errors:', {
+            errors: singleResult.errors,
+            messages: errorMessages,
+          });
+          
+          // Return errors in GraphQLResponse format
+          return {
+            data: singleResult.data as T,
+            errors: singleResult.errors.map((e: any) => ({
+              message: e.message,
+              path: e.path,
+            })),
+          };
+        }
+        
         // ✅ Force serialization through JSON to ensure all MongoDB objects/Date objects are converted to plain objects/strings
         // This prevents "Only plain objects" errors when passing data from Server Components to Client Components
-        const serializedData = JSON.parse(JSON.stringify(result.body.singleResult.data));
+        let serializedData: any;
+        try {
+          serializedData = JSON.parse(JSON.stringify(singleResult.data));
+        } catch (serializeError: any) {
+          console.error('[GraphQL Server] Serialization error:', {
+            error: serializeError.message,
+            dataType: typeof singleResult.data,
+            dataKeys: singleResult.data ? Object.keys(singleResult.data) : [],
+          });
+          throw new Error(`Failed to serialize GraphQL response: ${serializeError.message}`);
+        }
         
         return {
           data: serializedData as T,
-          errors: result.body.singleResult.errors?.map((e: any) => ({
-            message: e.message,
-            path: e.path,
-          })),
+          errors: undefined,
         };
       }
       
@@ -164,16 +225,24 @@ export async function executeGraphQL<T = any>(
     }
     
     // Use fetch with appropriate configuration
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: requestBody,
-      cache: 'no-store', // Don't cache GraphQL requests
-      // Increased timeout for complex queries (30s)
-      signal: AbortSignal.timeout(30000),
-    });
+    // Create AbortController for timeout (more compatible than AbortSignal.timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+        cache: 'no-store', // Don't cache GraphQL requests
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -185,13 +254,53 @@ export async function executeGraphQL<T = any>(
       throw new Error(`GraphQL request failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const result: GraphQLResponse<T> = await response.json();
+    let result: GraphQLResponse<T>;
+    try {
+      result = await response.json();
+    } catch (jsonError: any) {
+      const responseText = await response.text();
+      console.error('[GraphQL Client] JSON Parse Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        responseText: responseText.substring(0, 500),
+        jsonError: jsonError.message,
+      });
+      throw new Error(`Failed to parse GraphQL response: ${jsonError.message}. Response: ${responseText.substring(0, 200)}`);
+    }
     
-    // Log the response
-    console.log('[GraphQL Response]', result);
+    // Log the response (only data, not full object to avoid cluttering console)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[GraphQL Response]', {
+        hasData: !!result.data,
+        hasErrors: !!(result.errors && result.errors.length > 0),
+        errorCount: result.errors?.length || 0,
+        errors: result.errors?.map(e => e.message) || [],
+      });
+    }
 
     if (result.errors && result.errors.length > 0) {
-      const errorMessages = result.errors.map((e) => e.message).join(', ');
+      // Extract error messages safely
+      const errorMessages = result.errors
+        .map((e: any) => {
+          if (typeof e === 'string') return e;
+          if (e?.message) return e.message;
+          if (e?.error?.message) return e.error.message;
+          return JSON.stringify(e);
+        })
+        .filter((msg: string) => msg && msg.trim() !== '')
+        .join(', ');
+      
+      const errorDetails = result.errors.map((e: any) => ({
+        message: typeof e === 'string' ? e : e?.message || e?.error?.message || JSON.stringify(e),
+        path: e?.path || e?.error?.path,
+        extensions: e?.extensions || e?.error?.extensions,
+      }));
+      
+      console.error('[GraphQL Client] GraphQL Errors:', {
+        messages: errorMessages,
+        details: errorDetails,
+        hasData: !!result.data,
+      });
       
       // Check for MongoDB connection errors
       if (errorMessages.includes('ETIMEOUT') || errorMessages.includes('querySrv')) {
@@ -201,7 +310,12 @@ export async function executeGraphQL<T = any>(
         throw new Error('Cannot connect to MongoDB. Please verify your connection string and network settings.');
       }
       
-      throw new Error(`GraphQL errors: ${errorMessages}`);
+      // If we have data but also errors, log a warning but still throw
+      if (result.data) {
+        console.warn('[GraphQL Client] Partial success: Response has both data and errors');
+      }
+      
+      throw new Error(`GraphQL errors: ${errorMessages || 'Unknown error occurred'}`);
     }
 
     return result;
@@ -212,7 +326,14 @@ export async function executeGraphQL<T = any>(
       throw error; // Re-throw so React Query can handle it properly
     }
     
-    console.error('[GraphQL Client] Error:', error);
+    // Enhanced error logging
+    console.error('[GraphQL Client] Error:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause,
+      toString: error.toString(),
+    });
     
     // Handle network errors with more detail
     if (error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
@@ -241,7 +362,7 @@ export async function executeGraphQL<T = any>(
       throw error;
     }
     
-    throw new Error(`GraphQL request failed: ${error.message || 'Unknown error'}`);
+    throw new Error(`GraphQL request failed: ${error.message || error.toString() || 'Unknown error'}`);
   }
 }
 

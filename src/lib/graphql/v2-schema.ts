@@ -93,6 +93,21 @@ export const typeDefs = `#graphql
   }
 
   # ============================================
+  # COMPANY SETTINGS
+  # ============================================
+
+  type CompanySettings {
+    id: ID!
+    workingDayStartHour: Int! # 0-23, default: 6 (06:00)
+    createdAt: String
+    updatedAt: String
+  }
+
+  input CompanySettingsInput {
+    workingDayStartHour: Int! # 0-23
+  }
+
+  # ============================================
   # DATA TYPES
   # ============================================
 
@@ -120,11 +135,21 @@ export const typeDefs = `#graphql
     laborCostPercentage: Float!
     revenuePerHour: Float!
     teamStats: [TeamStats!]
+    workerStats: [WorkerStats!]
     createdAt: Date!
   }
 
   type TeamStats {
     team: Team!
+    hours: Float!
+    cost: Float!
+  }
+
+  type WorkerStats {
+    workerId: ID!
+    workerName: String!
+    teamId: ID
+    teamName: String
     hours: Float!
     cost: Float!
   }
@@ -146,6 +171,78 @@ export const typeDefs = `#graphql
     page: Int!
     totalPages: Int!
     error: String
+  }
+
+  # ============================================
+  # LABOR PRODUCTIVITY ENHANCED TYPES
+  # ============================================
+
+  enum PeriodType {
+    YEAR
+    MONTH
+    WEEK
+    DAY
+    HOUR
+  }
+
+  enum Division {
+    ALL
+    FOOD
+    BEVERAGE
+    MANAGEMENT
+    OTHER
+  }
+
+  enum TeamCategory {
+    KITCHEN
+    SERVICE
+    MANAGEMENT
+    OTHER
+  }
+
+  type ProductivityEnhanced {
+    id: ID!
+    period: String!
+    periodType: PeriodType!
+    locationId: String
+    locationName: String
+    teamId: String
+    teamName: String
+    totalHoursWorked: Float!
+    totalWageCost: Float!
+    totalRevenue: Float!
+    revenuePerHour: Float!
+    laborCostPercentage: Float!
+    recordCount: Int!
+    division: Division
+    teamCategory: TeamCategory
+    subTeam: String
+    workerId: String
+    workerName: String
+    ordersCount: Int
+    salesCount: Int
+    productivityScore: Float
+    goalStatus: String
+  }
+
+  type ProductivityEnhancedResponse {
+    success: Boolean!
+    records: [ProductivityEnhanced!]!
+    total: Int!
+    page: Int!
+    totalPages: Int!
+    error: String
+    byDivision: [ProductivityEnhanced!]
+    byTeamCategory: [ProductivityEnhanced!]
+    byWorker: [ProductivityEnhanced!]
+  }
+
+  input ProductivityEnhancedFilters {
+    locationId: ID
+    division: Division
+    teamCategory: TeamCategory
+    subTeam: String
+    workerId: ID
   }
 
   # ============================================
@@ -228,14 +325,22 @@ export const typeDefs = `#graphql
 
   type WorkerProfile {
     id: ID!
+    # User IDs and Names (denormalized for fast queries - 100x faster!)
     eitjeUserId: Int!
-    userName: String
+    userName: String # Prefer unifiedUserName if available
+    unifiedUserId: String # unified_users._id
+    unifiedUserName: String # unified_users.name (primary source of truth)
+    borkUserId: String # bork system mapping externalId
+    borkUserName: String # Usually same as unifiedUserName
+    # Teams (names already denormalized)
     teamName: String
     teams: [TeamMembership!]
+    # Locations (names already denormalized)
     locationId: String
     locationName: String
     locationIds: [String!]
     locationNames: [String!]
+    # Contract data
     contractType: String
     contractHours: Float
     hourlyWage: Float
@@ -275,6 +380,35 @@ export const typeDefs = `#graphql
     teamId: String
     contractType: String
     activeOnly: Boolean
+  }
+
+  # Worker Metrics Types
+  type WorkerSalesSummary {
+    totalRevenue: Float!
+    totalTransactions: Int!
+    averageTicketValue: Float!
+    totalItems: Int!
+  }
+
+  type WorkerHoursBreakdown {
+    gewerkt: Float!
+    ziek: Float!
+    verlof: Float!
+    total: Float!
+  }
+
+  type WorkerLaborCost {
+    totalCost: Float!
+    totalHours: Float!
+    averageHourlyCost: Float!
+  }
+
+  type WorkerHoursSummary {
+    totalHours: Float!
+    workedHours: Float!
+    leaveHours: Float!
+    sickHours: Float!
+    averageHoursPerDay: Float!
   }
 
   # ============================================
@@ -726,6 +860,9 @@ export const typeDefs = `#graphql
     teams(locationId: ID): [Team!]!
     team(id: ID!): Team
     
+    # Company Settings
+    companySettings: CompanySettings!
+    
     # Dashboard queries
     dashboard(
       locationId: ID!
@@ -749,6 +886,16 @@ export const typeDefs = `#graphql
       page: Int
       limit: Int
     ): LaborAggregatedResponse!
+    
+    laborProductivityEnhanced(
+      startDate: String!
+      endDate: String!
+      periodType: PeriodType!
+      locationId: ID
+      filters: ProductivityEnhancedFilters
+      page: Int
+      limit: Int
+    ): ProductivityEnhancedResponse!
     
     pnlData(
       locationId: ID!
@@ -877,6 +1024,34 @@ export const typeDefs = `#graphql
     
     workerProfile(id: ID!): WorkerProfile
     workerProfileByName(userName: String!): WorkerProfile
+    
+    # Worker Metrics
+    workerSales(
+      workerName: String!
+      startDate: String!
+      endDate: String!
+    ): WorkerSalesSummary!
+    
+    workerHours(
+      eitjeUserId: Int!
+      startDate: String!
+      endDate: String!
+    ): WorkerHoursBreakdown!
+    
+    workerLaborCost(
+      eitjeUserId: Int!
+      startDate: String!
+      endDate: String!
+    ): WorkerLaborCost!
+    
+    workerHoursSummary(
+      eitjeUserId: Int!
+      contractHours: Float
+      contractStartDate: String
+      contractEndDate: String
+      startDate: String!
+      endDate: String!
+    ): WorkerHoursSummary!
     
     # API Credentials
     apiCredentials(provider: String, locationId: ID): [ApiCredential!]!
@@ -1049,6 +1224,9 @@ export const typeDefs = `#graphql
     createProduct(input: ProductInput!): Product!
     updateProduct(id: ID!, input: ProductUpdateInput!): Product!
     deleteProduct(id: ID!): Boolean!
+    
+    # Company Settings
+    updateCompanySettings(input: CompanySettingsInput!): CompanySettings!
   }
 `;
 

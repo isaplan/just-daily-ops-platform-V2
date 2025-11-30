@@ -120,6 +120,66 @@ export interface BorkAggregated {
   avgRevenuePerTransaction: number;
   revenueByCategory: Record<string, number>; // { "food": 1000, "drinks": 500 }
   revenueByPaymentMethod: Record<string, number>;
+  
+  // ============================================
+  // BREAKDOWN ARRAYS (for fast analysis queries)
+  // ============================================
+  paymentMethodBreakdown?: Array<{
+    paymentMethod: string;
+    totalRevenue: number;
+    totalTransactions: number;
+    averageTransactionValue: number;
+    percentageOfTotal: number;
+  }>;
+  
+  waiterBreakdown?: Array<{
+    waiterName: string;
+    totalRevenue: number;
+    totalItemsSold: number;
+    totalTransactions: number;
+    averageTicketValue: number;
+    averageItemsPerTransaction: number;
+  }>;
+  
+  tableBreakdown?: Array<{
+    tableNumber: number;
+    totalRevenue: number;
+    totalItemsSold: number;
+    totalTransactions: number;
+    averageTransactionValue: number;
+  }>;
+  
+  hourlyBreakdown?: Array<{
+    hour: number; // 0-23
+    totalRevenue: number;
+    totalItemsSold: number;
+    totalTransactions: number;
+    averageTransactionValue: number;
+  }>;
+  
+  // ============================================
+  // HOURLY BREAKDOWNS (for productivity calculations)
+  // ============================================
+  
+  workerBreakdownHourly?: Array<{
+    waiterName: string;
+    hour: number; // 0-23
+    totalRevenue: number;
+    totalItemsSold: number;
+    totalTransactions: number;
+    totalOrders: number;
+    averageTransactionValue: number;
+  }>;
+  
+  divisionHourlyBreakdown?: Array<{
+    division: 'Food' | 'Beverage';
+    hour: number; // 0-23
+    totalRevenue: number;
+    totalItemsSold: number;
+    totalTransactions: number;
+    averageTransactionValue: number;
+  }>;
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -197,6 +257,20 @@ export interface ProductsAggregated {
     lastSoldDate: Date;
     totalQuantitySold: number;
     totalRevenue: number;
+  }>;
+  
+  // ============================================
+  // PRODUCT PERFORMANCE BY LOCATION (for productPerformance resolver)
+  // ============================================
+  productPerformanceByLocation?: Array<{
+    locationId: ObjectId;
+    locationName: string;
+    totalQuantitySold: number;
+    totalRevenue: number;
+    totalProfit: number; // Calculate from cost_price if available
+    averageUnitPrice: number;
+    transactionCount: number;
+    lastSoldDate: Date;
   }>;
   
   // ============================================
@@ -473,6 +547,56 @@ export interface EitjeAggregated {
 }
 
 // ============================================
+// LABOR PRODUCTIVITY HIERARCHICAL
+// ============================================
+
+export interface LaborProductivityHierarchical {
+  _id?: ObjectId;
+  date: Date;
+  locationId: ObjectId;
+  locationName: string;
+  byDivision: {
+    [divisionName: string]: {
+      totalHours: number;
+      totalCost: number;
+      totalRevenue: number;
+      revenuePerHour: number;
+      laborCostPercentage: number;
+      byTeamCategory: {
+        [categoryName: string]: {
+          totalHours: number;
+          totalCost: number;
+          totalRevenue: number;
+          revenuePerHour: number;
+          laborCostPercentage: number;
+          bySubTeam: {
+            [subTeamName: string]: {
+              totalHours: number;
+              totalCost: number;
+              totalRevenue: number;
+              revenuePerHour: number;
+              laborCostPercentage: number;
+              byWorker: {
+                [workerId: string]: {
+                  workerName: string;
+                  totalHours: number;
+                  totalCost: number;
+                  totalRevenue: number;
+                  revenuePerHour: number;
+                  laborCostPercentage: number;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
 // POWERBI DATA
 // ============================================
 
@@ -631,6 +755,29 @@ export interface Menu {
 }
 
 // ============================================
+// EVENTS
+// ============================================
+
+export interface Event {
+  _id?: ObjectId;
+  title: string;
+  startDate: Date;
+  endDate?: Date; // Optional for repeating events
+  locationId?: ObjectId; // Location this event is for
+  isRepeating: boolean;
+  recurrencePattern?: 'weekly' | 'monthly' | 'custom' | {
+    type: 'custom';
+    daysOfWeek?: number[]; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    interval?: number; // Every N weeks/months
+    unit?: 'week' | 'month'; // Interval unit
+  };
+  notes?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
 // DATA IMPORTS TRACKING
 // ============================================
 
@@ -648,5 +795,291 @@ export interface DataImport {
   metadata?: Record<string, any>;
   createdAt: Date;
   completedAt?: Date;
+}
+
+// ============================================
+// SALES LINE ITEMS AGGREGATED (for dailySales resolver)
+// Line-item level data - one record per product sold
+// ============================================
+
+export interface SalesLineItemAggregated {
+  _id?: ObjectId;
+  ticketNumber: string;
+  ticketKey: string;
+  orderKey: string;
+  orderLineKey: string;
+  date: string; // YYYY-MM-DD
+  locationId: ObjectId;
+  locationName: string;
+  productName: string;
+  productSku?: string;
+  productNumber?: string;
+  category: string;
+  groupName?: string;
+  quantity: number;
+  unitPrice: number;
+  totalExVat: number;
+  totalIncVat: number;
+  vatRate: number;
+  vatAmount: number;
+  costPrice?: number;
+  tableNumber?: number;
+  waiterName?: string;
+  paymentMethod?: string;
+  time?: string; // HH:MM
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// TRANSACTIONS AGGREGATED (for transactionAnalysis resolver)
+// Transaction summary level - one record per ticket
+// ============================================
+
+export interface TransactionAggregated {
+  _id?: ObjectId;
+  ticketNumber: string;
+  date: string; // YYYY-MM-DD
+  locationId: ObjectId;
+  locationName: string;
+  tableNumber?: number;
+  waiterName?: string;
+  paymentMethod?: string;
+  time?: string; // HH:MM
+  totalRevenue: number;
+  totalItems: number;
+  itemCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// PROCESSED HOURS AGGREGATED (for processedHours resolver)
+// Individual shift records with pre-aggregated user names
+// ============================================
+
+export interface ProcessedHoursAggregated {
+  _id?: ObjectId;
+  date: string; // YYYY-MM-DD
+  locationId: ObjectId;
+  locationName: string;
+  userId: number;
+  userName: string; // ✅ Pre-aggregated (no N+1 queries!)
+  environmentId?: number;
+  environmentName?: string;
+  teamId?: number;
+  teamName?: string;
+  start: string; // HH:MM
+  end: string; // HH:MM
+  breakMinutes: number;
+  workedHours: number;
+  hourlyWage: number;
+  wageCost: number;
+  typeName?: string;
+  shiftType?: string;
+  remarks?: string;
+  approved?: boolean;
+  // Team hours breakdown: total hours per team for this worker/date/location
+  // Example: [{ teamName: "Bediening", hours: 4, wageCost: 80 }, { teamName: "Management", hours: 2.25, wageCost: 45 }]
+  teamHoursBreakdown?: Array<{
+    teamId?: number;
+    teamName: string;
+    hours: number;
+    wageCost: number;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// WORKER PROFILES AGGREGATED (for workerProfiles resolver)
+// Pre-computed worker data with connected metrics
+// ============================================
+
+export interface WorkerProfilesAggregated {
+  _id?: ObjectId;
+  
+  // User IDs and Names (denormalized for fast queries - 100x faster!)
+  eitjeUserId: number;
+  userName?: string | null; // From unified_users or eitje_raw_data (preferred: unified_users.name)
+  
+  unifiedUserId?: ObjectId | null; // unified_users._id
+  unifiedUserName?: string | null; // unified_users.name (primary source of truth)
+  
+  borkUserId?: string | null; // bork system mapping externalId (if exists)
+  borkUserName?: string | null; // Usually same as unifiedUserName
+  
+  // Location data (pre-computed with names - denormalized)
+  locationId?: ObjectId | null;
+  locationName?: string | null;
+  locationIds?: ObjectId[] | null;
+  locationNames?: string[] | null;
+  
+  // Contract data
+  contractType?: string | null;
+  contractHours?: number | null;
+  hourlyWage?: number | null;
+  wageOverride: boolean;
+  effectiveFrom?: Date | null;
+  effectiveTo?: Date | null;
+  notes?: string | null;
+  
+  // Teams (pre-aggregated from shifts)
+  teams?: Array<{
+    team_id: string;
+    team_name: string;
+    team_type?: string;
+  }> | null;
+  teamName?: string | null; // Primary team
+  
+  // Pre-computed date ranges for fast filtering
+  activeYears: number[]; // [2024, 2025] - years worker was active
+  activeMonths: Array<{
+    year: number;
+    month: number; // 1-12
+  }>; // [{year: 2024, month: 11}, {year: 2024, month: 12}]
+  activeDays?: Array<{
+    year: number;
+    month: number;
+    day: number;
+  }>; // Optional: for very granular filtering
+  
+  // Pre-computed connected data (common periods)
+  // ThisMonth period
+  thisMonth?: {
+    hoursBreakdown: {
+      gewerkt: number;
+      ziek: number;
+      verlof: number;
+      total: number;
+    };
+    salesSummary: {
+      totalRevenue: number;
+      totalTransactions: number;
+      averageTicketValue: number;
+      totalItems: number;
+    };
+    laborCost: number;
+    hoursSummary?: {
+      totalContractHours: number;
+      totalHoursWorked: number;
+      contractDifference: number;
+      totalOpgebouwdVerlof: number;
+      totalOpgenomenVerlof: number;
+      leaveDifference: number;
+    };
+  };
+  
+  // LastMonth period
+  lastMonth?: {
+    hoursBreakdown: {
+      gewerkt: number;
+      ziek: number;
+      verlof: number;
+      total: number;
+    };
+    salesSummary: {
+      totalRevenue: number;
+      totalTransactions: number;
+      averageTicketValue: number;
+      totalItems: number;
+    };
+    laborCost: number;
+    hoursSummary?: {
+      totalContractHours: number;
+      totalHoursWorked: number;
+      contractDifference: number;
+      totalOpgebouwdVerlof: number;
+      totalOpgenomenVerlof: number;
+      leaveDifference: number;
+    };
+  };
+  
+  // Total period (all time)
+  total?: {
+    hoursBreakdown: {
+      gewerkt: number;
+      ziek: number;
+      verlof: number;
+      total: number;
+    };
+    salesSummary: {
+      totalRevenue: number;
+      totalTransactions: number;
+      averageTicketValue: number;
+      totalItems: number;
+    };
+    laborCost: number;
+    hoursSummary?: {
+      totalContractHours: number;
+      totalHoursWorked: number;
+      contractDifference: number;
+      totalOpgebouwdVerlof: number;
+      totalOpgenomenVerlof: number;
+      leaveDifference: number;
+    };
+  };
+  
+  // ============================================
+  // HIERARCHICAL TIME-SERIES PRODUCTIVITY DATA
+  // Fast queries for year/month/week/day breakdowns with costs and revenue
+  // ============================================
+  productivityByYear?: Array<{
+    year: string; // "2025"
+    totalHoursWorked: number;
+    totalWageCost: number;
+    totalRevenue: number;
+    revenuePerHour: number;
+    laborCostPercentage: number;
+    byMonth?: Array<{
+      year: number; // 2025
+      month: number; // 1-12
+      totalHoursWorked: number;
+      totalWageCost: number;
+      totalRevenue: number;
+      revenuePerHour: number;
+      laborCostPercentage: number;
+      byWeek?: Array<{
+        week: string; // "46"
+        totalHoursWorked: number;
+        totalWageCost: number;
+        totalRevenue: number;
+        revenuePerHour: number;
+        laborCostPercentage: number;
+      }>;
+      byDay?: Array<{
+        date: string; // "2025-11-27"
+        locationId: ObjectId;
+        locationName: string;
+        totalHoursWorked: number;
+        totalWageCost: number;
+        totalRevenue: number;
+        revenuePerHour: number;
+        laborCostPercentage: number;
+      }>;
+    }>;
+  }>;
+  
+  // Metadata
+  isActive: boolean; // Pre-computed: !effectiveTo || effectiveTo > now
+  lastAggregated: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// COMPANY SETTINGS
+// ============================================
+
+export interface CompanySettings {
+  _id?: ObjectId;
+  // Working Day Configuration
+  workingDayStartHour: number; // 0-23, default: 6 (06:00)
+  // Future: Add more company-wide settings here
+  // timezone?: string;
+  // currency?: string;
+  // fiscalYearStart?: { month: number; day: number };
+  createdAt: Date;
+  updatedAt: Date;
 }
 

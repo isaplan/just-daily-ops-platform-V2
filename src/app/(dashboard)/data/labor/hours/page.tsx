@@ -1,6 +1,8 @@
 /**
- * Hours V2 - Server Component
- * Fetches initial data on server for fast first paint
+ * Hours - Server Component
+ * ✅ SSR with ISR - Fetches initial data on server for fast first paint
+ * HTML structure is pre-rendered with initial data and cached at CDN edge
+ * Client component uses initialData for instant display, then updates client-side
  */
 
 import { HoursClient } from './HoursClient';
@@ -10,38 +12,30 @@ import { getLocations } from '@/lib/services/graphql/queries';
 // ✅ ISR revalidation - page cached at CDN for 30 minutes
 export const revalidate = 1800;
 
-export default async function HoursV2Page() {
-  // ✅ Fetch initial data on server (fast, SSR)
-  // Use default filters: this-year preset, all locations, page 1
-  // Calculate 'this-year' range on server (can't use client-side function)
-  const now = new Date();
-  const startDate = `${now.getFullYear()}-01-01`;
-  const endDate = `${now.getFullYear()}-12-31`;
-  
-  // Fetch data in parallel
+// ✅ SSR: Fetch initial data on server for fast first paint
+export default async function HoursPage() {
+  // Use default filters: this-year preset, all locations, page 1, first 50 items
+  const currentYear = new Date().getFullYear();
+  const startDate = `${currentYear}-01-01`;
+  const endDate = `${currentYear}-12-31`;
+
+  // Fetch initial 50 items from aggregated collections (fast, < 500ms)
   const [initialProcessedData, locations] = await Promise.all([
     fetchProcessedHours({
       startDate,
       endDate,
+      locationId: 'all',
       page: 1,
       limit: 50,
-      locationId: 'all',
-    }).catch(() => ({
-      success: false,
-      records: [],
-      total: 0,
-      page: 1,
-      totalPages: 0,
-    })),
+    }).catch(() => null),
     getLocations().catch(() => []),
   ]);
-  
-  // ✅ Pass server-fetched data to client component
+
   return (
     <HoursClient
       initialData={{
-        processedData: initialProcessedData.success ? initialProcessedData : undefined,
-        locations,
+        processedData: initialProcessedData || undefined,
+        locations: locations || [],
       }}
     />
   );

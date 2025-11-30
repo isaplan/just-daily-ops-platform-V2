@@ -13,7 +13,7 @@ import { LocationOption } from "@/models/sales/bork-sales-v2.model";
 
 const ITEMS_PER_PAGE = 50;
 
-export function useTransactionAnalysisViewModel() {
+export function useTransactionAnalysisViewModel(initialData?: { transactionData?: any; locations?: any[] }) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -27,9 +27,10 @@ export function useTransactionAnalysisViewModel() {
 
   const dateRange = useMemo(() => getDateRangeForPreset(selectedDatePreset), [selectedDatePreset]);
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -85,39 +86,27 @@ export function useTransactionAnalysisViewModel() {
     };
   }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
 
-  // Fetch transaction analysis for ALL locations
-  const { data: allTransactionData, isLoading, error } = useQuery({
-    queryKey: ["transaction-analysis", startDate, endDate],
-    queryFn: () => getTransactionAnalysis(startDate, endDate, 1, 10000, {}), // Fetch all
+  // Build filters for GraphQL query
+  const filters = useMemo(() => {
+    const filterObj: { locationId?: string } = {};
+    if (selectedLocation !== "all") {
+      filterObj.locationId = selectedLocation;
+    }
+    return filterObj;
+  }, [selectedLocation]);
+
+  // Fetch transaction analysis with proper pagination
+  const { data: transactionAnalysisData, isLoading, error } = useQuery({
+    queryKey: ["transaction-analysis", startDate, endDate, currentPage, selectedLocation],
+    queryFn: () => getTransactionAnalysis(startDate, endDate, currentPage, ITEMS_PER_PAGE, filters),
+    initialData: currentPage === 1 && selectedLocation === "all" ? initialData?.transactionData : undefined,
     staleTime: 30 * 60 * 1000,
     enabled: !!startDate && !!endDate,
   });
 
-  // Filter and paginate data client-side
-  const { transactionData, totalPages, total } = useMemo(() => {
-    if (!allTransactionData?.records) {
-      return { transactionData: [], totalPages: 0, total: 0 };
-    }
-    
-    // Filter by location
-    let filtered = allTransactionData.records;
-    if (selectedLocation !== "all") {
-      filtered = filtered.filter((transaction: any) => 
-        transaction.location_id === selectedLocation
-      );
-    }
-    
-    // Paginate client-side
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginated = filtered.slice(startIndex, endIndex);
-    
-    return {
-      transactionData: paginated,
-      totalPages: Math.ceil(filtered.length / ITEMS_PER_PAGE),
-      total: filtered.length,
-    };
-  }, [allTransactionData?.records, selectedLocation, currentPage]);
+  const transactionData = transactionAnalysisData?.records || [];
+  const totalPages = transactionAnalysisData?.totalPages || 0;
+  const total = transactionAnalysisData?.total || 0;
 
   return {
     selectedYear,
@@ -139,6 +128,8 @@ export function useTransactionAnalysisViewModel() {
     error: error as Error | null,
     totalPages,
     total,
+    startDate,
+    endDate,
   };
 }
 

@@ -90,12 +90,6 @@ export function initializeBreadcrumbRegistry(): void {
   });
   registerBreadcrumb('/data/labor/costs', {
     label: 'Labor Costs',
-    subtitle: 'View labor cost data',
-    parentPath: '/data/labor',
-    parentLabel: 'Labor',
-  });
-  registerBreadcrumb('/data/labor/labor-cost', {
-    label: 'Labor Cost',
     subtitle: 'Calculate and view labor costs per year, month, week, day, and hour',
     parentPath: '/data/labor',
     parentLabel: 'Labor',
@@ -106,6 +100,36 @@ export function initializeBreadcrumbRegistry(): void {
     parentPath: '/data/labor',
     parentLabel: 'Labor',
   });
+  registerBreadcrumb('/data/labor/productivity', {
+    label: 'Productivity',
+    subtitle: 'View productivity metrics by location, division, team, and worker',
+    parentPath: '/data/labor',
+    parentLabel: 'Labor',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-location', {
+    label: 'By Location',
+    subtitle: 'Productivity metrics grouped by location',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-division', {
+    label: 'By Division',
+    subtitle: 'Productivity metrics grouped by division (Food/Beverage/Management)',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-team', {
+    label: 'By Team',
+    subtitle: 'Productivity metrics grouped by team category',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-worker', {
+    label: 'By Worker',
+    subtitle: 'Productivity metrics per worker per day',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
+  });
   registerBreadcrumb('/data/labor/locations-teams', {
     label: 'Locations & Teams',
     subtitle: 'View workers by location, team, and contract type',
@@ -113,10 +137,34 @@ export function initializeBreadcrumbRegistry(): void {
     parentLabel: 'Labor',
   });
   registerBreadcrumb('/data/labor/productivity', {
-    label: 'Labor Productivity',
-    subtitle: 'Calculate labor productivity per day, week, and month per team and total',
+    label: 'Productivity',
+    subtitle: 'View productivity metrics by location, division, team, and worker',
     parentPath: '/data/labor',
     parentLabel: 'Labor',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-location', {
+    label: 'By Location',
+    subtitle: 'Productivity metrics grouped by location',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-division', {
+    label: 'By Division',
+    subtitle: 'Productivity metrics grouped by division (Food/Beverage/Management)',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-team', {
+    label: 'By Team',
+    subtitle: 'Productivity metrics grouped by team category',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
+  });
+  registerBreadcrumb('/data/labor/productivity/by-worker', {
+    label: 'By Worker',
+    subtitle: 'Productivity metrics per worker per day',
+    parentPath: '/data/labor/productivity',
+    parentLabel: 'Productivity',
   });
 
   // Daily Ops
@@ -142,32 +190,39 @@ export function initializeBreadcrumbRegistry(): void {
     label: 'Sales',
     subtitle: 'View and manage sales data',
   });
-registerBreadcrumb('/data/sales/bork', {
+registerBreadcrumb('/data/sales/daily', {
   label: 'Daily Sales',
   subtitle: 'View sales data from Bork POS system',
   parentPath: '/data/sales',
   parentLabel: 'Sales',
 });
 
-registerBreadcrumb('/data/sales/bork/waiters', {
+registerBreadcrumb('/data/sales/daily/waiters', {
   label: 'Waiter Performance',
   subtitle: 'Sales performance metrics per waiter',
-  parentPath: '/data/sales',
-  parentLabel: 'Sales',
+  parentPath: '/data/sales/daily',
+  parentLabel: 'Daily Sales',
 });
 
-registerBreadcrumb('/data/sales/bork/revenue', {
+registerBreadcrumb('/data/sales/daily/revenue', {
   label: 'Revenue Analysis',
   subtitle: 'Revenue breakdown by date and location',
-  parentPath: '/data/sales',
-  parentLabel: 'Sales',
+  parentPath: '/data/sales/daily',
+  parentLabel: 'Daily Sales',
 });
 
-registerBreadcrumb('/data/sales/bork/payment-methods', {
+registerBreadcrumb('/data/sales/daily/payment-methods', {
   label: 'Payment Methods',
   subtitle: 'Payment method statistics and breakdown',
-  parentPath: '/data/sales',
-  parentLabel: 'Sales',
+  parentPath: '/data/sales/daily',
+  parentLabel: 'Daily Sales',
+});
+
+registerBreadcrumb('/data/sales/daily/categories-products', {
+  label: 'Categories & Products',
+  subtitle: 'Sales analysis by categories and products',
+  parentPath: '/data/sales/daily',
+  parentLabel: 'Daily Sales',
 });
 
 registerBreadcrumb('/daily-ops/labor/products', {
@@ -225,6 +280,28 @@ registerBreadcrumb('/operations/menus', {
   subtitle: 'Create and manage menu cards with products and date ranges',
   parentPath: '/operations',
   parentLabel: 'Operations',
+});
+
+// Operations - Events & Promotions
+registerBreadcrumb('/operations/events-promotions', {
+  label: 'Events & Promotions',
+  subtitle: 'Manage events and promotions',
+  parentPath: '/operations',
+  parentLabel: 'Operations',
+});
+
+registerBreadcrumb('/operations/events-promotions/events', {
+  label: 'Events',
+  subtitle: 'Create and manage events with support for single and repeating events',
+  parentPath: '/operations/events-promotions',
+  parentLabel: 'Events & Promotions',
+});
+
+registerBreadcrumb('/operations/events-promotions/socials', {
+  label: 'Socials',
+  subtitle: 'Instagram Promotions',
+  parentPath: '/operations/events-promotions',
+  parentLabel: 'Events & Promotions',
 });
 
   // Workforce V2 (for backwards compatibility)

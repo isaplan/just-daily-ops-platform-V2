@@ -220,12 +220,27 @@ function buildHierarchicalSalesData(
   }>;
 } {
   // Build hierarchical structure: year -> month -> week -> day -> location
-  const yearMap = new Map<string, Map<string, Map<string, Map<string, Map<string, {
-    quantity: number;
-    revenueExVat: number;
-    revenueIncVat: number;
-    transactions: Set<string>;
-  }>>>>>>();
+  const yearMap = new Map<
+    string,
+    Map<
+      string,
+      Map<
+        string,
+        Map<
+          string,
+          Map<
+            string,
+            {
+              quantity: number;
+              revenueExVat: number;
+              revenueIncVat: number;
+              transactions: Set<string>;
+            }
+          >
+        >
+      >
+    >
+  >();
 
   // Process each daily sales record
   for (const [dateStr, dailyData] of salesByDate.entries()) {
@@ -696,6 +711,7 @@ export async function aggregateProductsData(
         salesByWeek: Map<string, { quantity: number; revenueExVat: number; revenueIncVat: number; transactionCount: number }>;
         salesByMonth: Map<string, { quantity: number; revenueExVat: number; revenueIncVat: number; transactionCount: number }>;
         locationDetails: Map<string, { locationId: ObjectId; locationName: string; lastSoldDate: Date; totalQuantity: number; totalRevenue: number }>;
+        locationPerformance: Map<string, { locationId: ObjectId; locationName: string; totalQuantity: number; totalRevenue: number; totalProfit: number; totalUnitPrice: number; unitPriceCount: number; transactions: Set<string>; lastSoldDate: Date }>;
         priceHistory: Array<{ date: Date; price: number; quantity: number; locationId?: ObjectId }>;
         totalQuantity: number;
         totalRevenue: number;
@@ -768,6 +784,7 @@ export async function aggregateProductsData(
                   salesByWeek: new Map(),
                   salesByMonth: new Map(),
                   locationDetails: new Map(),
+                  locationPerformance: new Map(),
                   priceHistory: [],
                   totalQuantity: 0,
                   totalRevenue: 0,
@@ -867,7 +884,7 @@ export async function aggregateProductsData(
               monthly.revenueIncVat += totalIncVat;
               if (ticketKey) monthly.transactionCount++;
 
-              // Location details
+              // Location details (for backward compatibility)
               if (locationId) {
                 const locKey = locationId.toString();
                 if (!product.locationDetails.has(locKey)) {
@@ -885,6 +902,50 @@ export async function aggregateProductsData(
                 locDetail.totalRevenue += totalIncVat;
                 if (recordDate > locDetail.lastSoldDate) {
                   locDetail.lastSoldDate = recordDate;
+                }
+              }
+
+              // Location performance (for productPerformance resolver)
+              if (locationId) {
+                const locKey = locationId.toString();
+                if (!product.locationPerformance.has(locKey)) {
+                  const loc = locationMap.get(locKey);
+                  product.locationPerformance.set(locKey, {
+                    locationId,
+                    locationName: loc?.name || 'Unknown',
+                    totalQuantity: 0,
+                    totalRevenue: 0,
+                    totalProfit: 0,
+                    totalUnitPrice: 0,
+                    unitPriceCount: 0,
+                    transactions: new Set(),
+                    lastSoldDate: recordDate,
+                  });
+                }
+                const locPerf = product.locationPerformance.get(locKey)!;
+                locPerf.totalQuantity += quantity;
+                locPerf.totalRevenue += totalIncVat;
+                
+                // Calculate profit if cost price available
+                const costPrice = line.CostPrice ?? line.costPrice ?? null;
+                if (costPrice && typeof costPrice === 'number') {
+                  const cost = costPrice * quantity;
+                  locPerf.totalProfit += (totalIncVat - cost);
+                }
+                
+                // Track unit prices for average calculation
+                if (unitPrice > 0) {
+                  locPerf.totalUnitPrice += unitPrice;
+                  locPerf.unitPriceCount += 1;
+                }
+                
+                // Track transactions
+                if (ticketKey) {
+                  locPerf.transactions.add(ticketKey);
+                }
+                
+                if (recordDate > locPerf.lastSoldDate) {
+                  locPerf.lastSoldDate = recordDate;
                 }
               }
 
@@ -1015,6 +1076,20 @@ export async function aggregateProductsData(
 
         const locationDetailsArray = Array.from(aggregate.locationDetails.values());
 
+        // Build productPerformanceByLocation array
+        const productPerformanceByLocation = Array.from(aggregate.locationPerformance.values()).map((perf) => ({
+          locationId: perf.locationId,
+          locationName: perf.locationName,
+          totalQuantitySold: Math.round(perf.totalQuantity * 100) / 100,
+          totalRevenue: Math.round(perf.totalRevenue * 100) / 100,
+          totalProfit: perf.totalProfit !== 0 ? Math.round(perf.totalProfit * 100) / 100 : 0,
+          averageUnitPrice: perf.unitPriceCount > 0
+            ? Math.round((perf.totalUnitPrice / perf.unitPriceCount) * 100) / 100
+            : 0,
+          transactionCount: perf.transactions.size,
+          lastSoldDate: perf.lastSoldDate,
+        }));
+
         // Build hierarchical time-series data
         const hierarchicalData = buildHierarchicalSalesData(
           aggregate.salesByDate,
@@ -1130,6 +1205,9 @@ export async function aggregateProductsData(
 
           // Update location details
           locationDetails: locationDetailsArray,
+          
+          // Update product performance by location
+          productPerformanceByLocation,
 
           // Update time-series data (deprecated, kept for backward compatibility)
           salesByDate: salesByDateArray,

@@ -2,7 +2,17 @@
  * MongoDB V2 Connection Utility
  * 
  * Handles MongoDB Atlas connection with proper serverless/Next.js optimization
+ * 
+ * ⚠️ SERVER-ONLY: This module must only be used in Server Components, API Routes, or Server Actions
  */
+
+// Prevent client-side usage
+if (typeof window !== 'undefined') {
+  throw new Error(
+    'MongoDB connection cannot be used in client-side code. ' +
+    'Use API routes or Server Components instead.'
+  );
+}
 
 import { MongoClient, Db } from 'mongodb';
 
@@ -23,10 +33,11 @@ const options = {
   minPoolSize: 1,
   maxIdleTimeMS: 30000,
   serverSelectionTimeoutMS: 10000, // Increased from 5000 to 10000 (10 seconds)
-  socketTimeoutMS: 45000,
-  connectTimeoutMS: 10000, // Added: Connection timeout
+  socketTimeoutMS: 180000, // Increased to 180 seconds (3 minutes) for long-running queries
+  connectTimeoutMS: 10000, // Connection timeout
   retryWrites: true,
-  retryReads: true,
+  retryReads: true, // Retry reads on connection errors
+  maxStalenessSeconds: 120, // Allow reads from secondary if primary is stale
 };
 
 // Global is used here to maintain a cached connection across hot reloads

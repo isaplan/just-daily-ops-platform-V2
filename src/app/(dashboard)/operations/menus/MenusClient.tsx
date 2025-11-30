@@ -5,7 +5,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getBreadcrumb } from "@/lib/navigation/breadcrumb-registry";
 import { Menu } from "@/models/menu/menu.model";
 import { getLocations } from "@/lib/services/graphql/queries";
+import { AutoFilterRegistry } from "@/components/navigation/auto-filter-registry";
+import { SmartMonthFilter } from "@/components/view-data/SmartMonthFilter";
+import { LocationFilterButtons } from "@/components/view-data/LocationFilterButtons";
 
 // Format date for input (YYYY-MM-DD)
 function formatDateForInput(date: Date | string): string {
@@ -65,6 +68,12 @@ export function MenusClient() {
   const [productSearch, setProductSearch] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [productPrices, setProductPrices] = useState<Record<string, number>>({});
+  
+  // Filter state
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   
   // Load menus
   const loadMenus = async () => {
@@ -389,6 +398,95 @@ export function MenusClient() {
     return menu.isActive === true;
   };
 
+  // Calculate month counts for smart filter
+  const monthCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    menus.forEach((menu) => {
+      const startDate = new Date(menu.startDate);
+      const endDate = menu.endDate ? new Date(menu.endDate) : startDate;
+      const menuYear = startDate.getFullYear();
+      
+      // Only count if year matches selected year
+      if (menuYear !== selectedYear) return;
+      
+      // Check location filter
+      if (selectedLocation !== "all" && menu.locationId !== selectedLocation) return;
+      
+      // Count months that overlap with menu date range
+      for (let month = 1; month <= 12; month++) {
+        const monthStart = new Date(selectedYear, month - 1, 1);
+        const monthEnd = new Date(selectedYear, month, 0, 23, 59, 59);
+        
+        // Check if menu overlaps with this month
+        if (startDate <= monthEnd && endDate >= monthStart) {
+          counts[month] = (counts[month] || 0) + 1;
+        }
+      }
+    });
+    return counts;
+  }, [menus, selectedYear, selectedLocation]);
+
+  // Filter menus based on selected filters
+  const filteredMenus = useMemo(() => {
+    return menus.filter((menu) => {
+      const startDate = new Date(menu.startDate);
+      const endDate = menu.endDate ? new Date(menu.endDate) : startDate;
+      const menuYear = startDate.getFullYear();
+      
+      // Year filter
+      if (menuYear !== selectedYear) return false;
+      
+      // Month filter
+      if (selectedMonth !== null) {
+        const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+        const monthEnd = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
+        if (startDate > monthEnd || endDate < monthStart) return false;
+      }
+      
+      // Location filter
+      if (selectedLocation !== "all" && menu.locationId !== selectedLocation) return false;
+      
+      return true;
+    });
+  }, [menus, selectedYear, selectedMonth, selectedLocation]);
+
+  // Filter location options - only show specific locations
+  const filterLocationOptions = useMemo(() => {
+    const targetNames = ["Van Kinsbergen", "Bar Bea", "L'Amour Toujours", "l'Amour Toujours", "l'Amour Toujours"];
+    const filtered = locations.filter((loc) => 
+      targetNames.some(name => loc.name === name || loc.name?.includes(name))
+    );
+    return [
+      { value: "all", label: "All Locations" },
+      ...filtered.map((loc) => ({ value: loc.id, label: loc.name })),
+    ];
+  }, [locations]);
+
+  // Auto-generate filter labels from state
+  const filterLabels = useMemo(() => [
+    { key: "year", label: "Year", value: selectedYear },
+    { key: "month", label: "Month", value: selectedMonth },
+    { key: "location", label: "Location", value: selectedLocation !== "all" ? selectedLocation : null },
+  ], [selectedYear, selectedMonth, selectedLocation]);
+
+  // Filter change handlers - memoized with useCallback for stable reference
+  const handleFilterChange = useCallback((key: string, value: any) => {
+    switch (key) {
+      case "year": setSelectedYear(value); break;
+      case "month": setSelectedMonth(value); break;
+      case "location": setSelectedLocation(value); break;
+    }
+  }, []);
+
+  // Filter remove handlers - memoized with useCallback for stable reference
+  const handleFilterRemove = useCallback((key: string) => {
+    switch (key) {
+      case "year": setSelectedYear(currentYear); break;
+      case "month": setSelectedMonth(null); break;
+      case "location": setSelectedLocation("all"); break;
+    }
+  }, [currentYear]);
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Page Title */}
@@ -401,6 +499,51 @@ export function MenusClient() {
         </div>
       )}
       
+      {/* Auto-registered Filters - Will show in Sheet/Drawer, hidden in page */}
+      <AutoFilterRegistry
+        filters={{
+          labels: filterLabels,
+          onFilterChange: handleFilterChange,
+          onFilterRemove: handleFilterRemove,
+        }}
+      >
+        <div className="space-y-4">
+          {/* Year Filter */}
+          <div className="space-y-2">
+            <span className="text-sm font-bold text-foreground">Year</span>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                className={`border rounded-sm ${
+                  selectedYear === currentYear
+                    ? "bg-blue-500 border-blue-500 text-white"
+                    : "bg-white border-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
+                }`}
+                onClick={() => setSelectedYear(currentYear)}
+              >
+                {currentYear}
+              </Button>
+            </div>
+          </div>
+
+          {/* Smart Month Filter */}
+          <SmartMonthFilter
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            monthCounts={monthCounts}
+          />
+
+          {/* Location Filter */}
+          <LocationFilterButtons
+            options={filterLocationOptions}
+            selectedValue={selectedLocation}
+            onValueChange={setSelectedLocation}
+            label="Location"
+          />
+        </div>
+      </AutoFilterRegistry>
+
       {/* Action Buttons */}
       <div className="flex justify-end gap-2">
         <Button
@@ -522,7 +665,7 @@ export function MenusClient() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {menus.map((menu) => (
+          {filteredMenus.map((menu) => (
             <Card key={menu._id}>
               <CardHeader>
                 <div className="flex items-start justify-between">

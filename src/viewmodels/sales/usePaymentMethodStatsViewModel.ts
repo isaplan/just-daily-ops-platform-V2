@@ -11,7 +11,7 @@ import { getPaymentMethodStats } from "@/lib/services/graphql/queries";
 import { getLocations } from "@/lib/services/graphql/queries";
 import { LocationOption } from "@/models/sales/bork-sales-v2.model";
 
-export function usePaymentMethodStatsViewModel() {
+export function usePaymentMethodStatsViewModel(initialData?: { paymentData?: any; locations?: any[] }) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -20,9 +20,10 @@ export function usePaymentMethodStatsViewModel() {
 
   const dateRange = useMemo(() => getDateRangeForPreset(selectedDatePreset), [selectedDatePreset]);
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -78,26 +79,26 @@ export function usePaymentMethodStatsViewModel() {
     };
   }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
 
-  // Fetch payment stats for ALL locations
-  const { data: allPaymentData, isLoading, error } = useQuery({
-    queryKey: ["payment-method-stats", startDate, endDate],
-    queryFn: () => getPaymentMethodStats(startDate, endDate, {}),
+  // Build filters for GraphQL query
+  const filters = useMemo(() => {
+    const filterObj: { locationId?: string } = {};
+    if (selectedLocation !== "all") {
+      filterObj.locationId = selectedLocation;
+    }
+    return filterObj;
+  }, [selectedLocation]);
+
+  // Fetch payment method stats data
+  const { data: paymentMethodStatsData, isLoading, error } = useQuery({
+    queryKey: ["payment-method-stats", startDate, endDate, selectedLocation],
+    queryFn: () => getPaymentMethodStats(startDate, endDate, filters),
+    initialData: selectedLocation === "all" ? initialData?.paymentData : undefined,
     staleTime: 30 * 60 * 1000,
     enabled: !!startDate && !!endDate,
   });
 
-  // Filter data client-side
-  const paymentData = useMemo(() => {
-    if (!allPaymentData?.records) return [];
-    
-    if (selectedLocation === "all") {
-      return allPaymentData.records;
-    }
-    
-    return allPaymentData.records.filter((payment: any) => 
-      payment.location_id === selectedLocation
-    );
-  }, [allPaymentData?.records, selectedLocation]);
+  // Get payment data from query result
+  const paymentData = paymentMethodStatsData?.records || [];
 
   return {
     selectedYear,
@@ -115,6 +116,8 @@ export function usePaymentMethodStatsViewModel() {
     paymentData,
     isLoading,
     error: error as Error | null,
+    startDate,
+    endDate,
   };
 }
 

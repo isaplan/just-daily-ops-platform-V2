@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -24,6 +25,7 @@ import {
   Grid,
   Receipt,
   ChefHat,
+  Megaphone,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -83,6 +85,11 @@ const operationsProductsItems: MenuItem[] = [
   { title: "Catalog", icon: Package, url: "/operations/products/catalog" },
 ];
 
+const operationsEventsPromotionsItems: MenuItem[] = [
+  { title: "Events", icon: Calendar, url: "/operations/events-promotions/events" },
+  { title: "Socials", icon: Sparkles, url: "/operations/events-promotions/socials" },
+];
+
 const operationsItems: MenuItem[] = [
   {
     title: "Products",
@@ -91,6 +98,12 @@ const operationsItems: MenuItem[] = [
     children: operationsProductsItems,
   },
   { title: "Manage Menus", icon: Calendar, url: "/operations/menus" },
+  {
+    title: "Events & Promotions",
+    icon: Megaphone,
+    isCollapsible: true,
+    children: operationsEventsPromotionsItems,
+  },
   { title: "Suppliers", icon: Truck, comingSoon: true },
   { title: "Locations", icon: MapPin, comingSoon: true },
   { title: "Teams", icon: UserCheck, comingSoon: true },
@@ -102,19 +115,32 @@ const dataFinanceItems: MenuItem[] = [
   { title: "Revenue", icon: TrendingUp, comingSoon: true },
 ];
 
+const dataLaborProductivityItems: MenuItem[] = [
+  { title: "By Location", icon: MapPin, url: "/data/labor/productivity/by-location" },
+  { title: "By Division", icon: Grid, url: "/data/labor/productivity/by-division" },
+  { title: "By Team", icon: Users, url: "/data/labor/productivity/by-team" },
+  { title: "By Worker", icon: UserCheck, url: "/data/labor/productivity/by-worker" },
+];
+
 const dataLaborItems: MenuItem[] = [
   { title: "Hours", icon: Clock, url: "/data/labor/hours" },
-  { title: "Labor Costs", icon: DollarSign, url: "/data/labor/labor-cost" },
+  { title: "Labor Costs", icon: DollarSign, url: "/data/labor/costs" },
+  {
+    title: "Labor Productivity",
+    icon: TrendingUp,
+    isCollapsible: true,
+    children: dataLaborProductivityItems,
+  },
   { title: "Workers", icon: Users, url: "/data/labor/workers" },
-  { title: "Labor Productivity", icon: TrendingUp, url: "/data/labor/productivity" },
   // { title: "Locations & Teams", icon: Building2, url: "/data/labor/locations-teams" }, // Merged into Workers page
 ];
 
 const dataSalesItems: MenuItem[] = [
-  { title: "Daily Sales", icon: TrendingUp, url: "/data/sales/bork" },
-  { title: "Waiters", icon: Users, url: "/data/sales/bork/waiters" },
-  { title: "Revenue", icon: DollarSign, url: "/data/sales/bork/revenue" },
-  { title: "Payment Methods", icon: FileText, url: "/data/sales/bork/payment-methods" },
+  { title: "Daily Sales", icon: TrendingUp, url: "/data/sales/daily" },
+  { title: "Waiters", icon: Users, url: "/data/sales/daily/waiters" },
+  { title: "Revenue", icon: DollarSign, url: "/data/sales/daily/revenue" },
+  { title: "Payment Methods", icon: FileText, url: "/data/sales/daily/payment-methods" },
+  { title: "Categories & Products", icon: Package, url: "/data/sales/daily/categories-products" },
 ];
 
 const dataItems: MenuItem[] = [
@@ -141,9 +167,11 @@ const dataItems: MenuItem[] = [
 ];
 
 const settingsItems: MenuItem[] = [
+  { title: "Documentation", icon: FileText, url: "/docs" },
+  { title: "Data & Status", icon: BarChart3, url: "/settings/data-status" },
   { title: "Eitje API Connect", icon: Plug, url: "/settings/eitje-api" },
   { title: "Bork API Connect", icon: Plug, url: "/settings/bork-api" },
-  { title: "Company Settings", icon: Building2, url: "/settings/company", comingSoon: true },
+  { title: "Company Settings", icon: Building2, url: "/settings/company" },
   { title: "SSR Demo", icon: Zap, url: "/demo-ssr" },
 ];
 
@@ -156,21 +184,59 @@ export function AppSidebar({ layoutVersion, onVersionChange }: AppSidebarProps) 
   const { state } = useSidebar();
   const pathname = usePathname();
   const collapsed = state === "collapsed";
+  
+  // Calculate initial open states based on pathname (synchronously to avoid hydration mismatch)
+  const getInitialOpenStates = (currentPathname: string): Record<string, boolean> => {
+    const initialStates: Record<string, boolean> = {};
+    const checkCollapsible = (items: MenuItem[]) => {
+      items.forEach((item) => {
+        if (item.isCollapsible && item.children) {
+          const childActive = item.children.some(
+            (child) => child.url && (currentPathname === child.url || currentPathname.startsWith(`${child.url}/`))
+          );
+          initialStates[item.title] = childActive;
+        }
+      });
+    };
+    checkCollapsible(dataLaborItems);
+    checkCollapsible(dataItems);
+    checkCollapsible(dailyOpsItems);
+    checkCollapsible(operationsItems);
+    return initialStates;
+  };
+  
+  // Track open state for collapsibles - initialize synchronously to match server/client
+  const [openStates, setOpenStates] = useState<Record<string, boolean>>(() => getInitialOpenStates(pathname || ''));
+
+  // Update open states when pathname changes
+  useEffect(() => {
+    if (pathname) {
+      const newStates = getInitialOpenStates(pathname);
+      setOpenStates(newStates);
+    }
+  }, [pathname]);
 
   const isActive = (path?: string) => {
     if (!path) return false;
-    return pathname === path || pathname === `${path}/`;
+    return pathname === path || pathname === `${path}/` || pathname.startsWith(`${path}/`);
   };
 
   const isChildActive = (children: MenuItem[] | undefined) => {
-    return children?.some((child) => child.url && pathname.startsWith(child.url)) || false;
+    return children?.some((child) => child.url && (pathname === child.url || pathname.startsWith(`${child.url}/`))) || false;
   };
 
   const renderMenuItem = (item: MenuItem) => {
     if (item.isCollapsible && item.children) {
       const childActive = isChildActive(item.children);
+      // Use controlled state - default to childActive if not in state yet (after first render)
+      const isOpen = openStates[item.title] !== undefined ? openStates[item.title] : childActive;
       return (
-        <Collapsible key={item.title} defaultOpen={childActive} className="group/collapsible">
+        <Collapsible 
+          key={item.title} 
+          open={isOpen}
+          onOpenChange={(open) => setOpenStates(prev => ({ ...prev, [item.title]: open }))}
+          className="group/collapsible"
+        >
           <SidebarMenuItem>
             <CollapsibleTrigger asChild>
               <SidebarMenuButton tooltip={item.title} isActive={childActive}>
@@ -181,7 +247,60 @@ export function AppSidebar({ layoutVersion, onVersionChange }: AppSidebarProps) 
             </CollapsibleTrigger>
             <CollapsibleContent>
               <SidebarMenuSub>
-                {item.children.map((child) => (
+                {item.children.map((child) => {
+                  // If child is also collapsible, render it as a nested collapsible
+                  if (child.isCollapsible && child.children) {
+                    const childChildActive = isChildActive(child.children);
+                    const childIsOpen = openStates[child.title] !== undefined ? openStates[child.title] : childChildActive;
+                    return (
+                      <SidebarMenuSubItem key={child.title}>
+                        <Collapsible
+                          open={childIsOpen}
+                          onOpenChange={(open) => setOpenStates(prev => ({ ...prev, [child.title]: open }))}
+                          className="group/collapsible"
+                        >
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuSubButton isActive={childChildActive}>
+                              <child.icon />
+                              <span>{child.title}</span>
+                              <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            </SidebarMenuSubButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <ul className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5">
+                              {child.children.map((grandchild) => (
+                                <li key={grandchild.title}>
+                                  {grandchild.url ? (
+                                    <SidebarMenuSubButton asChild isActive={isActive(grandchild.url)}>
+                                      <Link href={grandchild.url}>
+                                        <grandchild.icon />
+                                        <span>{grandchild.title}</span>
+                                        {grandchild.comingSoon && (
+                                          <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+                                        )}
+                                      </Link>
+                                    </SidebarMenuSubButton>
+                                  ) : (
+                                    <SidebarMenuSubButton asChild>
+                                      <span className={grandchild.comingSoon ? "opacity-50 cursor-not-allowed" : ""}>
+                                        <grandchild.icon />
+                                        <span>{grandchild.title}</span>
+                                        {grandchild.comingSoon && (
+                                          <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+                                        )}
+                                      </span>
+                                    </SidebarMenuSubButton>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </SidebarMenuSubItem>
+                    );
+                  }
+                  // Regular child item (link or disabled)
+                  return (
                   <SidebarMenuSubItem key={child.title}>
                     {child.url ? (
                       <SidebarMenuSubButton asChild isActive={isActive(child.url)}>
@@ -194,18 +313,19 @@ export function AppSidebar({ layoutVersion, onVersionChange }: AppSidebarProps) 
                         </Link>
                       </SidebarMenuSubButton>
                     ) : (
-                      <SidebarMenuSubButton asChild>
-                        <span className={child.comingSoon ? "opacity-50 cursor-not-allowed" : ""}>
-                          <child.icon />
-                          <span>{child.title}</span>
-                          {child.comingSoon && (
-                            <span className="ml-auto text-xs text-muted-foreground">Soon</span>
-                          )}
-                        </span>
+                        <SidebarMenuSubButton asChild>
+                          <span className={child.comingSoon ? "opacity-50 cursor-not-allowed" : ""}>
+                        <child.icon />
+                        <span>{child.title}</span>
+                        {child.comingSoon && (
+                          <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+                        )}
+                          </span>
                       </SidebarMenuSubButton>
                     )}
                   </SidebarMenuSubItem>
-                ))}
+                  );
+                })}
               </SidebarMenuSub>
             </CollapsibleContent>
           </SidebarMenuItem>

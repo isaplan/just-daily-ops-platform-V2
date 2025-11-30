@@ -61,6 +61,11 @@ export interface UseHoursV2ViewModelReturn {
   currentData: any;
   isLoading: boolean;
   error: Error | null;
+  aggregatedCosts: {
+    perHour: number;
+    perDay: number;
+    perMonth: number;
+  };
 }
 
 export function useHoursV2ViewModel(initialData?: { processedData?: any; locations?: any[]; teams?: any[] }): UseHoursV2ViewModelReturn {
@@ -244,6 +249,58 @@ export function useHoursV2ViewModel(initialData?: { processedData?: any; locatio
     enabled: activeTab === "aggregated" && !!queryParams.startDate && !!queryParams.endDate,
   });
 
+  // Fetch ALL processed hours records for aggregated costs calculation (no pagination)
+  const { data: allProcessedHoursResponse } = useQuery({
+    queryKey: ["eitje-v2-processed-hours-all", queryFilters], // Use queryFilters, not queryParams (no pagination)
+    queryFn: () => fetchProcessedHours({
+      ...queryFilters,
+      page: 1,
+      limit: 10000, // Large limit to get all records
+    }),
+    enabled: activeTab === "processed" && !!queryFilters.startDate && !!queryFilters.endDate,
+    staleTime: 0, // Always refetch when filters change
+  });
+
+  // Aggregate costs per time period - use ALL filtered records, not just current page
+  const aggregatedCosts = useMemo(() => {
+    const records = allProcessedHoursResponse?.records || [];
+    
+    if (records.length === 0) {
+      return {
+        perHour: 0,
+        perDay: 0,
+        perMonth: 0,
+      };
+    }
+
+    // Group by period
+    const groupedByDay = new Map<string, number>();
+    const groupedByMonth = new Map<string, number>();
+
+    records.forEach((record: any) => {
+      const date = new Date(record.date);
+      const wageCost = record.wage_cost || 0;
+
+      // Day key: YYYY-MM-DD
+      const dayKey = record.date;
+      groupedByDay.set(dayKey, (groupedByDay.get(dayKey) || 0) + wageCost);
+
+      // Month key: YYYY-MM
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      groupedByMonth.set(monthKey, (groupedByMonth.get(monthKey) || 0) + wageCost);
+    });
+
+    // Calculate totals
+    const totalCost = records.reduce((sum, r) => sum + (r.wage_cost || 0), 0);
+    const totalHours = records.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
+
+    return {
+      perHour: totalHours > 0 ? totalCost / totalHours : 0,
+      perDay: groupedByDay.size > 0 ? Array.from(groupedByDay.values()).reduce((sum, cost) => sum + cost, 0) / groupedByDay.size : 0,
+      perMonth: groupedByMonth.size > 0 ? Array.from(groupedByMonth.values()).reduce((sum, cost) => sum + cost, 0) / groupedByMonth.size : 0,
+    };
+  }, [allProcessedHoursResponse?.records]);
+
   // Computed values
   const currentData = activeTab === "processed" ? processedData : aggregatedData;
   const isLoading = activeTab === "processed" ? isLoadingProcessed : isLoadingAggregated;
@@ -291,6 +348,7 @@ export function useHoursV2ViewModel(initialData?: { processedData?: any; locatio
     currentData,
     isLoading,
     error: error as Error | null,
+    aggregatedCosts,
   };
 }
 

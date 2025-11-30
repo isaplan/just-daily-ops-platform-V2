@@ -46,6 +46,325 @@ const getLocationId = (parent: any): ObjectId | null => {
 };
 
 // ============================================
+// WORKER PROFILES MODULAR HELPERS
+// ============================================
+
+/**
+ * Build MongoDB query for worker profiles using pre-computed date ranges
+ */
+function buildWorkerProfilesQuery(
+  year: number | undefined,
+  month: number | undefined,
+  day: number | undefined,
+  filters: any
+): { query: any; useAggregated: boolean } {
+  console.log('[Worker Profiles Query Builder] Building query:', { year, month, day, filters });
+  
+  const query: any = {};
+  const andConditions: any[] = [];
+  const safeFilters = filters || {};
+  let useAggregated = true; // Prefer aggregated collection
+  
+  // Date filtering using pre-computed activeYears/activeMonths
+  if (year) {
+    if (day && month) {
+      // Specific day - use activeDays if available, otherwise fallback
+      query.activeMonths = {
+        $elemMatch: {
+          year,
+          month,
+        },
+      };
+      // Note: activeDays is optional, so we use activeMonths for day queries too
+    } else if (month) {
+      // Specific month
+      query.activeMonths = {
+        $elemMatch: {
+          year,
+          month,
+        },
+      };
+    } else {
+      // Whole year
+      query.activeYears = year;
+    }
+  }
+  
+  // Location filter
+  if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+    try {
+      query.locationId = new ObjectId(safeFilters.locationId);
+    } catch {
+      // Invalid ObjectId, try as string
+      query.locationId = safeFilters.locationId;
+    }
+  }
+  
+  // Contract type filter
+  if (safeFilters.contractType && safeFilters.contractType !== 'all') {
+    query.contractType = safeFilters.contractType;
+  }
+  
+  // Active only filter
+  if (safeFilters.activeOnly === true) {
+    query.isActive = true;
+  } else if (safeFilters.activeOnly === false) {
+    query.isActive = false;
+  }
+  
+  // Team filter - will be applied after fetching (teams array)
+  // Note: We can't filter teams in MongoDB query easily, so we'll filter in memory
+  
+  // Combine all $and conditions
+  if (andConditions.length > 0) {
+    query.$and = andConditions;
+  }
+  
+  console.log('[Worker Profiles Query Builder] Built query:', JSON.stringify(query, null, 2));
+  
+  return { query, useAggregated };
+}
+
+/**
+ * Fetch worker profiles from aggregated collection
+ */
+async function fetchWorkerProfilesFromAggregated(
+  query: any,
+  page: number,
+  limit: number
+): Promise<{ records: any[]; total: number }> {
+  console.log('[Worker Profiles Aggregated] Fetching from aggregated collection');
+  
+  const db = await getDatabase();
+  const skip = (page - 1) * limit;
+  
+  // Get total count
+  const total = await db.collection('worker_profiles_aggregated').countDocuments(query);
+  console.log(`[Worker Profiles Aggregated] Found ${total} records`);
+  
+  // Fetch records
+  const records = await db.collection('worker_profiles_aggregated')
+    .find(query)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .toArray();
+  
+  console.log(`[Worker Profiles Aggregated] Fetched ${records.length} records`);
+  
+  return { records, total };
+}
+
+/**
+ * Transform aggregated record to GraphQL format
+ */
+function transformAggregatedToWorkerProfile(record: any): any {
+  const teams = record.teams || [];
+  const primaryTeam = teams.length > 0 ? teams[0].team_name : null;
+  
+  // ✅ All names are denormalized in aggregated collection - use directly!
+  // Fallback to snake_case only for backward compatibility with old records
+  const userName = record.userName || record.unifiedUserName || record.user_name || null;
+  const locationName = record.locationName || record.location_name || null;
+  const locationIds = record.locationIds || record.location_ids;
+  const locationNames = record.locationNames || record.location_names || null;
+  
+  return {
+    id: record._id?.toString() || '',
+    eitjeUserId: record.eitjeUserId || record.eitje_user_id,
+    userName: userName, // ✅ Denormalized - no lookup needed!
+    unifiedUserId: record.unifiedUserId?.toString() || null,
+    unifiedUserName: record.unifiedUserName || null,
+    borkUserId: record.borkUserId || null,
+    borkUserName: record.borkUserName || null,
+    teamName: primaryTeam, // ✅ Denormalized in teams array
+    teams: teams.length > 0 ? teams : null, // ✅ All team names already denormalized
+    locationId: record.locationId?.toString() || record.location_id?.toString() || null,
+    locationName: locationName, // ✅ Denormalized - no lookup needed!
+    locationIds: locationIds?.map((id: any) => id.toString()) || null,
+    locationNames: locationNames, // ✅ Denormalized - no lookup needed!
+    contractType: record.contractType || record.contract_type || null,
+    contractHours: record.contractHours || record.contract_hours || null,
+    hourlyWage: record.hourlyWage || record.hourly_wage || null,
+    wageOverride: record.wageOverride !== undefined ? record.wageOverride : (record.wage_override !== undefined ? record.wage_override : false),
+    effectiveFrom: record.effectiveFrom || record.effective_from ? new Date(record.effectiveFrom || record.effective_from).toISOString() : null,
+    effectiveTo: record.effectiveTo || record.effective_to ? new Date(record.effectiveTo || record.effective_to).toISOString() : null,
+    notes: record.notes || null,
+    isActive: record.isActive !== undefined ? record.isActive : (!(record.effectiveTo || record.effective_to) || new Date(record.effectiveTo || record.effective_to) > new Date()),
+    createdAt: record.createdAt || record.created_at ? new Date(record.createdAt || record.created_at).toISOString() : null,
+    updatedAt: record.updatedAt || record.updated_at ? new Date(record.updatedAt || record.updated_at).toISOString() : null,
+  };
+}
+
+/**
+ * Enrich records with location names (batch query)
+ * 
+ * @deprecated Aggregated collections should have all data pre-computed. Only use for fallback scenarios.
+ * ⚠️ DEPRECATED: Aggregated collections should have all data pre-computed. Only use for fallback scenarios.
+ * This function queries the locations collection to enrich records with location names.
+ * In production, use worker_profiles_aggregated which already has locationName pre-computed.
+ */
+async function enrichWithLocationNames(records: any[]): Promise<any[]> {
+  console.log('[Worker Profiles] Enriching with location names');
+  
+  const db = await getDatabase();
+  const locationIds = new Set<string>();
+  
+  // Collect all location IDs (check both camelCase and snake_case)
+  records.forEach(record => {
+    const locationId = record.locationId || record.location_id;
+    if (locationId) {
+      locationIds.add(locationId.toString());
+    }
+    const locationIdsArray = record.locationIds || record.location_ids;
+    if (locationIdsArray && Array.isArray(locationIdsArray)) {
+      locationIdsArray.forEach((id: any) => {
+        locationIds.add(id.toString());
+      });
+    }
+  });
+  
+  if (locationIds.size === 0) {
+    console.log('[Worker Profiles] No locations to enrich');
+    return records; // No locations to enrich
+  }
+  
+  console.log(`[Worker Profiles] Enriching ${locationIds.size} locations with names`);
+  
+  // Fetch locations in batch
+  const locationObjIds = Array.from(locationIds).map(id => {
+    try {
+      return new ObjectId(id);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean) as ObjectId[];
+  
+  const locations = await db.collection('locations')
+    .find({ _id: { $in: locationObjIds } })
+    .toArray();
+  
+  console.log(`[Worker Profiles] Found ${locations.length} locations`);
+  
+  const locationMap = new Map<string, string>();
+  locations.forEach(location => {
+    if (location._id && location.name) {
+      locationMap.set(location._id.toString(), location.name);
+    }
+  });
+  
+  // Enrich records (set both camelCase and snake_case for compatibility)
+  return records.map(record => {
+    const locationId = record.locationId || record.location_id;
+    if (!record.locationName && !record.location_name && locationId) {
+      const locationName = locationMap.get(locationId.toString());
+      if (locationName) {
+        record.locationName = locationName;
+        record.location_name = locationName; // Set both formats
+      }
+    }
+    const locationIdsArray = record.locationIds || record.location_ids;
+    if (!record.locationNames && !record.location_names && locationIdsArray) {
+      const locationNames = locationIdsArray
+        .map((id: any) => locationMap.get(id.toString()))
+        .filter(Boolean);
+      if (locationNames.length > 0) {
+        record.locationNames = locationNames;
+        record.location_names = locationNames; // Set both formats
+      }
+    }
+    return record;
+  });
+}
+
+/**
+ * Enrich records with user names from unified_users (batch query)
+ * 
+ * @deprecated Aggregated collections should have all data pre-computed. Only use for fallback scenarios.
+ * ⚠️ DEPRECATED: Aggregated collections should have all data pre-computed. Only use for fallback scenarios.
+ * This function queries the unified_users collection to enrich records with user names.
+ * In production, use worker_profiles_aggregated which already has userName pre-computed.
+ */
+async function enrichWithUserNames(records: any[]): Promise<any[]> {
+  console.log('[Worker Profiles] Enriching with user names from unified_users');
+  
+  const db = await getDatabase();
+  const eitjeUserIds = new Set<number>();
+  
+  // Collect all eitje_user_ids that need names
+  records.forEach(record => {
+    const eitjeUserId = record.eitjeUserId || record.eitje_user_id;
+    // Check both camelCase and snake_case field names
+    const hasUserName = record.userName || record.user_name;
+    if (eitjeUserId && !hasUserName) {
+      eitjeUserIds.add(Number(eitjeUserId));
+    }
+  });
+  
+  if (eitjeUserIds.size === 0) {
+    console.log('[Worker Profiles] No users need name enrichment');
+    return records; // No users to enrich
+  }
+  
+  console.log(`[Worker Profiles] Enriching ${eitjeUserIds.size} users with names`);
+  
+  // Fetch unified_users in batch
+  // Query for users with eitje systemMappings, then filter by externalId in memory
+  const eitjeUserIdsArray = Array.from(eitjeUserIds).map(id => String(id));
+  const eitjeUserIdsSet = new Set(eitjeUserIdsArray);
+  
+  // First, get all unified_users that have eitje in their systemMappings
+  const allUnifiedUsers = await db.collection('unified_users')
+    .find({
+      'systemMappings.system': 'eitje'
+    })
+    .toArray();
+  
+  // Filter to only those with matching externalIds
+  const unifiedUsers = allUnifiedUsers.filter((user: any) => {
+    const eitjeMapping = user.systemMappings?.find((m: any) => m.system === 'eitje');
+    return eitjeMapping && eitjeMapping.externalId && eitjeUserIdsSet.has(String(eitjeMapping.externalId));
+  });
+  
+  console.log(`[Worker Profiles] Found ${unifiedUsers.length} unified_users with eitje mappings`);
+  
+  // Create map: eitje_user_id -> userName
+  const userNameMap = new Map<number, string>();
+  unifiedUsers.forEach(user => {
+    const eitjeMapping = user.systemMappings?.find((m: any) => m.system === 'eitje');
+    if (eitjeMapping && eitjeMapping.externalId) {
+      const eitjeUserId = parseInt(eitjeMapping.externalId, 10);
+      if (eitjeUserId && user.name) {
+        userNameMap.set(eitjeUserId, user.name);
+      }
+    }
+  });
+  
+  console.log(`[Worker Profiles] Created userNameMap with ${userNameMap.size} entries`);
+  
+  // Enrich records with user names (set both camelCase and snake_case for compatibility)
+  let enrichedCount = 0;
+  const enrichedRecords = records.map(record => {
+    const eitjeUserId = record.eitjeUserId || record.eitje_user_id;
+    const hasUserName = record.userName || record.user_name;
+    if (eitjeUserId && !hasUserName) {
+      const userName = userNameMap.get(Number(eitjeUserId));
+      if (userName) {
+        record.userName = userName;
+        record.user_name = userName; // Set both formats
+        enrichedCount++;
+      } else {
+        console.log(`[Worker Profiles] No userName found for eitjeUserId: ${eitjeUserId}`);
+      }
+    }
+    return record;
+  });
+  
+  console.log(`[Worker Profiles] Enriched ${enrichedCount} records with user names`);
+  return enrichedRecords;
+}
+
+// ============================================
 // HIERARCHICAL TIME-SERIES ROUTING HELPERS
 // ============================================
 
@@ -331,7 +650,10 @@ function getProductSalesData(
 
 export const resolvers = {
   Query: {
-    // Diagnostics
+    // ⚠️ DIAGNOSTICS ONLY: Uses eitje_raw_data for debugging. Not for production queries.
+    // This resolver is used to check data quality and diagnose issues with team data.
+    // It queries raw data collections to provide diagnostic information.
+    // For production queries, use aggregated collections via other resolvers.
     checkTeamData: async () => {
       const db = await getDatabase();
       
@@ -454,56 +776,38 @@ export const resolvers = {
     },
 
     // Teams
+    // ✅ NOW USES: unified_teams collection (master data)
     teams: async (_: any, { locationId }: { locationId?: string }) => {
       const db = await getDatabase();
       
-      // Query eitje_raw_data for teams (master data from Eitje API)
-      const query: any = { endpoint: 'teams' };
+      // Query unified_teams collection
+      const query: any = { isActive: true };
       
-      // If location filter provided, match by environment_id
+      // If location filter provided, match by locationIds
       if (locationId && locationId !== 'all') {
         try {
-          const location = await db.collection('locations').findOne({ _id: toObjectId(locationId) });
-          if (location?.systemMappings) {
-            const eitjeMapping = location.systemMappings.find((m: any) => m.system === 'eitje');
-            if (eitjeMapping?.externalId) {
-              const environmentId = parseInt(eitjeMapping.externalId);
-              query.$or = [
-                { 'extracted.environment_id': environmentId },
-                { 'rawApiResponse.environment_id': environmentId }
-              ];
-            }
-          }
+        query.locationIds = toObjectId(locationId);
         } catch (e) {
           logger.warn('Error filtering teams by location:', e);
         }
       }
       
-      const eitjeTeams = await db.collection('eitje_raw_data').find(query).toArray();
+      const unifiedTeams = await db.collection('unified_teams').find(query).toArray();
       
       // Transform to match GraphQL schema
-      return eitjeTeams.map((team) => {
-        const teamData = team.extracted || team.rawApiResponse || {};
-        const eitjeTeamId = teamData.id || teamData.team_id;
-        
-        return {
+      return unifiedTeams.map((team) => ({
           _id: team._id,
-          id: String(eitjeTeamId), // Use Eitje's numeric team ID as string
-          name: teamData.name || teamData.team_name || 'Unknown Team',
-          description: teamData.description || null,
-          teamType: teamData.team_type || null,
-          isActive: true, // Eitje teams are active if they exist in the API
-          locationIds: [], // Will be populated if needed
-          memberIds: [], // Will be populated if needed
-          systemMappings: [{
-            system: 'eitje',
-            externalId: String(eitjeTeamId),
-            rawData: teamData
-          }],
-          createdAt: team.createdAt || new Date(),
-          updatedAt: team.updatedAt || new Date(),
-        };
-      });
+        id: toId(team._id),
+        name: team.name || 'Unknown Team',
+        description: team.description || null,
+        teamType: team.teamType || null,
+        isActive: team.isActive !== undefined ? team.isActive : true,
+        locationIds: team.locationIds || [],
+        memberIds: team.memberIds || [],
+        systemMappings: team.systemMappings || [],
+        createdAt: team.createdAt ? (team.createdAt instanceof Date ? team.createdAt.toISOString() : new Date(team.createdAt).toISOString()) : new Date().toISOString(),
+        updatedAt: team.updatedAt ? (team.updatedAt instanceof Date ? team.updatedAt.toISOString() : new Date(team.updatedAt).toISOString()) : new Date().toISOString(),
+      }));
     },
     
     team: async (_: any, { id }: { id: string }) => {
@@ -599,47 +903,93 @@ export const resolvers = {
       const queryType = detectQueryType(startDate, endDate);
       const periods = extractTimePeriods(startDate, endDate);
       
-      // Try to use hierarchical data if available
+      // Try to use hierarchical data if available (for year, month, week, or day queries)
+      if ((queryType === 'year' || queryType === 'month' || queryType === 'week' || queryType === 'day') && periods.date) {
+        // Query for records with hierarchical data
+        const query: any = {
+        locationId: toObjectId(locationId),
+        date: {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        },
+        };
+        
+        // Add hierarchical data filter based on query type
       if (queryType === 'year' && periods.year) {
-        // Query for records with hierarchical data for this year
+          query['hoursByYear.year'] = periods.year;
+        } else if (queryType === 'day' && periods.date) {
+          query['hoursByDay.date'] = periods.date;
+        }
+        
         const recordsWithHierarchical = await db.collection('eitje_aggregated')
-          .find({
-            locationId: toObjectId(locationId),
-            'hoursByYear.year': periods.year,
-          })
+          .find(query)
           .toArray();
         
         if (recordsWithHierarchical.length > 0) {
-          // Extract hierarchical data for this location/year
+          // Extract hierarchical data for this location
           const hierarchicalRecords = recordsWithHierarchical
             .map(record => {
               if (!record || !record.locationId) return null;
               
+              let locationData: any = null;
+              let workerData: any[] = [];
+              
+              // Extract based on query type
+              if (queryType === 'year' && periods.year) {
               const yearData = record.hoursByYear?.find((y: any) => y.year === periods.year);
               if (!yearData) return null;
-              
-              const locationData = yearData.byLocation?.find((loc: any) => 
+                locationData = yearData.byLocation?.find((loc: any) => 
                 loc?.locationId && loc.locationId.toString() === locationId
               );
+                if (locationData) {
+                  workerData = locationData.byTeam?.flatMap((team: any) => 
+                    (team.byWorker || []).map((worker: any) => ({
+                      workerId: worker.unifiedUserId?.toString() || '',
+                      workerName: worker.workerName || 'Unknown',
+                      teamId: team.teamId?.toString() || '',
+                      teamName: team.teamName || '',
+                      hours: worker.totalHoursWorked || 0,
+                      cost: worker.totalWageCost || 0,
+                    }))
+                  ) || [];
+                }
+              } else if (queryType === 'day' && periods.date) {
+                const dayData = record.hoursByDay?.find((d: any) => d.date === periods.date);
+                if (!dayData) return null;
+                locationData = dayData.byLocation?.find((loc: any) => 
+                  loc?.locationId && loc.locationId.toString() === locationId
+                );
+                if (locationData) {
+                  workerData = locationData.byTeam?.flatMap((team: any) => 
+                    (team.byWorker || []).map((worker: any) => ({
+                      workerId: worker.unifiedUserId?.toString() || '',
+                      workerName: worker.workerName || 'Unknown',
+                      teamId: team.teamId?.toString() || '',
+                      teamName: team.teamName || '',
+                      hours: worker.totalHoursWorked || 0,
+                      cost: worker.totalWageCost || 0,
+                    }))
+                  ) || [];
+                }
+              }
               
               if (!locationData) return null;
               
               return {
                 locationId: record.locationId,
                 date: record.date,
-                totalHoursWorked: locationData.totalHoursWorked,
-                totalWageCost: locationData.totalWageCost,
-                totalRevenue: locationData.totalRevenue,
-                laborCostPercentage: yearData.laborCostPercentage,
-                revenuePerHour: yearData.revenuePerHour,
+                totalHoursWorked: locationData.totalHoursWorked || 0,
+                totalWageCost: locationData.totalWageCost || 0,
+                totalRevenue: record.totalRevenue || 0,
+                laborCostPercentage: record.laborCostPercentage || 0,
+                revenuePerHour: record.revenuePerHour || 0,
                 teamStats: locationData.byTeam?.map((team: any) => ({
                   teamId: team.teamId,
                   teamName: team.teamName,
-                  hours: team.totalHoursWorked,
-                  cost: team.totalWageCost,
+                  hours: team.totalHoursWorked || 0,
+                  cost: team.totalWageCost || 0,
                 })) || [],
-                byTeam: locationData.byTeam || [],
-                byWorker: locationData.byTeam?.flatMap((team: any) => team.byWorker || []) || [],
+                workerStats: workerData,
               };
             })
             .filter((r): r is any => r !== null);
@@ -684,14 +1034,254 @@ export const resolvers = {
         db.collection('eitje_aggregated').countDocuments(query),
       ]);
       
+      // Transform records to include workerStats from hierarchical data if available
+      const transformedRecords = await Promise.all(records.map(async (record: any) => {
+        // Try to get worker data from hoursByDay if available
+        if (record.hoursByDay && Array.isArray(record.hoursByDay)) {
+          const recordDate = record.date instanceof Date 
+            ? record.date.toISOString().split('T')[0]
+            : new Date(record.date).toISOString().split('T')[0];
+          
+          const dayData = record.hoursByDay.find((d: any) => d.date === recordDate);
+          if (dayData) {
+            const locationData = dayData.byLocation?.find((loc: any) => 
+              loc?.locationId && loc.locationId.toString() === locationId
+            );
+            
+            if (locationData) {
+              const workerStats = locationData.byTeam?.flatMap((team: any) => 
+                (team.byWorker || []).map((worker: any) => ({
+                  workerId: worker.unifiedUserId?.toString() || '',
+                  workerName: worker.workerName || 'Unknown',
+                  teamId: team.teamId?.toString() || '',
+                  teamName: team.teamName || '',
+                  hours: worker.totalHoursWorked || 0,
+                  cost: worker.totalWageCost || 0,
+                }))
+              ) || [];
+              
+              return {
+                ...record,
+                workerStats,
+              };
+            }
+          }
+        }
+        
+        // Fallback: return record without workerStats
+        return {
+          ...record,
+          workerStats: [],
+        };
+      }));
+      
       return {
         success: true,
-        records,
+        records: transformedRecords,
         total,
         page,
         totalPages: Math.ceil(total / limit),
         error: null,
       };
+    },
+
+    // Enhanced Labor Productivity
+    laborProductivityEnhanced: async (
+      _: any,
+      {
+        startDate,
+        endDate,
+        periodType,
+        locationId,
+        filters = {},
+        page = 1,
+        limit = 50,
+      }: {
+        startDate: string;
+        endDate: string;
+        periodType: 'YEAR' | 'MONTH' | 'WEEK' | 'DAY' | 'HOUR';
+        locationId?: string;
+        filters?: {
+          division?: 'TOTAL' | 'FOOD' | 'BEVERAGE';
+          teamCategory?: 'KITCHEN' | 'SERVICE' | 'MANAGEMENT' | 'OTHER';
+          subTeam?: string;
+          workerId?: string;
+        };
+        page?: number;
+        limit?: number;
+      }
+    ) => {
+      try {
+        const { fetchProductivityEnhanced } = await import('@/lib/services/workforce/productivity-enhanced.service');
+        
+        // Convert GraphQL enum values to TypeScript types
+        const periodTypeMap: Record<string, 'year' | 'month' | 'week' | 'day' | 'hour'> = {
+          YEAR: 'year',
+          MONTH: 'month',
+          WEEK: 'week',
+          DAY: 'day',
+          HOUR: 'hour',
+        };
+        
+        const divisionMap: Record<string, 'Food' | 'Beverage' | 'Management' | 'Other' | 'All'> = {
+          FOOD: 'Food',
+          BEVERAGE: 'Beverage',
+          MANAGEMENT: 'Management',
+          OTHER: 'Other',
+          ALL: 'All',
+        };
+        
+        const teamCategoryMap: Record<string, 'Kitchen' | 'Service' | 'Management' | 'Other'> = {
+          KITCHEN: 'Kitchen',
+          SERVICE: 'Service',
+          MANAGEMENT: 'Management',
+          OTHER: 'Other',
+        };
+        
+        const params = {
+          startDate,
+          endDate,
+          periodType: periodTypeMap[periodType] || 'day',
+          locationId: locationId || 'all',
+          division: filters.division ? divisionMap[filters.division] : undefined,
+          teamCategory: filters.teamCategory ? teamCategoryMap[filters.teamCategory] : undefined,
+          subTeam: filters.subTeam,
+          workerId: filters.workerId,
+          page,
+          limit,
+        };
+        
+        const result = await fetchProductivityEnhanced(params);
+        
+        // Transform to GraphQL response format
+        return {
+          success: result.success,
+          records: result.records.map(r => ({
+            id: `${r.period}_${r.locationId || 'all'}_${r.teamId || 'total'}_${r.teamCategory || 'all'}`,
+            period: r.period,
+            periodType: r.periodType.toUpperCase(),
+            locationId: r.locationId,
+            locationName: r.locationName,
+            teamId: r.teamId,
+            teamName: r.teamName,
+            totalHoursWorked: r.totalHoursWorked,
+            totalWageCost: r.totalWageCost,
+            totalRevenue: r.totalRevenue,
+            revenuePerHour: r.revenuePerHour,
+            laborCostPercentage: r.laborCostPercentage,
+            recordCount: r.recordCount,
+            division: r.division?.toUpperCase(),
+            teamCategory: r.teamCategory?.toUpperCase(),
+            subTeam: r.subTeam,
+            workerId: r.workerId,
+            workerName: r.workerName,
+            ordersCount: r.ordersCount,
+            salesCount: r.salesCount,
+            productivityScore: r.productivityScore,
+            goalStatus: r.goalStatus,
+          })),
+          total: result.total,
+          page: result.page,
+          totalPages: result.totalPages,
+          error: result.error,
+          byDivision: result.byDivision?.map(d => ({
+            id: `${d.period}_${d.division}_${d.locationId || 'all'}`,
+            period: d.period,
+            periodType: d.periodType.toUpperCase(),
+            locationId: d.locationId,
+            locationName: d.locationName,
+            totalHoursWorked: d.totalHoursWorked,
+            totalWageCost: d.totalWageCost,
+            totalRevenue: d.totalRevenue,
+            revenuePerHour: d.revenuePerHour,
+            laborCostPercentage: d.laborCostPercentage,
+            recordCount: 0,
+            division: d.division.toUpperCase(),
+            goalStatus: d.goalStatus,
+          })),
+          byTeamCategory: result.byTeamCategory?.map(tc => ({
+            id: `${tc.period}_${tc.teamCategory}_${tc.locationId || 'all'}`,
+            period: tc.period,
+            periodType: tc.periodType.toUpperCase(),
+            locationId: tc.locationId,
+            locationName: tc.locationName,
+            totalHoursWorked: tc.totalHoursWorked,
+            totalWageCost: tc.totalWageCost,
+            totalRevenue: tc.totalRevenue,
+            revenuePerHour: tc.revenuePerHour,
+            laborCostPercentage: tc.laborCostPercentage,
+            recordCount: 0,
+            teamCategory: tc.teamCategory.toUpperCase(),
+            subTeam: tc.subTeam,
+            goalStatus: tc.goalStatus,
+          })),
+          byWorker: result.byWorker?.map(w => ({
+            id: `${w.period}_${w.workerId}_${w.locationId || 'all'}`,
+            period: w.period,
+            periodType: w.periodType.toUpperCase(),
+            locationId: w.locationId,
+            locationName: w.locationName,
+            totalHoursWorked: w.totalHoursWorked,
+            totalWageCost: w.totalWageCost,
+            totalRevenue: w.totalRevenue,
+            revenuePerHour: w.revenuePerHour,
+            laborCostPercentage: w.laborCostPercentage,
+            recordCount: 0,
+            teamCategory: w.teamCategory?.toUpperCase(),
+            subTeam: w.subTeam,
+            workerId: w.workerId,
+            workerName: w.workerName,
+            ordersCount: w.ordersCount,
+            salesCount: w.salesCount,
+            productivityScore: w.productivityScore,
+            goalStatus: w.goalStatus,
+          })),
+        };
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] laborProductivityEnhanced error:', error);
+        return {
+          success: false,
+          records: [],
+          total: 0,
+          page: 1,
+          totalPages: 0,
+          error: error.message || 'Failed to fetch enhanced productivity data',
+        };
+      }
+    },
+
+    // Company Settings
+    companySettings: async () => {
+      try {
+        const db = await getDatabase();
+        let settings = await db.collection('company_settings').findOne({});
+        
+        // If no settings exist, return default
+        if (!settings) {
+          return {
+            id: 'default',
+            workingDayStartHour: 6, // Default: 06:00
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        
+        return {
+          id: settings._id?.toString() || 'default',
+          workingDayStartHour: settings.workingDayStartHour || 6,
+          createdAt: settings.createdAt?.toISOString() || new Date().toISOString(),
+          updatedAt: settings.updatedAt?.toISOString() || new Date().toISOString(),
+        };
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] companySettings error:', error);
+        // Return default on error
+        return {
+          id: 'default',
+          workingDayStartHour: 6,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
     },
 
     // P&L Data
@@ -931,61 +1521,75 @@ export const resolvers = {
       }
     ) => {
       try {
+        console.log('[GraphQL Resolver] workerProfiles called:', { year, month, day, page, limit, filters });
+        
         const db = await getDatabase();
-        
-        // Build query
-        const query: any = {};
-        const andConditions: any[] = [];
-        
-        // Ensure filters is defined
         const safeFilters = filters || {};
         
-        // Date filtering logic (for finding workers active during specified period)
-        // Make it more lenient: show workers if they have no dates OR if their dates overlap with the period
+        // Build query using modular function
+        const { query, useAggregated: preferAggregated } = buildWorkerProfilesQuery(year, month, day, safeFilters);
+        
+        let records: any[] = [];
+        let total = 0;
+        let usedAggregated = false;
+        
+        // Try aggregated collection first
+        if (preferAggregated) {
+          try {
+            console.log('[GraphQL Resolver] Attempting to fetch from aggregated collection');
+            const aggregatedResult = await fetchWorkerProfilesFromAggregated(query, page, limit);
+            records = aggregatedResult.records;
+            total = aggregatedResult.total;
+            usedAggregated = true;
+            console.log(`[GraphQL Resolver] ✅ Fetched ${records.length} records from aggregated collection`);
+            // ✅ No enrichment needed - all names are already denormalized in aggregated collection!
+          } catch (aggregatedError: any) {
+            console.warn('[GraphQL Resolver] Failed to fetch from aggregated collection, falling back to worker_profiles:', aggregatedError.message);
+            // Will fallback below
+          }
+        }
+        
+        // Fallback to worker_profiles if aggregated not available or failed
+        if (!usedAggregated || records.length === 0) {
+          console.log('[GraphQL Resolver] Fetching from worker_profiles collection (fallback)');
+          
+          // Build fallback query (original logic)
+          const fallbackQuery: any = {};
+          const andConditions: any[] = [];
+          
+          // Date filtering logic (original complex logic)
         if (year) {
           let startDate: Date;
           let endDate: Date;
           
           if (day && month) {
-            // Specific day
             startDate = new Date(year, month - 1, day, 0, 0, 0, 0);
             endDate = new Date(year, month - 1, day, 23, 59, 59, 999);
           } else if (month) {
-            // Specific month
             startDate = new Date(year, month - 1, 1, 0, 0, 0, 0);
             const lastDay = new Date(year, month, 0).getDate();
             endDate = new Date(year, month - 1, lastDay, 23, 59, 59, 999);
           } else {
-            // Whole year
             startDate = new Date(year, 0, 1, 0, 0, 0, 0);
             endDate = new Date(year, 11, 31, 23, 59, 59, 999);
           }
           
-          // Find workers whose contract overlaps with the date range OR have no dates set
-          // More lenient: Show workers if:
-          // 1. They have no effective_from AND no effective_to (no dates = show always)
-          // 2. OR their contract overlaps with the date range
           const dateFilter: any = {
             $or: [
-              // No dates at all - show always
               { 
                 $and: [
                   { effective_from: null },
                   { effective_to: null }
                 ]
               },
-              // Has dates - check if they overlap with the period
               {
                 $and: [
-                  // Contract has started (effective_from is null OR <= endDate)
                   {
                     $or: [
                       { effective_from: null },
                       { effective_from: { $lte: endDate } }
                     ]
                   },
-                  // Contract hasn't ended (effective_to is null OR >= startDate)
-                  // BUT: Don't add this if activeOnly filter is set (it will be added below)
                   ...(safeFilters.activeOnly === null || safeFilters.activeOnly === undefined ? [{
                     $or: [
                       { effective_to: null },
@@ -1000,79 +1604,45 @@ export const resolvers = {
           andConditions.push(dateFilter);
         }
         
-        // Location filter
         if (safeFilters.locationId && safeFilters.locationId !== 'all') {
-          query.location_id = safeFilters.locationId;
+            fallbackQuery.location_id = safeFilters.locationId;
         }
         
-        // Contract type filter
         if (safeFilters.contractType && safeFilters.contractType !== 'all') {
-          query.contract_type = safeFilters.contractType;
+            fallbackQuery.contract_type = safeFilters.contractType;
         }
         
-        // Active only filter
         if (safeFilters.activeOnly === true) {
-          andConditions.push({ effective_to: null }); // Only active contracts
+            andConditions.push({ effective_to: null });
         } else if (safeFilters.activeOnly === false) {
-          andConditions.push({ effective_to: { $ne: null } }); // Only inactive contracts
+            andConditions.push({ effective_to: { $ne: null } });
         }
         
-        // Combine all $and conditions
         if (andConditions.length > 0) {
-          query.$and = andConditions;
+            fallbackQuery.$and = andConditions;
         }
         
-        // Debug logging
-        logger.log('[GraphQL Resolver] workerProfiles query:', JSON.stringify(query, null, 2));
-        
-        // Pagination
         const skip = (page - 1) * limit;
-        const total = await db.collection('worker_profiles').countDocuments(query);
-        
-        logger.log('[GraphQL Resolver] Found', total, 'worker profiles');
-        const totalPages = Math.ceil(total / limit);
-        
-        // Fetch records
-        const records = await db.collection('worker_profiles')
-          .find(query)
+          total = await db.collection('worker_profiles').countDocuments(fallbackQuery);
+          
+          records = await db.collection('worker_profiles')
+            .find(fallbackQuery)
           .sort({ created_at: -1 })
           .skip(skip)
           .limit(limit)
           .toArray();
         
-        // Enrich with user names from eitje_raw_data
-        const userIds = [...new Set(records.map(r => r.eitje_user_id).filter(Boolean))];
-        const users = await db.collection('eitje_raw_data')
-          .find({
-            endpoint: 'users',
-            'extracted.id': { $in: userIds }
-          })
-          .toArray();
+          console.log(`[GraphQL Resolver] ✅ Fetched ${records.length} records from worker_profiles (fallback)`);
+        }
         
-        const userMap = new Map();
-        users.forEach(user => {
-          const userId = user.extracted?.id;
-          const firstName = user.extracted?.first_name || user.rawApiResponse?.first_name || '';
-          const lastName = user.extracted?.last_name || user.rawApiResponse?.last_name || '';
-          const fullName = `${firstName} ${lastName}`.trim();
-          if (userId && fullName) {
-            userMap.set(userId, fullName);
-          }
-        });
-        
-        // Teams are now stored directly in worker_profiles (pre-aggregated)
-        // No need to query shifts on every request
-        logger.log(`[GraphQL] Reading teams from worker_profiles (pre-aggregated data)`);
-        
-        // Team filter - filter records by team membership (from pre-aggregated data)
+        // Team filter - filter records by team membership
         let filteredRecords = records;
         if (safeFilters.teamId && safeFilters.teamId !== 'all') {
           const filterTeamId = String(safeFilters.teamId);
-          logger.log(`[GraphQL] Filtering by team: ${filterTeamId}`);
+          console.log(`[GraphQL Resolver] Filtering by team: ${filterTeamId}`);
           
           filteredRecords = records.filter(record => {
             const teams = record.teams || [];
-            // Check if worker is in the specified team (by ID or name)
             return teams.some((t: any) => 
               String(t.team_id) === filterTeamId || 
               t.team_name === safeFilters.teamId ||
@@ -1080,63 +1650,65 @@ export const resolvers = {
             );
           });
           
-          logger.log(`[GraphQL] Filtered to ${filteredRecords.length} workers in team ${filterTeamId}`);
+          console.log(`[GraphQL Resolver] Filtered to ${filteredRecords.length} workers in team ${filterTeamId}`);
         }
         
-        // Enrich with location names from locations collection
-        const locationIds = [...new Set(records.map(r => r.location_id).filter(Boolean))];
-        const locationObjIds = locationIds.map(id => {
-          try {
-            return toObjectId(id);
-          } catch {
-            return null;
+        // ✅ Aggregated collection has all names pre-computed - no enrichment needed!
+        // If using fallback worker_profiles collection, log warning but don't enrich
+        // (Data should be pre-computed in aggregated collection - ensure aggregation is running)
+        let enrichedRecords = filteredRecords;
+        if (!usedAggregated) {
+          console.warn('[GraphQL Resolver] ⚠️ Using fallback worker_profiles - ensure aggregation is running. Aggregated collection should have all names pre-computed.');
+          // Don't enrich - aggregated collection should be used instead
+          // Enrichment functions are deprecated and should not be called
+        } else {
+          console.log('[GraphQL Resolver] ✅ Using pre-computed names from aggregated collection');
+        }
+        
+        // Transform records to GraphQL format
+        const transformedRecords = enrichedRecords.map((record: any) => {
+          // If from aggregated collection, use transform function
+          if (record.eitjeUserId !== undefined && record.locationName !== undefined) {
+            return transformAggregatedToWorkerProfile(record);
           }
-        }).filter(Boolean);
-        
-        const locations = await db.collection('locations').find({
-          _id: { $in: locationObjIds }
-        }).toArray();
-        
-        const locationMap = new Map();
-        locations.forEach(location => {
-          if (location._id && location.name) {
-            locationMap.set(location._id.toString(), location.name);
-          }
-        });
-        
-        // Transform records (teams are already in the record from pre-aggregation)
-        const transformedRecords = filteredRecords.map((record: any) => {
+          
+          // Otherwise, transform from worker_profiles format
           const teams = record.teams || [];
           const primaryTeam = teams.length > 0 ? teams[0].team_name : null;
           
+          // Check both camelCase (from enrichment) and snake_case (from DB) formats
+          const userName = record.userName || record.user_name || null;
+          const locationName = record.locationName || record.location_name || null;
+          const locationNames = record.locationNames || record.location_names || null;
+          
           return {
             id: record._id.toString(),
-            eitjeUserId: record.eitje_user_id,
-            userName: userMap.get(record.eitje_user_id) || null,
+            eitjeUserId: record.eitje_user_id || record.eitjeUserId,
+            userName: userName,
             teamName: primaryTeam,
             teams: teams.length > 0 ? teams : null,
-            locationId: record.location_id || null,
-            locationName: record.location_id ? locationMap.get(record.location_id) || null : null,
-            locationIds: record.location_ids || (record.location_id ? [record.location_id] : null),
-            locationNames: record.location_ids 
-              ? record.location_ids.map((id: string) => locationMap.get(id)).filter(Boolean)
-              : (record.location_id && locationMap.get(record.location_id) ? [locationMap.get(record.location_id)] : null),
-            contractType: record.contract_type || null,
-            contractHours: record.contract_hours || null,
-            hourlyWage: record.hourly_wage || null,
-            wageOverride: record.wage_override || false,
-            effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
-            effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
+            locationId: record.location_id || record.locationId || null,
+            locationName: locationName,
+            locationIds: record.location_ids || record.locationIds || (record.location_id || record.locationId ? [record.location_id || record.locationId] : null),
+            locationNames: locationNames,
+            contractType: record.contract_type || record.contractType || null,
+            contractHours: record.contract_hours || record.contractHours || null,
+            hourlyWage: record.hourly_wage || record.hourlyWage || null,
+            wageOverride: record.wage_override !== undefined ? record.wage_override : (record.wageOverride !== undefined ? record.wageOverride : false),
+            effectiveFrom: record.effective_from || record.effectiveFrom ? new Date(record.effective_from || record.effectiveFrom).toISOString() : null,
+            effectiveTo: record.effective_to || record.effectiveTo ? new Date(record.effective_to || record.effectiveTo).toISOString() : null,
             notes: record.notes || null,
-            isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
-            createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
-            updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
+            isActive: !(record.effective_to || record.effectiveTo) || new Date(record.effective_to || record.effectiveTo) > new Date(),
+            createdAt: record.created_at || record.createdAt ? new Date(record.created_at || record.createdAt).toISOString() : null,
+            updatedAt: record.updated_at || record.updatedAt ? new Date(record.updated_at || record.updatedAt).toISOString() : null,
           };
         });
         
         // Recalculate total for filtered records
         const filteredTotal = filteredRecords.length;
         const filteredTotalPages = Math.ceil(filteredTotal / limit);
+        
+        console.log(`[GraphQL Resolver] ✅ Returning ${transformedRecords.length} records`);
         
         return {
           success: true,
@@ -1146,6 +1718,7 @@ export const resolvers = {
           totalPages: filteredTotalPages,
         };
       } catch (error: any) {
+        console.error('[GraphQL Resolver] workerProfiles error:', error);
         logger.error('[GraphQL Resolver] workerProfiles error:', error);
         return {
           success: false,
@@ -1160,87 +1733,121 @@ export const resolvers = {
 
     workerProfile: async (_: any, { id }: { id: string }) => {
       try {
+        console.log('[GraphQL Resolver] workerProfile called:', { id });
+        
         const db = await getDatabase();
-        const record = await db.collection('worker_profiles').findOne({ _id: toObjectId(id) });
         
-        if (!record) return null;
+        // Try aggregated collection first
+        let record: any = null;
+        let isFromAggregated = false;
         
-        // Get user name
-        let userName = null;
-        if (record.eitje_user_id) {
-          const user = await db.collection('eitje_raw_data').findOne({
-            endpoint: 'users',
-            'extracted.id': record.eitje_user_id
-          });
-          if (user) {
-            const firstName = user.extracted?.first_name || user.rawApiResponse?.first_name || '';
-            const lastName = user.extracted?.last_name || user.rawApiResponse?.last_name || '';
-            userName = `${firstName} ${lastName}`.trim() || null;
-          }
-        }
-        
-        // Get team name from processed hours
-        let teamName = null;
-        if (record.eitje_user_id) {
-          const shift = await db.collection('eitje_time_registration_shifts_processed_v2')
-            .findOne({
-              user_id: record.eitje_user_id,
-              team_name: { $exists: true, $ne: null }
-            }, {
-              sort: { date: -1 }
+        // Try to find by eitjeUserId in aggregated collection
+        if (!ObjectId.isValid(id)) {
+          // Assume it's an eitje_user_id
+          const eitjeUserId = parseInt(id, 10);
+          if (!isNaN(eitjeUserId)) {
+            record = await db.collection('worker_profiles_aggregated').findOne({
+              eitjeUserId
             });
-          if (shift) {
-            teamName = shift.team_name || null;
+            if (record) {
+              isFromAggregated = true;
+              console.log(`[GraphQL Resolver] ✅ Found worker ${eitjeUserId} in aggregated collection`);
+            }
+          }
+        } else {
+          // Valid ObjectId, try aggregated first
+          record = await db.collection('worker_profiles_aggregated').findOne({ 
+            _id: toObjectId(id) 
+          });
+          if (record) {
+            isFromAggregated = true;
+            console.log(`[GraphQL Resolver] ✅ Found worker ${id} in aggregated collection`);
           }
         }
         
-        // Get location names (support multiple locations)
-        let locationName = null;
-        let locationNames: string[] = [];
-        const locationIds = record.location_ids || (record.location_id ? [record.location_id] : []);
-        
-        if (locationIds.length > 0) {
-          try {
-            const locationObjIds = locationIds.map(id => {
-              try {
-                return toObjectId(id);
-              } catch {
-                return null;
-              }
-            }).filter(Boolean);
-            
-            const locations = await db.collection('locations').find({
-              _id: { $in: locationObjIds }
-            }).toArray();
-            
-            locationNames = locations.map((loc: any) => loc.name).filter(Boolean);
-            locationName = locationNames.length > 0 ? locationNames[0] : null;
-          } catch (error) {
-            console.warn('[GraphQL] Error fetching location names:', error);
+        // Fallback to worker_profiles if not found in aggregated
+        if (!record) {
+          console.log('[GraphQL Resolver] Worker not found in aggregated, trying worker_profiles (fallback)');
+          
+          if (!ObjectId.isValid(id)) {
+            record = await db.collection('worker_profiles').findOne({
+              eitje_user_id: parseInt(id, 10)
+            });
+          } else {
+            record = await db.collection('worker_profiles').findOne({ _id: toObjectId(id) });
           }
         }
         
-        return {
-          id: record._id.toString(),
-          eitjeUserId: record.eitje_user_id,
-          userName,
-          teamName,
-          locationId: record.location_id || null,
-          locationName,
-          locationIds: locationIds.length > 0 ? locationIds : null,
-          locationNames: locationNames.length > 0 ? locationNames : null,
-          contractType: record.contract_type || null,
-          contractHours: record.contract_hours || null,
-          hourlyWage: record.hourly_wage || null,
-          wageOverride: record.wage_override || false,
-          effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
-          effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
-          notes: record.notes || null,
-          isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
-          createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
-          updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
-        };
+        if (!record) {
+          console.log(`[GraphQL Resolver] Worker ${id} not found`);
+          return null;
+        }
+        
+        // Transform based on source
+        if (isFromAggregated) {
+          // Use pre-computed data from aggregated collection
+          const transformed = transformAggregatedToWorkerProfile(record);
+          console.log(`[GraphQL Resolver] ✅ Returning worker from aggregated collection`);
+          return transformed;
+        } else {
+          // Transform from worker_profiles format (fallback)
+          const teams = record.teams || [];
+          const primaryTeam = teams.length > 0 ? teams[0].team_name : null;
+          
+          // ⚠️ FALLBACK ONLY: This is for old worker_profiles collection (not aggregated)
+          // For aggregated collection, locationName is pre-computed and we skip this
+          // Get location names (support multiple locations) - only for fallback
+          let locationName = null;
+          let locationNames: string[] = [];
+          const locationIds = record.location_ids || (record.location_id ? [record.location_id] : []);
+          
+          if (locationIds.length > 0) {
+            try {
+              const locationObjIds = locationIds.map((id: any) => {
+                try {
+                  return typeof id === 'string' ? toObjectId(id) : id;
+                } catch {
+                  return null;
+                }
+              }).filter(Boolean);
+              
+              const locations = await db.collection('locations').find({
+                _id: { $in: locationObjIds }
+              }).toArray();
+              
+              locationNames = locations.map((loc: any) => loc.name).filter(Boolean);
+              locationName = locationNames.length > 0 ? locationNames[0] : null;
+            } catch (error) {
+              console.warn('[GraphQL Resolver] Error fetching location names:', error);
+            }
+          }
+          
+          console.log(`[GraphQL Resolver] ✅ Returning worker from worker_profiles (fallback)`);
+          
+          return {
+            id: record._id.toString(),
+            eitjeUserId: record.eitje_user_id,
+            userName: record.user_name || null,
+            teamName: primaryTeam,
+            teams: teams.length > 0 ? teams : null,
+            locationId: record.location_id || null,
+            locationName,
+            locationIds: locationIds.length > 0 ? locationIds : null,
+            locationNames: locationNames.length > 0 ? locationNames : null,
+            contractType: record.contract_type || null,
+            contractHours: record.contract_hours || null,
+            hourlyWage: record.hourly_wage || null,
+            wageOverride: record.wage_override || false,
+            effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
+            effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
+            notes: record.notes || null,
+            isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
+            createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
+            updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
+          };
+        }
       } catch (error: any) {
+        console.error('[GraphQL Resolver] workerProfile error:', error);
         logger.error('[GraphQL Resolver] workerProfile error:', error);
         throw error;
       }
@@ -1256,218 +1863,118 @@ export const resolvers = {
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
         
         if (!firstName || !lastName) {
-          // Try to find by full name match in eitje_raw_data
-          const user = await db.collection('eitje_raw_data').findOne({
-            endpoint: 'users',
-            $or: [
-              { 'extracted.first_name': firstName, 'extracted.last_name': lastName },
-              { 'rawApiResponse.first_name': firstName, 'rawApiResponse.last_name': lastName },
-            ]
-          });
-          
-          if (user) {
-            const eitjeUserId = user.extracted?.id || user.rawApiResponse?.id;
-            if (eitjeUserId) {
-              // Find worker profile by eitje_user_id
-              const record = await db.collection('worker_profiles').findOne({ 
-                eitje_user_id: eitjeUserId 
-              });
-              
-              if (record) {
-                // Use same enrichment logic as workerProfile resolver
-                let teamName = null;
-                const shift = await db.collection('eitje_time_registration_shifts_processed_v2')
-                  .findOne({
-                    user_id: eitjeUserId,
-                    team_name: { $exists: true, $ne: null }
-                  }, {
-                    sort: { date: -1 }
-                  });
-                if (shift) {
-                  teamName = shift.team_name || null;
-                }
-                
-                let locationName = null;
-                if (record.location_id) {
-                  try {
-                    const location = await db.collection('locations').findOne({ 
-                      _id: toObjectId(record.location_id) 
-                    });
-                    if (location) {
-                      locationName = location.name || null;
-                    }
-                  } catch (error) {
-                    console.warn('[GraphQL] Error fetching location name:', error);
-                  }
-                }
-                
-                return {
-                  id: record._id.toString(),
-                  eitjeUserId: record.eitje_user_id,
-                  userName,
-                  teamName,
-                  locationId: record.location_id || null,
-                  locationName,
-                  contractType: record.contract_type || null,
-                  contractHours: record.contract_hours || null,
-                  hourlyWage: record.hourly_wage || null,
-                  wageOverride: record.wage_override || false,
-                  effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
-                  effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
-                  notes: record.notes || null,
-                  isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
-                  createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
-                  updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
-                };
-              }
-            }
-          }
+          console.warn('[GraphQL Resolver] workerProfileByName: Invalid name format, need first and last name');
           return null;
         }
         
-        // Find unified user by name
+        // ✅ Use unified_users for name-based lookup (indexed, fast)
         const unifiedUser = await db.collection('unified_users').findOne({
           firstName,
           lastName,
         });
         
         if (!unifiedUser) {
-          // Fallback: try to find by name in eitje_raw_data
-          const user = await db.collection('eitje_raw_data').findOne({
-            endpoint: 'users',
-            $or: [
-              { 'extracted.first_name': firstName, 'extracted.last_name': lastName },
-              { 'rawApiResponse.first_name': firstName, 'rawApiResponse.last_name': lastName },
-            ]
-          });
-          
-          if (user) {
-            const eitjeUserId = user.extracted?.id || user.rawApiResponse?.id;
-            if (eitjeUserId) {
-              const record = await db.collection('worker_profiles').findOne({ 
-                eitje_user_id: eitjeUserId 
-              });
-              
-              if (record) {
-                // Enrich with team and location
-                let teamName = null;
-                const shift = await db.collection('eitje_time_registration_shifts_processed_v2')
-                  .findOne({
-                    user_id: eitjeUserId,
-                    team_name: { $exists: true, $ne: null }
-                  }, {
-                    sort: { date: -1 }
-                  });
-                if (shift) {
-                  teamName = shift.team_name || null;
-                }
-                
-                let locationName = null;
-                if (record.location_id) {
-                  try {
-                    const location = await db.collection('locations').findOne({ 
-                      _id: toObjectId(record.location_id) 
-                    });
-                    if (location) {
-                      locationName = location.name || null;
-                    }
-                  } catch (error) {
-                    console.warn('[GraphQL] Error fetching location name:', error);
-                  }
-                }
-                
-                return {
-                  id: record._id.toString(),
-                  eitjeUserId: record.eitje_user_id,
-                  userName,
-                  teamName,
-                  locationId: record.location_id || null,
-                  locationName,
-                  contractType: record.contract_type || null,
-                  contractHours: record.contract_hours || null,
-                  hourlyWage: record.hourly_wage || null,
-                  wageOverride: record.wage_override || false,
-                  effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
-                  effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
-                  notes: record.notes || null,
-                  isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
-                  createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
-                  updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
-                };
-              }
-            }
-          }
+          console.log(`[GraphQL Resolver] workerProfileByName: No unified user found for "${firstName} ${lastName}"`);
           return null;
         }
         
         // Find eitje_user_id from unified user's system mappings
         const eitjeMapping = unifiedUser.systemMappings?.find((m: any) => m.system === 'eitje');
         if (!eitjeMapping) {
+          console.log(`[GraphQL Resolver] workerProfileByName: No eitje mapping found for unified user ${unifiedUser._id}`);
           return null;
         }
         
         const eitjeUserId = parseInt(eitjeMapping.externalId, 10);
-        if (!eitjeUserId) {
+        if (!eitjeUserId || isNaN(eitjeUserId)) {
+          console.warn(`[GraphQL Resolver] workerProfileByName: Invalid eitje_user_id: ${eitjeMapping.externalId}`);
           return null;
         }
         
-        // Find worker profile by eitje_user_id
-        const record = await db.collection('worker_profiles').findOne({ 
-          eitje_user_id: eitjeUserId 
+        // ✅ Query worker_profiles_aggregated (has all data pre-computed, including locationName and userName)
+        const record = await db.collection('worker_profiles_aggregated').findOne({ 
+          eitjeUserId
         });
         
         if (!record) {
+          console.log(`[GraphQL Resolver] workerProfileByName: No aggregated worker profile found for eitje_user_id ${eitjeUserId}`);
           return null;
         }
         
-        // Enrich with team and location (same as workerProfile resolver)
-        let teamName = null;
-        const shift = await db.collection('eitje_time_registration_shifts_processed_v2')
-          .findOne({
-            user_id: eitjeUserId,
-            team_name: { $exists: true, $ne: null }
-          }, {
-            sort: { date: -1 }
-          });
-        if (shift) {
-          teamName = shift.team_name || null;
-        }
-        
-        let locationName = null;
-        if (record.location_id) {
-          try {
-            const location = await db.collection('locations').findOne({ 
-              _id: toObjectId(record.location_id) 
-            });
-            if (location) {
-              locationName = location.name || null;
-            }
-          } catch (error) {
-            console.warn('[GraphQL] Error fetching location name:', error);
-          }
-        }
-        
-        return {
-          id: record._id.toString(),
-          eitjeUserId: record.eitje_user_id,
-          userName,
-          teamName,
-          locationId: record.location_id || null,
-          locationName,
-          contractType: record.contract_type || null,
-          contractHours: record.contract_hours || null,
-          hourlyWage: record.hourly_wage || null,
-          wageOverride: record.wage_override || false,
-          effectiveFrom: record.effective_from ? new Date(record.effective_from).toISOString() : null,
-          effectiveTo: record.effective_to ? new Date(record.effective_to).toISOString() : null,
-          notes: record.notes || null,
-          isActive: !record.effective_to || new Date(record.effective_to) > new Date(),
-          createdAt: record.created_at ? new Date(record.created_at).toISOString() : null,
-          updatedAt: record.updated_at ? new Date(record.updated_at).toISOString() : null,
-        };
+        // ✅ Use transform function - all data already denormalized in aggregated collection
+        const transformed = transformAggregatedToWorkerProfile(record);
+        console.log(`[GraphQL Resolver] ✅ Found worker profile by name "${userName}" (eitje_user_id: ${eitjeUserId})`);
+        return transformed;
       } catch (error: any) {
         logger.error('[GraphQL Resolver] workerProfileByName error:', error);
         return null;
+      }
+    },
+
+    // Worker Metrics
+    workerSales: async (
+      _: any,
+      { workerName, startDate, endDate }: { workerName: string; startDate: string; endDate: string }
+    ) => {
+      try {
+        const { fetchWorkerSales } = await import('@/lib/services/workforce/worker-sales.service');
+        return await fetchWorkerSales(workerName, startDate, endDate);
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] workerSales error:', error);
+        throw new Error(error.message || 'Failed to fetch worker sales');
+      }
+    },
+
+    workerHours: async (
+      _: any,
+      { eitjeUserId, startDate, endDate }: { eitjeUserId: number; startDate: string; endDate: string }
+    ) => {
+      try {
+        const { fetchWorkerHoursBreakdown } = await import('@/lib/services/workforce/worker-hours.service');
+        return await fetchWorkerHoursBreakdown(eitjeUserId, startDate, endDate);
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] workerHours error:', error);
+        throw new Error(error.message || 'Failed to fetch worker hours');
+      }
+    },
+
+    workerLaborCost: async (
+      _: any,
+      { eitjeUserId, startDate, endDate }: { eitjeUserId: number; startDate: string; endDate: string }
+    ) => {
+      try {
+        const { fetchWorkerLaborCost } = await import('@/lib/services/workforce/worker-labor-cost.service');
+        return await fetchWorkerLaborCost(eitjeUserId, startDate, endDate);
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] workerLaborCost error:', error);
+        throw new Error(error.message || 'Failed to fetch worker labor cost');
+      }
+    },
+
+    workerHoursSummary: async (
+      _: any,
+      { eitjeUserId, contractHours, contractStartDate, contractEndDate, startDate, endDate }: { 
+        eitjeUserId: number; 
+        contractHours?: number | null;
+        contractStartDate?: string | null;
+        contractEndDate?: string | null;
+        startDate: string; 
+        endDate: string;
+      }
+    ) => {
+      try {
+        const { fetchWorkerHoursSummary } = await import('@/lib/services/workforce/worker-hours-summary.service');
+        return await fetchWorkerHoursSummary(
+          eitjeUserId,
+          contractHours || null,
+          contractStartDate || '',
+          contractEndDate || null,
+          startDate,
+          endDate
+        );
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] workerHoursSummary error:', error);
+        throw new Error(error.message || 'Failed to fetch worker hours summary');
       }
     },
 
@@ -1847,11 +2354,11 @@ export const resolvers = {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
 
+        // ✅ NOW USES: processed_hours_aggregated collection
         const query: any = {
-          endpoint: 'time_registration_shifts',
           date: {
-            $gte: start,
-            $lte: end,
+            $gte: startDate,
+            $lte: endDate,
           },
         };
 
@@ -1860,26 +2367,7 @@ export const resolvers = {
         // Location filter
         if (safeFilters.locationId && safeFilters.locationId !== 'all') {
           try {
-            const locationObjId = new ObjectId(safeFilters.locationId);
-            const location = await db.collection('locations').findOne({ _id: locationObjId });
-            
-            if (!location) {
-              logger.warn(`Location not found for locationId: ${safeFilters.locationId}`);
-            } else if (location.systemMappings && Array.isArray(location.systemMappings)) {
-              const eitjeMapping = location.systemMappings.find((m: any) => m.system === 'eitje');
-              if (eitjeMapping && eitjeMapping.externalId) {
-                andConditions.push({ environmentId: parseInt(eitjeMapping.externalId) });
-              } else {
-                andConditions.push({
-                  $or: [
-                    { locationId: locationObjId },
-                    { locationId: locationObjId.toString() }
-                  ]
-                });
-              }
-            } else {
-              andConditions.push({ locationId: locationObjId });
-            }
+            query.locationId = new ObjectId(safeFilters.locationId);
           } catch (e) {
             logger.warn(`Invalid locationId: ${safeFilters.locationId}`, e);
           }
@@ -1887,287 +2375,66 @@ export const resolvers = {
 
         // Environment filter
         if (safeFilters.environmentId) {
-          andConditions.push({ environmentId: parseInt(String(safeFilters.environmentId)) });
+          query.environmentId = parseInt(String(safeFilters.environmentId));
         }
 
         // Team filter
         if (safeFilters.teamName && safeFilters.teamName !== 'all') {
-          andConditions.push({
-            $or: [
-              { 'extracted.team_name': safeFilters.teamName },
-              { 'extracted.teamName': safeFilters.teamName },
-              { 'rawApiResponse.team_name': safeFilters.teamName },
-              { 'rawApiResponse.teamName': safeFilters.teamName }
-            ]
-          });
+          query.teamName = safeFilters.teamName;
         }
 
         // Type name filter
         if (safeFilters.typeName !== undefined && safeFilters.typeName !== null) {
-          logger.log('[GraphQL Resolver] typeName filter:', safeFilters.typeName);
           if (safeFilters.typeName === 'WORKED' || safeFilters.typeName === '') {
-            // "WORKED" marker or empty string means "Gewerkte Uren" (worked hours)
-            // Match records where NONE of the type_name fields contain leave types
-            // Check both snake_case (type_name) and camelCase (typeName) variants
-            andConditions.push({
-              $and: [
-                // extracted.type_name (snake_case) must be null, empty, gewerkte_uren, or not exist
-                {
-              $or: [
-                { 'extracted.type_name': null },
-                { 'extracted.type_name': { $exists: false } },
-                { 'extracted.type_name': '' },
-                { 'extracted.type_name': 'gewerkte_uren' },
-                    { 'extracted.type_name': 'Gewerkte Uren' }
-                  ]
-                },
-                // extracted.typeName (camelCase) must be null, empty, gewerkte_uren, or not exist
-                {
-                  $or: [
-                    { 'extracted.typeName': null },
-                    { 'extracted.typeName': { $exists: false } },
-                    { 'extracted.typeName': '' },
-                    { 'extracted.typeName': 'gewerkte_uren' },
-                    { 'extracted.typeName': 'Gewerkte Uren' }
-                  ]
-                },
-                // rawApiResponse.type_name (snake_case) must be null, empty, gewerkte_uren, or not exist
-                {
-                  $or: [
-                { 'rawApiResponse.type_name': null },
-                { 'rawApiResponse.type_name': { $exists: false } },
-                { 'rawApiResponse.type_name': '' },
-                { 'rawApiResponse.type_name': 'gewerkte_uren' },
-                { 'rawApiResponse.type_name': 'Gewerkte Uren' }
-                  ]
-                },
-                // rawApiResponse.typeName (camelCase) must be null, empty, gewerkte_uren, or not exist
-                {
-                  $or: [
-                    { 'rawApiResponse.typeName': null },
-                    { 'rawApiResponse.typeName': { $exists: false } },
-                    { 'rawApiResponse.typeName': '' },
-                    { 'rawApiResponse.typeName': 'gewerkte_uren' },
-                    { 'rawApiResponse.typeName': 'Gewerkte Uren' }
-                  ]
-                },
-                // Explicitly exclude leave types from extracted.type_name
-                {
-                  $or: [
-                    { 'extracted.type_name': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
-                    { 'extracted.type_name': { $exists: false } }
-                  ]
-                },
-                // Explicitly exclude leave types from extracted.typeName (camelCase)
-                {
-                  $or: [
-                    { 'extracted.typeName': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
-                    { 'extracted.typeName': { $exists: false } }
-                  ]
-                },
-                // Explicitly exclude leave types from rawApiResponse.type_name
-                {
-                  $or: [
-                    { 'rawApiResponse.type_name': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
-                    { 'rawApiResponse.type_name': { $exists: false } }
-                  ]
-                },
-                // Explicitly exclude leave types from rawApiResponse.typeName (camelCase)
-                {
-                  $or: [
-                    { 'rawApiResponse.typeName': { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] } },
-                    { 'rawApiResponse.typeName': { $exists: false } }
-                  ]
-                }
-              ]
-            });
+            // "WORKED" marker means exclude leave types
+            query.typeName = { $nin: ['verlof', 'ziek', 'bijzonder', 'Verlof', 'Ziek', 'Bijzonder Verlof'] };
           } else {
-            // Filter for specific leave type (verlof, ziek, bijzonder)
-            // Check both snake_case (type_name) and camelCase (typeName) variants
-            const typeValue = String(safeFilters.typeName).toLowerCase();
-            andConditions.push({
-              $or: [
-                { 'extracted.type_name': typeValue },
-                { 'extracted.type_name': typeValue.replace(' ', '_') },
-                { 'extracted.typeName': typeValue },
-                { 'extracted.typeName': typeValue.replace(' ', '_') },
-                { 'rawApiResponse.type_name': typeValue },
-                { 'rawApiResponse.type_name': typeValue.replace(' ', '_') },
-                { 'rawApiResponse.typeName': typeValue },
-                { 'rawApiResponse.typeName': typeValue.replace(' ', '_') }
-              ]
-            });
+            query.typeName = safeFilters.typeName;
           }
-        } else {
-          logger.log('[GraphQL Resolver] No typeName filter applied');
         }
 
         // User filter
         if (safeFilters.userId) {
-          andConditions.push({
-            $or: [
-              { 'extracted.userId': parseInt(String(safeFilters.userId)) },
-              { 'extracted.user_id': parseInt(String(safeFilters.userId)) },
-              { 'rawApiResponse.user_id': parseInt(String(safeFilters.userId)) },
-              { 'rawApiResponse.userId': parseInt(String(safeFilters.userId)) }
-            ]
-          });
+          query.userId = parseInt(String(safeFilters.userId));
         }
 
-        if (andConditions.length > 0) {
-          query.$and = andConditions;
-        }
+        // Get total count
+        const total = await db.collection('processed_hours_aggregated').countDocuments(query);
 
-        const total = await db.collection('eitje_raw_data').countDocuments(query);
-
-        const records = await db.collection('eitje_raw_data')
+        // Fetch paginated records with database-level pagination
+        const records = await db.collection('processed_hours_aggregated')
           .find(query)
-          .sort({ date: -1, createdAt: -1 })
+          .sort({ date: -1, start: -1 })
           .skip((page - 1) * limit)
           .limit(limit)
           .toArray();
 
-        // Get unique user IDs for hourly wage lookup
-        const userIds = new Set<number>();
-        records.forEach((record) => {
-          const extracted = record.extracted || {};
-          const raw = record.rawApiResponse || {};
-          const userId = extracted.userId || extracted.user_id || raw.user_id || raw.userId;
-          if (userId) {
-            userIds.add(parseInt(String(userId)));
-          }
-        });
-
-        // Fetch hourly wages
-        const hourlyWageMap = new Map<number, number | null>();
-        if (userIds.size > 0) {
-          try {
-            const workerProfiles = await db.collection('worker_profiles')
-              .find({
-                eitje_user_id: { $in: Array.from(userIds) },
-                $or: [
-                  { effective_to: null },
-                  { effective_to: { $gte: new Date() } }
-                ]
-              })
-              .sort({ effective_from: -1 })
-              .toArray();
-
-            workerProfiles.forEach((profile: any) => {
-              const userId = profile.eitje_user_id;
-              if (userId && !hourlyWageMap.has(userId) && profile.hourly_wage !== null && profile.hourly_wage !== undefined) {
-                hourlyWageMap.set(userId, Number(profile.hourly_wage));
-              }
-            });
-          } catch (error) {
-            logger.warn('[GraphQL Resolver] Error fetching hourly wages:', error);
-          }
-        }
-
-        // Transform records
-        const processedRecords = records
-          .filter((record) => record !== null && record !== undefined && record.date)
-          .map((record, index) => {
-            try {
-              const extracted = record.extracted || {};
-              const raw = record.rawApiResponse || {};
-              const userId = extracted.userId || extracted.user_id || raw.user_id || raw.userId;
-              const hourlyWage = userId ? hourlyWageMap.get(parseInt(String(userId))) || null : null;
-              
-              // Calculate worked hours from start/end times minus breaks
-              const startTime = extracted.start || extracted.start_time || raw.start || raw.start_time;
-              const endTime = extracted.end || extracted.end_time || raw.end || raw.end_time;
-              const breakMinutes = extracted.breakMinutes || extracted.break_minutes || raw.break_minutes || raw.breakMinutes || 0;
-              
-              let calculatedWorkedHours = null;
-              if (startTime && endTime) {
-                try {
-                  const start = new Date(startTime);
-                  const end = new Date(endTime);
-                  const diffMs = end.getTime() - start.getTime();
-                  const diffHours = diffMs / (1000 * 60 * 60); // Convert to hours
-                  calculatedWorkedHours = Math.max(0, diffHours - (breakMinutes / 60)); // Subtract break time
-                } catch (e) {
-                  logger.warn('[GraphQL processedHours] Error calculating worked hours:', e);
-                }
-              }
-              
-              // Use calculated hours, fallback to extracted hours
-              const workedHours = calculatedWorkedHours !== null 
-                ? calculatedWorkedHours 
-                : (extracted.workedHours || extracted.worked_hours || extracted.hours_worked || raw.hours_worked || raw.worked_hours || null);
-              
-              // Calculate wage_cost = hourly_wage × worked_hours
-              const wageCost = (hourlyWage !== null && hourlyWage !== undefined && workedHours !== null && workedHours !== undefined)
-                ? hourlyWage * workedHours
-                : (extracted.wageCost || extracted.wage_cost || raw.wage_cost || raw.wageCost || null);
-              
-              // Safely handle date
-              let dateStr = '';
-              try {
-                if (record.date) {
-                  dateStr = new Date(record.date).toISOString().split('T')[0];
-                }
-              } catch (e) {
-                logger.warn('[GraphQL processedHours] Error parsing date:', e, record);
-                dateStr = new Date().toISOString().split('T')[0]; // Fallback to today
-              }
-              
-              return {
-                id: record._id?.toString() || `${index}`,
-                eitje_id: extracted.eitje_id || raw.id || null,
-                date: dateStr,
-                user_id: userId ? parseInt(String(userId)) : null,
-                user_name: extracted.userName || extracted.user_name || raw.user_name || raw.userName || null,
-                environment_id: extracted.environmentId || extracted.environment_id || raw.environment_id || raw.environmentId || null,
-                environment_name: extracted.environmentName || extracted.environment_name || raw.environment_name || raw.environmentName || null,
-                team_id: extracted.teamId || extracted.team_id || raw.team_id || raw.teamId || null,
-                team_name: extracted.teamName || extracted.team_name || raw.team_name || raw.teamName || null,
-                start: startTime || null,
-                end: endTime || null,
-                break_minutes: breakMinutes || null,
-                worked_hours: workedHours,
-                hourly_wage: hourlyWage,
-                wage_cost: wageCost,
-                type_name: extracted.type_name || extracted.typeName || raw.type_name || raw.typeName || null,
-                shift_type: extracted.shift_type || extracted.shiftType || raw.shift_type || raw.shiftType || null,
-                remarks: extracted.remarks || raw.remarks || null,
-                approved: extracted.approved || raw.approved || null,
-                planning_shift_id: extracted.planning_shift_id || extracted.planningShiftId || raw.planning_shift_id || raw.planningShiftId || null,
-                exported_to_hr_integration: extracted.exported_to_hr_integration || extracted.exportedToHrIntegration || raw.exported_to_hr_integration || raw.exportedToHrIntegration || null,
-                updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : null,
-                created_at: record.createdAt ? new Date(record.createdAt).toISOString() : null,
-              };
-            } catch (error: any) {
-              logger.error('[GraphQL processedHours] Error processing record:', error, record);
-              // Return a minimal valid record to prevent breaking the response
-              return {
-                id: record._id?.toString() || `${index}`,
-                eitje_id: null,
-                date: record.date ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                user_id: null,
-                user_name: null,
-                environment_id: null,
-                environment_name: null,
-                team_id: null,
-                team_name: null,
-                start: null,
-                end: null,
-                break_minutes: null,
-                worked_hours: null,
-                hourly_wage: null,
-                wage_cost: null,
-                type_name: null,
-                shift_type: null,
-                remarks: null,
-                approved: null,
-                planning_shift_id: null,
-                exported_to_hr_integration: null,
-                updated_at: null,
-                created_at: null,
-              };
-            }
-          });
+        // Transform to match expected format
+        const processedRecords = records.map((record: any) => ({
+          id: record._id?.toString() || '',
+          eitje_id: null, // Not stored in aggregated collection
+          date: record.date,
+          user_id: record.userId || null,
+          user_name: record.userName || null, // ✅ Pre-aggregated (no N+1 queries!)
+          environment_id: record.environmentId || null,
+          environment_name: record.environmentName || null,
+          team_id: record.teamId || null,
+          team_name: record.teamName || null,
+          start: record.start || null,
+          end: record.end || null,
+          break_minutes: record.breakMinutes || null,
+          worked_hours: record.workedHours || null,
+          hourly_wage: record.hourlyWage || null,
+          wage_cost: record.wageCost || null,
+          type_name: record.typeName || null,
+          shift_type: record.shiftType || null,
+          remarks: record.remarks || null,
+          approved: record.approved || null,
+          planning_shift_id: null, // Not stored in aggregated collection
+          exported_to_hr_integration: null, // Not stored in aggregated collection
+          updated_at: record.updatedAt ? (record.updatedAt instanceof Date ? record.updatedAt.toISOString() : new Date(record.updatedAt).toISOString()) : null,
+          created_at: record.createdAt ? (record.createdAt instanceof Date ? record.createdAt.toISOString() : new Date(record.createdAt).toISOString()) : null,
+        }));
 
         const totalPages = Math.ceil(total / limit);
 
@@ -2386,9 +2653,7 @@ export const resolvers = {
     },
 
     // Daily Sales
-    // ⚠️ EXCEPTION: Uses bork_raw_data because it needs transaction-level detail
-    // (ticket keys, order keys, waiter names, table numbers, payment methods)
-    // Aggregated collections (bork_aggregated, products_aggregated) only have daily/product totals
+    // ✅ NOW USES: sales_line_items_aggregated collection (line-item level data)
     // This resolver is used for detailed sales line-item views that require individual transaction data
     dailySales: async (
       _: any,
@@ -2408,26 +2673,15 @@ export const resolvers = {
     ) => {
       try {
         const db = await getDatabase();
-        const start = new Date(startDate + 'T00:00:00.000Z');
-        let end: Date;
-        if (startDate === endDate) {
-          const endDateObj = new Date(endDate + 'T00:00:00.000Z');
-          endDateObj.setUTCDate(endDateObj.getUTCDate() + 1);
-          endDateObj.setUTCHours(1, 0, 0, 0);
-          end = endDateObj;
-        } else {
-          const endDateObj = new Date(endDate + 'T00:00:00.000Z');
-          endDateObj.setUTCHours(23, 59, 59, 999);
-          end = endDateObj;
-        }
 
         // ✅ Ensure filters is an object (handle null/undefined)
         const safeFilters = filters || {};
 
+        // Build query for sales_line_items_aggregated
         const query: any = {
           date: {
-            $gte: start,
-            $lte: end,
+            $gte: startDate,
+            $lte: endDate,
           },
         };
 
@@ -2439,203 +2693,90 @@ export const resolvers = {
           }
         }
 
-        const fetchLimit = Math.min(limit * 5, 100);
-        const rawDataRecords = await db.collection('bork_raw_data')
-          .find(query)
-          .limit(fetchLimit)
+        // Apply filters
+        if (safeFilters.category && safeFilters.category !== 'all') {
+          query.category = safeFilters.category;
+        }
+
+        if (safeFilters.productName) {
+          query.productName = { $regex: safeFilters.productName, $options: 'i' };
+        }
+
+        if (safeFilters.waiterName) {
+          query.waiterName = { $regex: safeFilters.waiterName, $options: 'i' };
+        }
+
+        // ✅ Check if collection exists - return error if not (no fallback to raw data)
+        const collectionExists = await db.listCollections({ name: 'sales_line_items_aggregated' }).hasNext();
+        if (!collectionExists) {
+          const errorMessage = 'sales_line_items_aggregated collection not found. Run /api/bork/v2/aggregate-sales-line-items first to create the aggregated collection.';
+          logger.error('[dailySales]', errorMessage);
+          return {
+            success: false,
+            records: [],
+            total: 0,
+            page,
+            totalPages: 0,
+            error: errorMessage,
+          };
+        }
+
+        // Get total count (with timeout protection and max execution time)
+        let total = 0;
+        try {
+          total = await db.collection('sales_line_items_aggregated')
+            .countDocuments(query, { maxTimeMS: 10000 }); // 10 second timeout for count
+        } catch (error: any) {
+          logger.warn('[dailySales] Error counting documents:', error.message);
+          // If count fails, return empty result to prevent timeout
+          return {
+            success: true,
+            records: [],
+            total: 0,
+            page,
+            totalPages: 0,
+          };
+        }
+
+        // Fetch paginated records with database-level pagination
+        // ✅ Use indexed fields for sorting (date is indexed)
+        // ✅ Add maxTimeMS to prevent long-running queries
+        const records = await db.collection('sales_line_items_aggregated')
+          .find(query, { maxTimeMS: 30000 }) // 30 second timeout for query
+          .sort({ date: -1, time: -1 }) // Uses { date: -1, time: -1 } index
+          .skip((page - 1) * limit)
+          .limit(limit)
           .toArray();
 
-        // Get location names
-        const locationIds = new Set<string>();
-        rawDataRecords.forEach((record) => {
-          if (record && record.locationId) {
-            const locId = record.locationId instanceof ObjectId 
-              ? record.locationId.toString() 
-              : typeof record.locationId === 'string' 
-                ? record.locationId 
-                : String(record.locationId);
-            if (locId) {
-              locationIds.add(locId);
-            }
-          }
-        });
-
-        const locationMap = new Map<string, { name: string; code?: string }>();
-        if (locationIds.size > 0) {
-          const locationObjectIds = Array.from(locationIds)
-            .map(id => {
-              try {
-                return new ObjectId(id);
-              } catch {
-                return null;
-              }
-            })
-            .filter((id): id is ObjectId => id !== null);
-          
-          if (locationObjectIds.length > 0) {
-            const locations = await db.collection('locations')
-              .find({ _id: { $in: locationObjectIds } })
-              .toArray() as Array<{ _id?: ObjectId; name?: string; code?: string }>;
-            
-            locations.forEach((loc) => {
-              if (loc._id) {
-                locationMap.set(loc._id.toString(), {
-                  name: loc.name || 'Unknown',
-                  code: loc.code,
-                });
-              }
-            });
-          }
-        }
-
-        // Extract sales records
-        const allSalesRecords: any[] = [];
-        let salesRecordCounter = 0;
-
-        for (const record of rawDataRecords) {
-          if (!record) continue;
-          
-          const recordId = record._id?.toString() || 'unknown';
-          const rawApiResponse = record.rawApiResponse;
-          const locationIdStr = record.locationId?.toString() || '';
-          const locationInfo = locationMap.get(locationIdStr);
-          
-          if (!rawApiResponse) continue;
-
-          let tickets: any[] = [];
-          if (Array.isArray(rawApiResponse)) {
-            tickets = rawApiResponse;
-          } else if (rawApiResponse && typeof rawApiResponse === 'object') {
-            const response = rawApiResponse as any;
-            if (response.Tickets && Array.isArray(response.Tickets)) {
-              tickets = response.Tickets;
-            } else if (response.tickets && Array.isArray(response.tickets)) {
-              tickets = response.tickets;
-            } else {
-              tickets = [rawApiResponse];
-            }
-          }
-
-          const recordDate = record.date instanceof Date 
-            ? record.date 
-            : typeof record.date === 'string' 
-              ? new Date(record.date) 
-              : new Date();
-
-          for (const ticket of tickets) {
-            if (!ticket || typeof ticket !== 'object') continue;
-
-            const ticketKey = ticket.Key || ticket.key || null;
-            const ticketNumber = ticket.TicketNumber || ticket.TicketNr || ticket.ticketNumber || ticket.ticketNr || '';
-            const ticketTable = ticket.TableNumber || ticket.tableNumber || ticket.TableName || ticket.tableName || null;
-            const ticketWaiter = ticket.WaiterName || ticket.waiterName || ticket.UserName || ticket.userName || null;
-            const ticketPayment = ticket.PaymentMethod || ticket.paymentMethod || null;
-            const ticketTime = ticket.Time || ticket.time || null;
-
-            const orders = ticket.Orders || ticket.orders || [];
-            let createdFromLines = false;
-
-            if (Array.isArray(orders) && orders.length > 0) {
-              for (const order of orders) {
-                if (!order || typeof order !== 'object') continue;
-                const orderLines = order.Lines || order.lines || [];
-                if (!Array.isArray(orderLines) || orderLines.length === 0) continue;
-
-                const orderKey = order.Key || order.key || null;
-                const tableNumber = order.TableNr || order.tableNr || order.TableNumber || order.tableNumber || ticketTable;
-                const waiterName = order.UserName || order.userName || order.WaiterName || order.waiterName || ticketWaiter;
-                const orderTime = order.Time || order.time || ticketTime;
-
-                orderLines.forEach((line: any, lineIndex: number) => {
-                  if (!line || typeof line !== 'object') return;
-
-                  if (safeFilters.category && safeFilters.category !== 'all') {
-                    const lineCategory = line.GroupName || line.groupName || line.Category || line.category;
-                    if (!lineCategory || lineCategory !== safeFilters.category) return;
-                  }
-
-                  const lineProductName = line.ProductName || line.productName || line.Name || line.name || null;
-                  
-                  if (safeFilters.productName) {
-                    if (!lineProductName || !lineProductName.toLowerCase().includes(safeFilters.productName.toLowerCase())) return;
-                  }
-
-                  // Filter by waiter name (case-insensitive)
-                  if (safeFilters.waiterName) {
-                    const waiterNameLower = (waiterName || '').toLowerCase();
-                    const filterWaiterNameLower = safeFilters.waiterName.toLowerCase();
-                    if (!waiterNameLower || !waiterNameLower.includes(filterWaiterNameLower)) return;
-                  }
-
-                  createdFromLines = true;
-                  salesRecordCounter++;
-                  const lineKey = line.Key || line.key || line.LineKey || line.lineKey || null;
-                  const uniqueId = `${recordId}_${ticketKey || 'ticket'}_${orderKey || 'order'}_${lineKey || lineIndex}_${salesRecordCounter}`;
-                  
-                  allSalesRecords.push({
-                    id: uniqueId,
-                    date: recordDate.toISOString().split('T')[0],
-                    location_id: locationIdStr,
-                    location_name: locationInfo?.name || null,
-                    ticket_key: ticketKey,
-                    ticket_number: ticketNumber,
-                    order_key: orderKey,
-                    order_line_key: lineKey,
-                    product_name: lineProductName,
-                    product_sku: line.ProductSku || line.productSku || line.Sku || line.sku || null,
-                    product_number: line.ProductNr || line.productNr || line.ProductNumber || line.productNumber || null,
-                    category: line.GroupName || line.groupName || line.Category || line.category || null,
-                    group_name: line.GroupName || line.groupName || line.Category || line.category || null,
-                    quantity: line.Qty ?? line.qty ?? line.Quantity ?? line.quantity ?? 1,
-                    unit_price: line.Price ?? line.price ?? line.UnitPrice ?? line.unitPrice ?? null,
-                    total_ex_vat: line.TotalEx ?? line.totalEx ?? line.TotalExVat ?? line.totalExVat ?? null,
-                    total_inc_vat: line.TotalInc ?? line.totalInc ?? line.TotalIncVat ?? line.totalIncVat ?? null,
-                    vat_rate: line.VatPerc ?? line.vatPerc ?? line.VatRate ?? line.vatRate ?? null,
-                    vat_amount: line.VatAmount ?? line.vatAmount ?? null,
-                    cost_price: line.CostPrice ?? line.costPrice ?? null,
-                    payment_method: ticketPayment,
-                    table_number: tableNumber,
-                    waiter_name: waiterName,
-                    time: orderTime,
+        // Transform to match expected format
+        const paginatedRecords = records.map((record: any) => ({
+          id: record._id?.toString() || '',
+          date: record.date,
+          location_id: record.locationId?.toString() || '',
+          location_name: record.locationName || null,
+          ticket_key: record.ticketKey || null,
+          ticket_number: record.ticketNumber || '',
+          order_key: record.orderKey || null,
+          order_line_key: record.orderLineKey || null,
+          product_name: record.productName || null,
+          product_sku: record.productSku || null,
+          product_number: record.productNumber || null,
+          category: record.category || null,
+          group_name: record.groupName || null,
+          quantity: record.quantity || 0,
+          unit_price: record.unitPrice || null,
+          total_ex_vat: record.totalExVat || null,
+          total_inc_vat: record.totalIncVat || null,
+          vat_rate: record.vatRate || null,
+          vat_amount: record.vatAmount || null,
+          cost_price: record.costPrice || null,
+          payment_method: record.paymentMethod || null,
+          table_number: record.tableNumber || null,
+          waiter_name: record.waiterName || null,
+          time: record.time || null,
                     created_at: record.createdAt ? (record.createdAt instanceof Date ? record.createdAt.toISOString() : new Date(record.createdAt).toISOString()) : null,
-                  });
-                });
-              }
-            }
-          }
-        }
+        }));
 
-        // Filter by date range and waiter name (if not already filtered in loop)
-        // Note: record.date is in YYYY-MM-DD format (string), compare as strings
-        const filteredRecords = allSalesRecords.filter(record => {
-          const recordDateStr = record.date; // Should be YYYY-MM-DD format
-          // Ensure we're comparing dates correctly (YYYY-MM-DD format)
-          if (recordDateStr < startDate || recordDateStr > endDate) return false;
-          
-          // Filter by waiter name if specified (case-insensitive)
-          if (safeFilters.waiterName) {
-            const recordWaiterName = (record.waiter_name || '').toLowerCase();
-            const filterWaiterName = safeFilters.waiterName.toLowerCase();
-            if (!recordWaiterName || !recordWaiterName.includes(filterWaiterName)) return false;
-          }
-          
-          return true;
-        });
-
-        filteredRecords.sort((a, b) => {
-          const dateA = new Date(a.date).getTime();
-          const dateB = new Date(b.date).getTime();
-          if (dateB !== dateA) return dateB - dateA;
-          const timeA = a.time ? a.time : '00:00:00';
-          const timeB = b.time ? b.time : '00:00:00';
-          return timeB.localeCompare(timeA);
-        });
-
-        // Paginate
-        const total = filteredRecords.length;
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        const paginatedRecords = filteredRecords.slice(startIndex, endIndex);
         const totalPages = Math.ceil(total / limit);
 
         return {
@@ -2646,14 +2787,22 @@ export const resolvers = {
           totalPages,
         };
       } catch (error: any) {
-        logger.error('[GraphQL Resolver] dailySales error:', error);
+        logger.error('[GraphQL Resolver] dailySales error:', {
+          message: error?.message,
+          stack: error?.stack,
+          name: error?.name,
+          error: error,
+        });
+        
+        // Return safe error response that can be serialized
+        const errorMessage = error?.message || error?.toString() || 'Failed to fetch daily sales';
         return {
           success: false,
           records: [],
           total: 0,
           page: 1,
           totalPages: 0,
-          error: error.message || 'Failed to fetch daily sales',
+          error: String(errorMessage).substring(0, 500), // Limit error message length
         };
       }
     },
@@ -3440,55 +3589,65 @@ export const resolvers = {
     },
 
     // Sales Aggregations
+    // ✅ NOW USES: bork_aggregated.waiterBreakdown[] (pre-aggregated data)
     waiterPerformance: async (
       _: any,
       { startDate, endDate, filters = {} }: { startDate: string; endDate: string; filters?: any }
     ) => {
       try {
         const db = await getDatabase();
-        const locations = await db.collection('locations').find({ isActive: true }).toArray();
-        const locationMap = new Map(locations.map((loc: any) => [loc._id.toString(), loc]));
+        const safeFilters = filters || {};
 
-        const records = await extractSalesRecords(startDate, endDate, filters, locationMap);
+        // Build query for bork_aggregated
+        const query: any = {
+          date: {
+            $gte: new Date(startDate + 'T00:00:00.000Z'),
+            $lte: new Date(endDate + 'T23:59:59.999Z'),
+          },
+        };
 
-        // Debug logging
-        console.log('[GraphQL Resolver] waiterPerformance:', {
-          startDate,
-          endDate,
-          filters,
-          totalRecords: records.length,
-          recordsWithWaiter: records.filter(r => r.waiter_name).length,
-          sampleRecords: records.slice(0, 3).map(r => ({
-            waiter_name: r.waiter_name,
-            date: r.date,
-            location_name: r.location_name,
-          })),
-        });
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+          try {
+            query.locationId = new ObjectId(safeFilters.locationId);
+          } catch (e) {
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`);
+          }
+        }
 
-        // Group by waiter_name
+        // Fetch aggregated records
+        const aggregatedRecords = await db.collection('bork_aggregated')
+          .find(query)
+          .toArray();
+
+        // ✅ Aggregated collection already has locationName pre-computed - no enrichment needed!
+        // Extract and flatten waiter breakdowns
         const waiterMap = new Map<string, any>();
 
-        for (const record of records) {
-          if (!record.waiter_name) continue;
-          
-          const waiterKey = `${record.waiter_name}_${record.location_id || 'unknown'}`;
-          const ticketKey = `${record.ticket_number}_${record.date}`;
+        for (const record of aggregatedRecords) {
+          if (!record.waiterBreakdown || !Array.isArray(record.waiterBreakdown)) continue;
+
+          const locationIdStr = record.locationId?.toString() || '';
+          const locationName = record.locationName || 'Unknown'; // ✅ Use pre-computed locationName
+
+          for (const waiter of record.waiterBreakdown) {
+            const waiterKey = `${waiter.waiterName}_${locationIdStr}`;
 
           if (!waiterMap.has(waiterKey)) {
             waiterMap.set(waiterKey, {
-              waiter_name: record.waiter_name,
-              location_id: record.location_id,
-              location_name: record.location_name,
+                waiter_name: waiter.waiterName,
+                location_id: locationIdStr,
+                location_name: locationName,
               total_revenue: 0,
               total_items_sold: 0,
-              ticketSet: new Set<string>(),
-            });
-          }
+                total_transactions: 0,
+              });
+            }
 
-          const waiter = waiterMap.get(waiterKey)!;
-          waiter.total_revenue += record.total_inc_vat || 0;
-          waiter.total_items_sold += record.quantity || 0;
-          waiter.ticketSet.add(ticketKey);
+            const aggregated = waiterMap.get(waiterKey)!;
+            aggregated.total_revenue += waiter.totalRevenue || 0;
+            aggregated.total_items_sold += waiter.totalItemsSold || 0;
+            aggregated.total_transactions += waiter.totalTransactions || 0;
+          }
         }
 
         const result = Array.from(waiterMap.values()).map(waiter => ({
@@ -3496,13 +3655,13 @@ export const resolvers = {
           location_id: waiter.location_id,
           location_name: waiter.location_name,
           total_revenue: Math.round(waiter.total_revenue * 100) / 100,
-          total_transactions: waiter.ticketSet.size,
+          total_transactions: waiter.total_transactions,
           total_items_sold: Math.round(waiter.total_items_sold * 100) / 100,
-          average_ticket_value: waiter.ticketSet.size > 0 
-            ? Math.round((waiter.total_revenue / waiter.ticketSet.size) * 100) / 100 
+          average_ticket_value: waiter.total_transactions > 0 
+            ? Math.round((waiter.total_revenue / waiter.total_transactions) * 100) / 100 
             : 0,
-          average_items_per_transaction: waiter.ticketSet.size > 0
-            ? Math.round((waiter.total_items_sold / waiter.ticketSet.size) * 100) / 100
+          average_items_per_transaction: waiter.total_transactions > 0
+            ? Math.round((waiter.total_items_sold / waiter.total_transactions) * 100) / 100
             : 0,
         })).sort((a, b) => b.total_revenue - a.total_revenue);
 
@@ -3513,7 +3672,7 @@ export const resolvers = {
           error: null,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] waiterPerformance error:', error);
+        logger.error('[GraphQL Resolver] waiterPerformance error:', error);
         return {
           success: false,
           records: [],
@@ -3523,56 +3682,70 @@ export const resolvers = {
       }
     },
 
+    // ✅ NOW USES: bork_aggregated (daily totals per location)
     revenueBreakdown: async (
       _: any,
       { startDate, endDate, filters = {} }: { startDate: string; endDate: string; filters?: any }
     ) => {
       try {
         const db = await getDatabase();
-        const locations = await db.collection('locations').find({ isActive: true }).toArray();
-        const locationMap = new Map(locations.map((loc: any) => [loc._id.toString(), loc]));
+        const safeFilters = filters || {};
 
-        const records = await extractSalesRecords(startDate, endDate, filters, locationMap);
+        // Build query for bork_aggregated
+        const query: any = {
+          date: {
+            $gte: new Date(startDate + 'T00:00:00.000Z'),
+            $lte: new Date(endDate + 'T23:59:59.999Z'),
+          },
+        };
 
-        // Group by date and location
-        const breakdownMap = new Map<string, any>();
-
-        for (const record of records) {
-          const key = `${record.date}_${record.location_id || 'unknown'}`;
-          const ticketKey = `${record.ticket_number}_${record.date}`;
-
-          if (!breakdownMap.has(key)) {
-            breakdownMap.set(key, {
-              date: record.date,
-              location_id: record.location_id,
-              location_name: record.location_name,
-              total_revenue_ex_vat: 0,
-              total_revenue_inc_vat: 0,
-              total_vat: 0,
-              ticketSet: new Set<string>(),
-            });
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+          try {
+            query.locationId = new ObjectId(safeFilters.locationId);
+          } catch (e) {
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`);
           }
-
-          const breakdown = breakdownMap.get(key)!;
-          breakdown.total_revenue_ex_vat += record.total_ex_vat || 0;
-          breakdown.total_revenue_inc_vat += record.total_inc_vat || 0;
-          breakdown.total_vat += record.vat_amount || 0;
-          breakdown.ticketSet.add(ticketKey);
         }
 
-        const result = Array.from(breakdownMap.values()).map(breakdown => ({
-          date: breakdown.date,
-          location_id: breakdown.location_id,
-          location_name: breakdown.location_name,
-          total_revenue_ex_vat: Math.round(breakdown.total_revenue_ex_vat * 100) / 100,
-          total_revenue_inc_vat: Math.round(breakdown.total_revenue_inc_vat * 100) / 100,
-          total_vat: Math.round(breakdown.total_vat * 100) / 100,
-          total_transactions: breakdown.ticketSet.size,
-          average_transaction_value: breakdown.ticketSet.size > 0
-            ? Math.round((breakdown.total_revenue_inc_vat / breakdown.ticketSet.size) * 100) / 100
+        // Fetch aggregated records
+        const aggregatedRecords = await db.collection('bork_aggregated')
+          .find(query)
+          .sort({ date: -1 })
+          .toArray();
+
+        // ✅ Aggregated collection already has locationName pre-computed - no enrichment needed!
+        // Transform to match expected format
+        // Note: bork_aggregated has totalRevenue (inc VAT) but we need ex VAT and VAT amount
+        // We'll calculate VAT from revenueByCategory if available, or estimate
+        const result = aggregatedRecords.map((record) => {
+          const locationIdStr = record.locationId?.toString() || '';
+          const locationName = record.locationName || 'Unknown'; // ✅ Use pre-computed locationName
+          const dateStr = record.date instanceof Date 
+            ? record.date.toISOString().split('T')[0] 
+            : typeof record.date === 'string' 
+              ? record.date 
+              : new Date(record.date).toISOString().split('T')[0];
+
+          // Calculate VAT (estimate 21% if not available)
+          const totalRevenueIncVat = record.totalRevenue || 0;
+          const estimatedVatRate = 0.21; // 21% VAT
+          const totalRevenueExVat = totalRevenueIncVat / (1 + estimatedVatRate);
+          const totalVat = totalRevenueIncVat - totalRevenueExVat;
+
+          return {
+            date: dateStr,
+            location_id: locationIdStr,
+            location_name: locationName,
+            total_revenue_ex_vat: Math.round(totalRevenueExVat * 100) / 100,
+            total_revenue_inc_vat: Math.round(totalRevenueIncVat * 100) / 100,
+            total_vat: Math.round(totalVat * 100) / 100,
+            total_transactions: record.totalTransactions || 0,
+            average_transaction_value: record.totalTransactions > 0
+              ? Math.round((totalRevenueIncVat / record.totalTransactions) * 100) / 100
             : 0,
           gross_profit: null,
-        })).sort((a, b) => b.date.localeCompare(a.date));
+          };
+        }).sort((a, b) => b.date.localeCompare(a.date));
 
         return {
           success: true,
@@ -3591,40 +3764,65 @@ export const resolvers = {
       }
     },
 
+    // ✅ NOW USES: bork_aggregated.paymentMethodBreakdown[] (pre-aggregated data)
     paymentMethodStats: async (
       _: any,
       { startDate, endDate, filters = {} }: { startDate: string; endDate: string; filters?: any }
     ) => {
       try {
         const db = await getDatabase();
-        const locations = await db.collection('locations').find({ isActive: true }).toArray();
-        const locationMap = new Map(locations.map((loc: any) => [loc._id.toString(), loc]));
+        const safeFilters = filters || {};
 
-        const records = await extractSalesRecords(startDate, endDate, filters, locationMap);
+        // Build query for bork_aggregated
+        const query: any = {
+          date: {
+            $gte: new Date(startDate + 'T00:00:00.000Z'),
+            $lte: new Date(endDate + 'T23:59:59.999Z'),
+          },
+        };
 
-        // Group by payment_method
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+          try {
+            query.locationId = new ObjectId(safeFilters.locationId);
+          } catch (e) {
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`);
+          }
+        }
+
+        // Fetch aggregated records
+        const aggregatedRecords = await db.collection('bork_aggregated')
+          .find(query)
+          .toArray();
+
+        // ✅ Aggregated collection already has locationName pre-computed - no enrichment needed!
+        // Extract and flatten payment method breakdowns
         const paymentMap = new Map<string, any>();
         let totalRevenue = 0;
 
-        for (const record of records) {
-          const paymentMethod = record.payment_method || 'Unknown';
-          const key = `${paymentMethod}_${record.location_id || 'unknown'}`;
-          const ticketKey = `${record.ticket_number}_${record.date}`;
+        for (const record of aggregatedRecords) {
+          if (!record.paymentMethodBreakdown || !Array.isArray(record.paymentMethodBreakdown)) continue;
+
+          const locationIdStr = record.locationId?.toString() || '';
+          const locationName = record.locationName || 'Unknown'; // ✅ Use pre-computed locationName
+
+          for (const payment of record.paymentMethodBreakdown) {
+            const key = `${payment.paymentMethod}_${locationIdStr}`;
 
           if (!paymentMap.has(key)) {
             paymentMap.set(key, {
-              payment_method: paymentMethod,
-              location_id: record.location_id,
-              location_name: record.location_name,
+                payment_method: payment.paymentMethod,
+                location_id: locationIdStr,
+                location_name: locationName,
               total_revenue: 0,
-              ticketSet: new Set<string>(),
-            });
-          }
+                total_transactions: 0,
+              });
+            }
 
-          const payment = paymentMap.get(key)!;
-          payment.total_revenue += record.total_inc_vat || 0;
-          payment.ticketSet.add(ticketKey);
-          totalRevenue += record.total_inc_vat || 0;
+            const aggregated = paymentMap.get(key)!;
+            aggregated.total_revenue += payment.totalRevenue || 0;
+            aggregated.total_transactions += payment.totalTransactions || 0;
+            totalRevenue += payment.totalRevenue || 0;
+          }
         }
 
         const result = Array.from(paymentMap.values()).map(payment => ({
@@ -3632,9 +3830,9 @@ export const resolvers = {
           location_id: payment.location_id,
           location_name: payment.location_name,
           total_revenue: Math.round(payment.total_revenue * 100) / 100,
-          total_transactions: payment.ticketSet.size,
-          average_transaction_value: payment.ticketSet.size > 0
-            ? Math.round((payment.total_revenue / payment.ticketSet.size) * 100) / 100
+          total_transactions: payment.total_transactions,
+          average_transaction_value: payment.total_transactions > 0
+            ? Math.round((payment.total_revenue / payment.total_transactions) * 100) / 100
             : 0,
           percentage_of_total: totalRevenue > 0
             ? Math.round((payment.total_revenue / totalRevenue) * 10000) / 100
@@ -3648,7 +3846,7 @@ export const resolvers = {
           error: null,
         };
       } catch (error: any) {
-        console.error('[GraphQL Resolver] paymentMethodStats error:', error);
+        logger.error('[GraphQL Resolver] paymentMethodStats error:', error);
         return {
           success: false,
           records: [],
@@ -3658,71 +3856,74 @@ export const resolvers = {
       }
     },
 
+    // ✅ NOW USES: products_aggregated.productPerformanceByLocation[] (pre-aggregated data)
     productPerformance: async (
       _: any,
       { startDate, endDate, page = 1, limit = 50, filters = {} }: { startDate: string; endDate: string; page?: number; limit?: number; filters?: any }
     ) => {
       try {
         const db = await getDatabase();
-        const locations = await db.collection('locations').find({ isActive: true }).toArray();
-        const locationMap = new Map(locations.map((loc: any) => [loc._id.toString(), loc]));
+        const safeFilters = filters || {};
 
-        const records = await extractSalesRecords(startDate, endDate, filters, locationMap);
+        // Build query for products_aggregated
+        // Filter by date range using hierarchical data or salesByDate
+        const query: any = {};
 
-        // Group by product_name
-        const productMap = new Map<string, any>();
-
-        for (const record of records) {
-          if (!record.product_name || record.product_name === 'Ticket Total') continue;
-          
-          const key = `${record.product_name}_${record.location_id || 'unknown'}`;
-          const ticketKey = `${record.ticket_number}_${record.date}`;
-
-          if (!productMap.has(key)) {
-            productMap.set(key, {
-              product_name: record.product_name,
-              category: record.category,
-              location_id: record.location_id,
-              location_name: record.location_name,
-              total_quantity_sold: 0,
-              total_revenue: 0,
-              total_profit: 0,
-              total_unit_price: 0,
-              unit_price_count: 0,
-              ticketSet: new Set<string>(),
-            });
-          }
-
-          const product = productMap.get(key)!;
-          product.total_quantity_sold += record.quantity || 0;
-          product.total_revenue += record.total_inc_vat || 0;
-          if (record.cost_price) {
-            product.total_profit += (record.total_inc_vat || 0) - ((record.cost_price || 0) * (record.quantity || 0));
-          }
-          if (record.unit_price) {
-            product.total_unit_price += record.unit_price;
-            product.unit_price_count++;
-          }
-          product.ticketSet.add(ticketKey);
+        if (safeFilters.productName) {
+          query.productName = { $regex: safeFilters.productName, $options: 'i' };
         }
 
-        const result = Array.from(productMap.values()).map(product => ({
-          product_name: product.product_name,
-          category: product.category,
-          location_id: product.location_id,
-          location_name: product.location_name,
-          total_quantity_sold: Math.round(product.total_quantity_sold * 100) / 100,
-          total_revenue: Math.round(product.total_revenue * 100) / 100,
-          total_profit: product.total_profit !== 0 ? Math.round(product.total_profit * 100) / 100 : null,
-          average_unit_price: product.unit_price_count > 0
-            ? Math.round((product.total_unit_price / product.unit_price_count) * 100) / 100
-            : 0,
-          transaction_count: product.ticketSet.size,
-        })).sort((a, b) => b.total_revenue - a.total_revenue);
+        if (safeFilters.category && safeFilters.category !== 'all') {
+          query.category = safeFilters.category;
+        }
 
+        // Fetch products with productPerformanceByLocation
+        const products = await db.collection('products_aggregated')
+          .find(query)
+          .toArray();
+
+        // Filter productPerformanceByLocation by date range and location
+        const productPerformanceRecords: any[] = [];
+
+        for (const product of products) {
+          if (!product.productPerformanceByLocation || !Array.isArray(product.productPerformanceByLocation)) continue;
+
+          for (const perf of product.productPerformanceByLocation) {
+            // Filter by location
+            if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+              if (perf.locationId?.toString() !== safeFilters.locationId) continue;
+            }
+
+            // Filter by date range (check lastSoldDate)
+            if (perf.lastSoldDate) {
+              const lastSold = perf.lastSoldDate instanceof Date 
+                ? perf.lastSoldDate 
+                : new Date(perf.lastSoldDate);
+              const start = new Date(startDate + 'T00:00:00.000Z');
+              const end = new Date(endDate + 'T23:59:59.999Z');
+              
+              if (lastSold < start || lastSold > end) continue;
+            }
+
+            productPerformanceRecords.push({
+              product_name: product.productName,
+              category: product.category || null,
+              location_id: perf.locationId?.toString() || '',
+              location_name: perf.locationName || 'Unknown',
+              total_quantity_sold: perf.totalQuantitySold || 0,
+              total_revenue: perf.totalRevenue || 0,
+              total_profit: perf.totalProfit || 0,
+              average_unit_price: perf.averageUnitPrice || 0,
+              transaction_count: perf.transactionCount || 0,
+            });
+          }
+        }
+
+        // Sort and paginate
+        const sorted = productPerformanceRecords.sort((a, b) => b.total_revenue - a.total_revenue);
         const skip = (page - 1) * limit;
-        const paginatedResult = result.slice(skip, skip + limit);
-        const totalPages = Math.ceil(result.length / limit);
+        const paginatedResult = sorted.slice(skip, skip + limit);
+        const totalPages = Math.ceil(sorted.length / limit);
 
         return {
           success: true,
@@ -3746,45 +3947,65 @@ export const resolvers = {
     },
 
     // Analysis Pages
+    // ✅ NOW USES: bork_aggregated.hourlyBreakdown[] (pre-aggregated data)
     timeBasedAnalysis: async (
       _: any,
       { startDate, endDate, filters = {} }: { startDate: string; endDate: string; filters?: any }
     ) => {
       try {
         const db = await getDatabase();
-        const locations = await db.collection('locations').find({ isActive: true }).toArray();
-        const locationMap = new Map(locations.map((loc: any) => [loc._id.toString(), loc]));
+        const safeFilters = filters || {};
 
-        const records = await extractSalesRecords(startDate, endDate, filters, locationMap);
+        // Build query for bork_aggregated
+        const query: any = {
+          date: {
+            $gte: new Date(startDate + 'T00:00:00.000Z'),
+            $lte: new Date(endDate + 'T23:59:59.999Z'),
+          },
+        };
 
-        // Group by hour of day
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+          try {
+            query.locationId = new ObjectId(safeFilters.locationId);
+          } catch (e) {
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`);
+          }
+        }
+
+        // Fetch aggregated records
+        const aggregatedRecords = await db.collection('bork_aggregated')
+          .find(query)
+          .toArray();
+
+        // ✅ Aggregated collection already has locationName pre-computed - no enrichment needed!
+        // Extract and flatten hourly breakdowns
         const hourMap = new Map<string, any>();
 
-        for (const record of records) {
-          if (!record.time) continue;
+        for (const record of aggregatedRecords) {
+          if (!record.hourlyBreakdown || !Array.isArray(record.hourlyBreakdown)) continue;
           
-          // Extract hour from time (format: HH:MM or HH:MM:SS)
-          const timeMatch = record.time.match(/^(\d{1,2}):/);
-          if (!timeMatch) continue;
+          const locationIdStr = record.locationId?.toString() || '';
+          const locationName = record.locationName || 'Unknown'; // ✅ Use pre-computed locationName
           
-          const hour = parseInt(timeMatch[1], 10);
-          const key = `${hour}_${record.location_id || 'unknown'}`;
+          for (const hourData of record.hourlyBreakdown) {
+            const key = `${hourData.hour}_${locationIdStr}`;
 
           if (!hourMap.has(key)) {
             hourMap.set(key, {
-              hour,
-              location_id: record.location_id,
-              location_name: record.location_name,
+                hour: hourData.hour,
+                location_id: locationIdStr,
+                location_name: locationName,
               total_revenue: 0,
               total_items_sold: 0,
-              ticketSet: new Set<string>(),
-            });
-          }
+                total_transactions: 0,
+              });
+            }
 
-          const hourData = hourMap.get(key)!;
-          hourData.total_revenue += record.total_inc_vat || 0;
-          hourData.total_items_sold += record.quantity || 0;
-          hourData.ticketSet.add(`${record.ticket_number}_${record.date}`);
+            const aggregated = hourMap.get(key)!;
+            aggregated.total_revenue += hourData.totalRevenue || 0;
+            aggregated.total_items_sold += hourData.totalItemsSold || 0;
+            aggregated.total_transactions += hourData.totalTransactions || 0;
+          }
         }
 
         const result = Array.from(hourMap.values()).map(hourData => ({
@@ -3792,10 +4013,10 @@ export const resolvers = {
           location_id: hourData.location_id,
           location_name: hourData.location_name,
           total_revenue: Math.round(hourData.total_revenue * 100) / 100,
-          total_transactions: hourData.ticketSet.size,
+          total_transactions: hourData.total_transactions,
           total_items_sold: Math.round(hourData.total_items_sold * 100) / 100,
-          average_transaction_value: hourData.ticketSet.size > 0
-            ? Math.round((hourData.total_revenue / hourData.ticketSet.size) * 100) / 100
+          average_transaction_value: hourData.total_transactions > 0
+            ? Math.round((hourData.total_revenue / hourData.total_transactions) * 100) / 100
             : 0,
         })).sort((a, b) => a.hour - b.hour);
 
@@ -3816,49 +4037,97 @@ export const resolvers = {
       }
     },
 
+    // ✅ NOW USES: bork_aggregated.tableBreakdown[] (pre-aggregated data)
     tableAnalysis: async (
       _: any,
       { startDate, endDate, filters = {} }: { startDate: string; endDate: string; filters?: any }
     ) => {
       try {
         const db = await getDatabase();
-        const locations = await db.collection('locations').find({ isActive: true }).toArray();
-        const locationMap = new Map(locations.map((loc: any) => [loc._id.toString(), loc]));
+        const safeFilters = filters || {};
 
-        const records = await extractSalesRecords(startDate, endDate, filters, locationMap);
+        // Build query for bork_aggregated
+        const query: any = {
+          date: {
+            $gte: new Date(startDate + 'T00:00:00.000Z'),
+            $lte: new Date(endDate + 'T23:59:59.999Z'),
+          },
+        };
 
-        // Group by table_number
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+          try {
+            query.locationId = new ObjectId(safeFilters.locationId);
+          } catch (e) {
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`);
+          }
+        }
+
+        // Fetch aggregated records
+        const aggregatedRecords = await db.collection('bork_aggregated')
+          .find(query)
+          .toArray();
+
+        // Get location names in batch
+        const locationIds = new Set<string>();
+        aggregatedRecords.forEach((record) => {
+          if (record.locationId) {
+            locationIds.add(record.locationId.toString());
+          }
+        });
+
+        const locationNameMap = new Map<string, string>();
+        if (locationIds.size > 0) {
+          const locationObjectIds = Array.from(locationIds)
+            .map(id => {
+              try {
+                return new ObjectId(id);
+              } catch {
+                return null;
+              }
+            })
+            .filter((id): id is ObjectId => id !== null);
+
+          if (locationObjectIds.length > 0) {
+            const locations = await db.collection('locations')
+              .find({ _id: { $in: locationObjectIds } })
+              .toArray() as Array<{ _id?: ObjectId; name?: string }>;
+
+            locations.forEach((loc) => {
+              if (loc._id) {
+                locationNameMap.set(loc._id.toString(), loc.name || 'Unknown');
+              }
+            });
+          }
+        }
+
+        // Extract and flatten table breakdowns
         const tableMap = new Map<string, any>();
 
-        for (const record of records) {
-          // Ensure table_number is a valid integer
-          const tableNum = record.table_number != null 
-            ? (typeof record.table_number === 'number' 
-                ? record.table_number 
-                : parseInt(String(record.table_number), 10))
-            : null;
-          
-          // Skip if table_number is invalid (NaN or null)
-          if (tableNum == null || isNaN(tableNum)) continue;
-          
-          const key = `${tableNum}_${record.location_id || 'unknown'}`;
-          const ticketKey = `${record.ticket_number}_${record.date}`;
+        for (const record of aggregatedRecords) {
+          if (!record.tableBreakdown || !Array.isArray(record.tableBreakdown)) continue;
+
+          const locationIdStr = record.locationId?.toString() || '';
+          const locationName = locationNameMap.get(locationIdStr) || 'Unknown';
+
+          for (const tableData of record.tableBreakdown) {
+            const key = `${tableData.tableNumber}_${locationIdStr}`;
 
           if (!tableMap.has(key)) {
             tableMap.set(key, {
-              table_number: tableNum,
-              location_id: record.location_id,
-              location_name: record.location_name,
+                table_number: tableData.tableNumber,
+                location_id: locationIdStr,
+                location_name: locationName,
               total_revenue: 0,
               total_items_sold: 0,
-              ticketSet: new Set<string>(),
-            });
-          }
+                total_transactions: 0,
+              });
+            }
 
-          const tableData = tableMap.get(key)!;
-          tableData.total_revenue += record.total_inc_vat || 0;
-          tableData.total_items_sold += record.quantity || 0;
-          tableData.ticketSet.add(ticketKey);
+            const aggregated = tableMap.get(key)!;
+            aggregated.total_revenue += tableData.totalRevenue || 0;
+            aggregated.total_items_sold += tableData.totalItemsSold || 0;
+            aggregated.total_transactions += tableData.totalTransactions || 0;
+          }
         }
 
         const result = Array.from(tableMap.values()).map(tableData => ({
@@ -3866,10 +4135,10 @@ export const resolvers = {
           location_id: tableData.location_id,
           location_name: tableData.location_name,
           total_revenue: Math.round(tableData.total_revenue * 100) / 100,
-          total_transactions: tableData.ticketSet.size,
+          total_transactions: tableData.total_transactions,
           total_items_sold: Math.round(tableData.total_items_sold * 100) / 100,
-          average_transaction_value: tableData.ticketSet.size > 0
-            ? Math.round((tableData.total_revenue / tableData.ticketSet.size) * 100) / 100
+          average_transaction_value: tableData.total_transactions > 0
+            ? Math.round((tableData.total_revenue / tableData.total_transactions) * 100) / 100
             : 0,
           turnover_rate: null, // Can be calculated if we have opening/closing times
         })).sort((a, b) => b.total_revenue - a.total_revenue);
@@ -3891,69 +4160,67 @@ export const resolvers = {
       }
     },
 
+    // ✅ NOW USES: transactions_aggregated (transaction summary level)
     transactionAnalysis: async (
       _: any,
       { startDate, endDate, page = 1, limit = 50, filters = {} }: { startDate: string; endDate: string; page?: number; limit?: number; filters?: any }
     ) => {
       try {
         const db = await getDatabase();
-        const locations = await db.collection('locations').find({ isActive: true }).toArray();
-        const locationMap = new Map(locations.map((loc: any) => [loc._id.toString(), loc]));
+        const safeFilters = filters || {};
 
-        const records = await extractSalesRecords(startDate, endDate, filters, locationMap);
+        // Build query for transactions_aggregated
+        const query: any = {
+          date: {
+            $gte: startDate,
+            $lte: endDate,
+          },
+        };
 
-        // Group by ticket_number
-        const transactionMap = new Map<string, any>();
-
-        for (const record of records) {
-          if (!record.ticket_number) continue;
-          
-          const key = `${record.ticket_number}_${record.date}`;
-
-          if (!transactionMap.has(key)) {
-            transactionMap.set(key, {
-              ticket_number: record.ticket_number,
-              date: record.date,
-              location_id: record.location_id,
-              location_name: record.location_name,
-              table_number: record.table_number,
-              waiter_name: record.waiter_name,
-              payment_method: record.payment_method,
-              time: record.time,
-              total_revenue: 0,
-              total_items: 0,
-              item_count: 0,
-            });
+        if (safeFilters.locationId && safeFilters.locationId !== 'all') {
+          try {
+            query.locationId = new ObjectId(safeFilters.locationId);
+          } catch (e) {
+            logger.warn(`Invalid locationId: ${safeFilters.locationId}`);
           }
-
-          const transaction = transactionMap.get(key)!;
-          transaction.total_revenue += record.total_inc_vat || 0;
-          transaction.total_items += record.quantity || 0;
-          transaction.item_count++;
         }
 
-        const result = Array.from(transactionMap.values()).map(transaction => ({
-          ticket_number: transaction.ticket_number,
-          date: transaction.date,
-          location_id: transaction.location_id,
-          location_name: transaction.location_name,
-          table_number: transaction.table_number,
-          waiter_name: transaction.waiter_name,
-          payment_method: transaction.payment_method,
-          time: transaction.time,
-          total_revenue: Math.round(transaction.total_revenue * 100) / 100,
-          total_items: Math.round(transaction.total_items * 100) / 100,
-          item_count: transaction.item_count,
-        })).sort((a, b) => {
-          // Sort by date (newest first), then by time (newest first)
-          const dateCompare = b.date.localeCompare(a.date);
-          if (dateCompare !== 0) return dateCompare;
-          return (b.time || '').localeCompare(a.time || '');
-        });
+        // Apply additional filters
+        if (safeFilters.waiterName) {
+          query.waiterName = { $regex: safeFilters.waiterName, $options: 'i' };
+        }
 
-        const skip = (page - 1) * limit;
-        const paginatedResult = result.slice(skip, skip + limit);
-        const totalPages = Math.ceil(result.length / limit);
+        if (safeFilters.paymentMethod) {
+          query.paymentMethod = safeFilters.paymentMethod;
+        }
+
+        // Get total count
+        const total = await db.collection('transactions_aggregated').countDocuments(query);
+
+        // Fetch paginated records with database-level pagination
+        const records = await db.collection('transactions_aggregated')
+          .find(query)
+          .sort({ date: -1, time: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .toArray();
+
+        // Transform to match expected format
+        const result = records.map((transaction: any) => ({
+          ticket_number: transaction.ticketNumber || '',
+          date: transaction.date,
+          location_id: transaction.locationId?.toString() || '',
+          location_name: transaction.locationName || 'Unknown',
+          table_number: transaction.tableNumber || null,
+          waiter_name: transaction.waiterName || null,
+          payment_method: transaction.paymentMethod || null,
+          time: transaction.time || null,
+          total_revenue: Math.round(transaction.totalRevenue * 100) / 100,
+          total_items: Math.round(transaction.totalItems * 100) / 100,
+          item_count: transaction.itemCount || 0,
+        }));
+
+        const totalPages = Math.ceil(total / limit);
 
         return {
           success: true,
@@ -3998,24 +4265,33 @@ export const resolvers = {
           updated_at: now,
         };
         
-        const result = await db.collection('worker_profiles').insertOne(doc);
-        const created = await db.collection('worker_profiles').findOne({ _id: result.insertedId });
+        const insertResult = await db.collection('worker_profiles').insertOne(doc);
+        const created = await db.collection('worker_profiles').findOne({ _id: insertResult.insertedId });
         
-        // Get user name
+        // ✅ Get user name from unified_users (not eitje_raw_data)
         let userName = null;
         if (created.eitje_user_id) {
-          const user = await db.collection('eitje_raw_data').findOne({
-            endpoint: 'users',
-            'extracted.id': created.eitje_user_id
+          // Try unified_users first (preferred source)
+          const unifiedUser = await db.collection('unified_users').findOne({
+            'systemMappings.system': 'eitje',
+            'systemMappings.externalId': String(created.eitje_user_id)
           });
-          if (user) {
-            const firstName = user.extracted?.first_name || user.rawApiResponse?.first_name || '';
-            const lastName = user.extracted?.last_name || user.rawApiResponse?.last_name || '';
-            userName = `${firstName} ${lastName}`.trim() || null;
+          if (unifiedUser) {
+            userName = unifiedUser.name || null;
+          } else {
+            // Fallback: try to find by eitje_user_id in systemMappings
+            const userByMapping = await db.collection('unified_users').findOne({
+              $or: [
+                { 'systemMappings': { $elemMatch: { system: 'eitje', externalId: String(created.eitje_user_id) } } }
+              ]
+            });
+            if (userByMapping) {
+              userName = userByMapping.name || null;
+            }
           }
         }
         
-        // Get location name
+        // ✅ Get location name from locations collection
         let locationName = null;
         if (created.location_id) {
           try {
@@ -4030,7 +4306,7 @@ export const resolvers = {
           }
         }
         
-        return {
+        const workerProfileResult = {
           id: created._id.toString(),
           eitjeUserId: created.eitje_user_id,
           userName,
@@ -4047,6 +4323,17 @@ export const resolvers = {
           createdAt: created.created_at ? new Date(created.created_at).toISOString() : null,
           updatedAt: created.updated_at ? new Date(created.updated_at).toISOString() : null,
         };
+
+        // ✅ Trigger reaggregation (async, don't wait for completion)
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        fetch(`${baseUrl}/api/admin/aggregate-worker-profiles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch((err) => {
+          console.warn('[GraphQL Resolver] Reaggregation trigger failed after createWorkerProfile:', err.message);
+        });
+
+        return workerProfileResult;
       } catch (error: any) {
         console.error('[GraphQL Resolver] createWorkerProfile error:', error);
         throw error;
@@ -4103,17 +4390,26 @@ export const resolvers = {
         
         if (!updated) throw new Error('Worker profile not found after update');
         
-        // Get user name
+        // ✅ Get user name from unified_users (not eitje_raw_data)
         let userName = null;
         if (updated.eitje_user_id) {
-          const user = await db.collection('eitje_raw_data').findOne({
-            endpoint: 'users',
-            'extracted.id': updated.eitje_user_id
+          // Try unified_users first (preferred source)
+          const unifiedUser = await db.collection('unified_users').findOne({
+            'systemMappings.system': 'eitje',
+            'systemMappings.externalId': String(updated.eitje_user_id)
           });
-          if (user) {
-            const firstName = user.extracted?.first_name || user.rawApiResponse?.first_name || '';
-            const lastName = user.extracted?.last_name || user.rawApiResponse?.last_name || '';
-            userName = `${firstName} ${lastName}`.trim() || null;
+          if (unifiedUser) {
+            userName = unifiedUser.name || null;
+          } else {
+            // Fallback: try to find by eitje_user_id in systemMappings
+            const userByMapping = await db.collection('unified_users').findOne({
+              $or: [
+                { 'systemMappings': { $elemMatch: { system: 'eitje', externalId: String(updated.eitje_user_id) } } }
+              ]
+            });
+            if (userByMapping) {
+              userName = userByMapping.name || null;
+            }
           }
         }
         
@@ -4132,7 +4428,7 @@ export const resolvers = {
           }
         }
         
-        return {
+        const updatedWorkerProfileResult = {
           id: updated._id.toString(),
           eitjeUserId: updated.eitje_user_id,
           userName,
@@ -4149,6 +4445,17 @@ export const resolvers = {
           createdAt: updated.created_at ? new Date(updated.created_at).toISOString() : null,
           updatedAt: updated.updated_at ? new Date(updated.updated_at).toISOString() : null,
         };
+
+        // ✅ Trigger reaggregation (async, don't wait for completion)
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        fetch(`${baseUrl}/api/admin/aggregate-worker-profiles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch((err) => {
+          console.warn('[GraphQL Resolver] Reaggregation trigger failed after updateWorkerProfile:', err.message);
+        });
+
+        return updatedWorkerProfileResult;
       } catch (error: any) {
         console.error('[GraphQL Resolver] updateWorkerProfile error:', error);
         throw error;
@@ -4159,6 +4466,22 @@ export const resolvers = {
       try {
         const db = await getDatabase();
         const result = await db.collection('worker_profiles').deleteOne({ _id: toObjectId(id) });
+        
+        // ✅ Also delete from aggregated collection
+        await db.collection('worker_profiles_aggregated').deleteOne({ _id: toObjectId(id) }).catch((err) => {
+          console.warn('[GraphQL Resolver] Failed to delete from aggregated collection:', err.message);
+        });
+
+        // ✅ Trigger reaggregation (async, don't wait for completion)
+        // This ensures any related data is cleaned up
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        fetch(`${baseUrl}/api/admin/aggregate-worker-profiles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch((err) => {
+          console.warn('[GraphQL Resolver] Reaggregation trigger failed after deleteWorkerProfile:', err.message);
+        });
+
         return result.deletedCount === 1;
       } catch (error: any) {
         console.error('[GraphQL Resolver] deleteWorkerProfile error:', error);
@@ -4332,6 +4655,47 @@ export const resolvers = {
         return result.deletedCount === 1;
       } catch (error: any) {
         console.error('[GraphQL Resolver] deleteProduct error:', error);
+        throw error;
+      }
+    },
+
+    // Company Settings
+    updateCompanySettings: async (_: any, { input }: { input: { workingDayStartHour: number } }) => {
+      try {
+        const db = await getDatabase();
+        
+        // Validate hour (0-23)
+        if (input.workingDayStartHour < 0 || input.workingDayStartHour > 23) {
+          throw new Error('workingDayStartHour must be between 0 and 23');
+        }
+        
+        const now = new Date();
+        const result = await db.collection('company_settings').findOneAndUpdate(
+          {},
+          {
+            $set: {
+              workingDayStartHour: input.workingDayStartHour,
+              updatedAt: now,
+            },
+            $setOnInsert: {
+              createdAt: now,
+            },
+          },
+          { upsert: true, returnDocument: 'after' }
+        );
+        
+        if (!result) {
+          throw new Error('Failed to update company settings');
+        }
+        
+        return {
+          id: result._id?.toString() || 'default',
+          workingDayStartHour: result.workingDayStartHour || 6,
+          createdAt: result.createdAt?.toISOString() || now.toISOString(),
+          updatedAt: result.updatedAt?.toISOString() || now.toISOString(),
+        };
+      } catch (error: any) {
+        logger.error('[GraphQL Resolver] updateCompanySettings error:', error);
         throw error;
       }
     },
@@ -4516,8 +4880,8 @@ export const resolvers = {
             if (!team) return null; // Skip if team not found
             return {
               team,
-              hours: stat.hours,
-              cost: stat.cost,
+        hours: stat.hours,
+        cost: stat.cost,
             };
           } catch {
             return null;
@@ -4554,9 +4918,15 @@ export const resolvers = {
 // ============================================
 
 // Helper function to extract sales records (reused from dailySales)
-// ⚠️ EXCEPTION: Uses bork_raw_data because it needs transaction-level detail
+// 
+// @deprecated This function is no longer used. dailySales resolver now requires sales_line_items_aggregated collection.
+// ⚠️ DEPRECATED: This function uses bork_raw_data and is no longer called.
+// The dailySales resolver now requires sales_line_items_aggregated collection to exist.
+// This function is kept for reference/diagnostics only.
+// 
+// Original purpose: Extract sales records from bork_raw_data with transaction-level detail
 // (ticket keys, order keys, waiter names, table numbers, payment methods)
-// Aggregated collections don't have this level of detail
+// Note: sales_line_items_aggregated should have all this detail pre-computed
 async function extractSalesRecords(
   startDate: string,
   endDate: string,

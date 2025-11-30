@@ -17,6 +17,7 @@ import {
 } from "@/models/sales/bork-sales-v2.model";
 
 const ITEMS_PER_PAGE = 50;
+const INITIAL_LOAD_LIMIT = 20; // ✅ Lazy loading: initial 20 rows, then load rest of page 1
 
 export interface UseBorkSalesV2ViewModelReturn {
   // State
@@ -47,6 +48,17 @@ export interface UseBorkSalesV2ViewModelReturn {
   isLoading: boolean;
   error: Error | null;
   totalPages: number;
+  
+  // Computed
+  salesTotals: {
+    totalRevenue: number;
+    totalProducts: number;
+    totalQuantity: number;
+    totalTransactions: number;
+    avgTransactionValue: number;
+  } | null;
+  startDate: string;
+  endDate: string;
 }
 
 export function useBorkSalesV2ViewModel(initialData?: { salesData?: any; locations?: any[] }): UseBorkSalesV2ViewModelReturn {
@@ -60,9 +72,10 @@ export function useBorkSalesV2ViewModel(initialData?: { salesData?: any; locatio
   const [currentPage, setCurrentPage] = useState(1);
   const [showAllColumns, setShowAllColumns] = useState(false);
   
-  // Reset page when filters change
+  // Reset page and lazy load state when filters change
   useEffect(() => {
     setCurrentPage(1);
+    setHasLoadedRestOfPage1(false); // Reset lazy load state when filters change
   }, [selectedLocation, selectedCategory, selectedYear, selectedMonth, selectedDay, selectedDatePreset]);
 
   // Get date range from preset
@@ -179,20 +192,136 @@ export function useBorkSalesV2ViewModel(initialData?: { salesData?: any; locatio
     };
   }, [dateRangeFilters, selectedCategory, selectedLocation, currentPage]);
 
-  // Fetch sales data with database-level pagination - use initialData if provided
+  // ✅ Lazy loading strategy:
+  // 1. Initial load: 20 rows (fast first paint)
+  // 2. After initial render: Load rest of page 1 (rows 21-50)
+  // 3. Background: Prefetch next page
+  
+  // Track if we need to load rest of page 1
+  const [hasLoadedRestOfPage1, setHasLoadedRestOfPage1] = useState(false);
+  // ✅ Only do initial load on page 1, and only if we haven't loaded rest yet
+  const isInitialLoad = currentPage === 1 && !hasLoadedRestOfPage1;
+  
+  // Initial query: only 20 rows for fast first paint (only on page 1)
+  const initialParams = useMemo(() => ({
+    ...baseQueryParams,
+    limit: isInitialLoad ? INITIAL_LOAD_LIMIT : ITEMS_PER_PAGE,
+  }), [baseQueryParams, isInitialLoad]);
+  
+  // ✅ Fetch sales data with database-level pagination
+  // No initialData from server - client fetches after HTML is ready (ISR strategy)
+  // This allows ISR to cache HTML instantly without waiting for slow DB queries
   const { 
     data: salesData, 
     isLoading, 
     error 
   } = useQuery({
-    queryKey: ["bork-v2-sales", baseQueryParams.startDate, baseQueryParams.endDate, baseQueryParams.category, baseQueryParams.locationId, baseQueryParams.page],
-    queryFn: () => fetchBorkSales(baseQueryParams),
-    initialData: initialData?.salesData,
-    enabled: !!baseQueryParams.startDate && !!baseQueryParams.endDate,
+    queryKey: ["bork-v2-sales", initialParams.startDate, initialParams.endDate, initialParams.category, initialParams.locationId, initialParams.page, initialParams.limit],
+    queryFn: () => fetchBorkSales(initialParams),
+    // ✅ No initialData - client fetches after HTML is ready for instant first paint
+    enabled: !!initialParams.startDate && !!initialParams.endDate,
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
+  
+  // ✅ Load rest of page 1 after initial render (lazy load)
+  // Only run after initial query completes successfully and we have exactly 20 records
+  const { data: restOfPage1Data } = useQuery({
+    queryKey: ["bork-v2-sales", baseQueryParams.startDate, baseQueryParams.endDate, baseQueryParams.category, baseQueryParams.locationId, 1, ITEMS_PER_PAGE],
+    queryFn: () => fetchBorkSales({ ...baseQueryParams, page: 1, limit: ITEMS_PER_PAGE }),
+    enabled: isInitialLoad && 
+             !isLoading && // ✅ Wait for initial query to complete
+             !!salesData?.records && 
+             salesData.records.length === INITIAL_LOAD_LIMIT && 
+             !hasLoadedRestOfPage1 && 
+             !!baseQueryParams.startDate && 
+             !!baseQueryParams.endDate &&
+             !error, // ✅ Don't run if initial query failed
+    staleTime: 30 * 60 * 1000,
+    onSuccess: () => setHasLoadedRestOfPage1(true),
+  });
+  
+  // ✅ Prefetch next page in background
+  // Only run after we have successfully loaded data and are on page 1
+  // Disable prefetch to reduce simultaneous queries and prevent timeouts
+  const { data: nextPageData } = useQuery({
+    queryKey: ["bork-v2-sales", baseQueryParams.startDate, baseQueryParams.endDate, baseQueryParams.category, baseQueryParams.locationId, currentPage + 1, ITEMS_PER_PAGE],
+    queryFn: () => fetchBorkSales({ ...baseQueryParams, page: currentPage + 1, limit: ITEMS_PER_PAGE }),
+    enabled: false, // ✅ DISABLED: Prefetch causes simultaneous queries and timeouts
+    // enabled: !!baseQueryParams.startDate && 
+    //          !!baseQueryParams.endDate && 
+    //          currentPage < (salesData?.totalPages || 0) &&
+    //          !isLoading && // ✅ Wait for current page to load
+    //          !!salesData?.records, // ✅ Only prefetch if we have data
+    staleTime: 30 * 60 * 1000,
+  });
+  
+  // Merge rest of page 1 data if available
+  const mergedSalesData = useMemo(() => {
+    if (isInitialLoad && restOfPage1Data?.records && salesData?.records) {
+      return {
+        ...salesData,
+        records: restOfPage1Data.records, // Use full page 1 data
+      };
+    }
+    return salesData;
+  }, [isInitialLoad, salesData, restOfPage1Data]);
 
-  const totalPages = salesData?.totalPages || 0;
+  const totalPages = mergedSalesData?.totalPages || salesData?.totalPages || 0;
+
+  // Helper to check if record is cancelled (negative quantity)
+  const isCancelled = (record: any): boolean => {
+    return record.quantity !== null && record.quantity !== undefined && record.quantity < 0;
+  };
+
+  // Calculate actual date range from records (for display in summary)
+  const actualDateRange = useMemo(() => {
+    const recordsToUse = mergedSalesData?.records || salesData?.records;
+    if (!recordsToUse || recordsToUse.length === 0) {
+      return { startDate: '', endDate: '' };
+    }
+    const records = recordsToUse;
+    const dates = records
+      .map((r: any) => r.date)
+      .filter((date: string | null | undefined) => date != null && date !== '');
+    
+    if (dates.length === 0) {
+      return { startDate: '', endDate: '' };
+    }
+    
+    // Sort dates and get min/max
+    const sortedDates = dates.sort();
+    return {
+      startDate: sortedDates[0],
+      endDate: sortedDates[sortedDates.length - 1],
+    };
+  }, [mergedSalesData?.records, salesData?.records]);
+
+  // Calculate totals from sales data (MVVM: business logic in ViewModel)
+  const salesTotals = useMemo(() => {
+    const recordsToUse = mergedSalesData?.records || salesData?.records;
+    if (!recordsToUse) return null;
+    const records = recordsToUse;
+    // Total Revenue = sum of (quantity × price_ex_vat) for all non-cancelled records
+    // Using total_ex_vat which is already quantity × price_ex_vat
+    const totalRevenue = records.reduce((sum: number, r: any) => {
+      if (isCancelled(r)) return sum; // Exclude cancelled items
+      const revenue = r.total_ex_vat !== null && r.total_ex_vat !== undefined ? Number(r.total_ex_vat) : 0;
+      return sum + revenue;
+    }, 0);
+    const totalProducts = new Set(records.filter((r: any) => !isCancelled(r)).map((r: any) => r.product_name)).size;
+    const totalQuantity = records.reduce((sum: number, r: any) => sum + (isCancelled(r) ? 0 : Math.abs(r.quantity || 0)), 0);
+    const totalTransactions = new Set(records.filter((r: any) => !isCancelled(r)).map((r: any) => r.ticket_key)).size;
+    // Avg Transaction Value = total revenue / number of transactions
+    const avgTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+    
+    return {
+      totalRevenue,
+      totalProducts,
+      totalQuantity,
+      totalTransactions,
+      avgTransactionValue,
+    };
+  }, [mergedSalesData?.records, salesData?.records]);
 
   return {
     // State
@@ -219,10 +348,15 @@ export function useBorkSalesV2ViewModel(initialData?: { salesData?: any; locatio
     // Data
     locationOptions,
     categoryOptions,
-    salesData,
+    salesData: mergedSalesData || salesData,
     isLoading,
     error: error as Error | null,
     totalPages,
+    
+    // Computed
+    salesTotals,
+    startDate: actualDateRange.startDate || dateRangeFilters.startDate,
+    endDate: actualDateRange.endDate || dateRangeFilters.endDate,
   };
 }
 

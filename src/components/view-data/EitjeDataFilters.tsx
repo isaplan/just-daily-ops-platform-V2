@@ -225,7 +225,7 @@ export const EitjeDataFilters = memo(function EitjeDataFilters({
                 className={`border rounded-sm ${
                   isActive
                     ? "bg-blue-500 border-blue-500 text-white"
-                    : "bg-white border-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
+                    : "bg-white border-black text-black hover:bg-blue-500 hover:border-blue-500 hover:text-white"
                 }`}
                 onClick={() => onLocationChange(location.value)}
               >

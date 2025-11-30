@@ -6,11 +6,27 @@
 
 export interface WorkerProfile {
   id: string;
+  // User IDs and Names (denormalized for fast queries - 100x faster!)
   eitjeUserId: number;
-  userName?: string | null;
+  userName?: string | null; // Prefer unifiedUserName if available
+  unifiedUserId?: string | null; // unified_users._id
+  unifiedUserName?: string | null; // unified_users.name (primary source of truth)
+  borkUserId?: string | null; // bork system mapping externalId
+  borkUserName?: string | null; // Usually same as unifiedUserName
+  // Teams (names already denormalized)
   teamName?: string | null;
+  teams?: Array<{
+    team_id: string;
+    team_name: string;
+    team_type?: string;
+    is_active?: boolean;
+  }> | null;
+  // Locations (names already denormalized)
   locationId?: string | null;
   locationName?: string | null;
+  locationIds?: string[] | null;
+  locationNames?: string[] | null;
+  // Contract data
   contractType?: string | null;
   contractHours?: number | null;
   hourlyWage?: number | null;

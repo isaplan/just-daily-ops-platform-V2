@@ -55,11 +55,8 @@ export interface UseLaborCostViewModelReturn {
   
   // Computed aggregated costs
   aggregatedCosts: {
-    perHour: number;
-    perDay: number;
-    perWeek: number;
-    perMonth: number;
-    perYear: number;
+    avgHour: number;
+    avgCost: number;
   };
 }
 
@@ -263,61 +260,30 @@ export function useLaborCostViewModel(initialData?: { laborCostData?: any; locat
     staleTime: 0, // Always refetch when filters change
   });
 
-  // Aggregate costs per time period - use ALL filtered records, not just current page
+  // Aggregate costs - calculate averages from table data
   const aggregatedCosts = useMemo(() => {
     const records = allLaborCostResponse?.records || [];
     
     if (records.length === 0) {
       return {
-        perHour: 0,
-        perDay: 0,
-        perWeek: 0,
-        perMonth: 0,
-        perYear: 0,
+        avgHour: 0,
+        avgCost: 0,
       };
     }
 
-    // Group by period based on selectedTimePeriod
-    const groupedByDay = new Map<string, number>();
-    const groupedByWeek = new Map<string, number>();
-    const groupedByMonth = new Map<string, number>();
-    const groupedByYear = new Map<string, number>();
-
-    records.forEach((record) => {
-      const date = new Date(record.date);
-      const laborCost = record.labor_cost || 0;
-
-      // Day key: YYYY-MM-DD
-      const dayKey = record.date;
-      groupedByDay.set(dayKey, (groupedByDay.get(dayKey) || 0) + laborCost);
-
-      // Week key: YYYY-WW (week number)
-      const weekStart = new Date(date);
-      weekStart.setDate(date.getDate() - date.getDay());
-      const weekKey = `${weekStart.getFullYear()}-W${Math.ceil((weekStart.getDate() + (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1)) / 7)}`;
-      groupedByWeek.set(weekKey, (groupedByWeek.get(weekKey) || 0) + laborCost);
-
-      // Month key: YYYY-MM
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      groupedByMonth.set(monthKey, (groupedByMonth.get(monthKey) || 0) + laborCost);
-
-      // Year key: YYYY
-      const yearKey = String(date.getFullYear());
-      groupedByYear.set(yearKey, (groupedByYear.get(yearKey) || 0) + laborCost);
-    });
-
-    // Calculate totals
-    const totalCost = records.reduce((sum, r) => sum + (r.labor_cost || 0), 0);
+    // Calculate average hours per record
     const totalHours = records.reduce((sum, r) => sum + (r.hours_worked || 0), 0);
+    const avgHour = records.length > 0 ? totalHours / records.length : 0;
+
+    // Calculate average cost per record
+    const totalCost = records.reduce((sum, r) => sum + (r.labor_cost || 0), 0);
+    const avgCost = records.length > 0 ? totalCost / records.length : 0;
 
     return {
-      perHour: totalHours > 0 ? totalCost / totalHours : 0,
-      perDay: Array.from(groupedByDay.values()).reduce((sum, cost) => sum + cost, 0) / groupedByDay.size || 0,
-      perWeek: Array.from(groupedByWeek.values()).reduce((sum, cost) => sum + cost, 0) / groupedByWeek.size || 0,
-      perMonth: Array.from(groupedByMonth.values()).reduce((sum, cost) => sum + cost, 0) / groupedByMonth.size || 0,
-      perYear: Array.from(groupedByYear.values()).reduce((sum, cost) => sum + cost, 0) / groupedByYear.size || 0,
+      avgHour,
+      avgCost,
     };
-  }, [laborCostResponse?.records]);
+  }, [allLaborCostResponse?.records]);
 
   const totalPages = laborCostResponse ? Math.ceil((laborCostResponse.total || 0) / ITEMS_PER_PAGE) : 0;
 

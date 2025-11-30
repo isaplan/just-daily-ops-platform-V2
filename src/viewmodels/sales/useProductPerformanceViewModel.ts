@@ -13,7 +13,7 @@ import { LocationOption } from "@/models/sales/bork-sales-v2.model";
 
 const ITEMS_PER_PAGE = 50;
 
-export function useProductPerformanceViewModel() {
+export function useProductPerformanceViewModel(initialData?: { productData?: any; locations?: any[] }) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -27,9 +27,10 @@ export function useProductPerformanceViewModel() {
 
   const dateRange = useMemo(() => getDateRangeForPreset(selectedDatePreset), [selectedDatePreset]);
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -85,39 +86,27 @@ export function useProductPerformanceViewModel() {
     };
   }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
 
-  // Fetch product performance for ALL locations
-  const { data: allProductData, isLoading, error } = useQuery({
-    queryKey: ["product-performance", startDate, endDate],
-    queryFn: () => getProductPerformance(startDate, endDate, 1, 10000, {}), // Fetch all
+  // Build filters for GraphQL query
+  const filters = useMemo(() => {
+    const filterObj: { locationId?: string } = {};
+    if (selectedLocation !== "all") {
+      filterObj.locationId = selectedLocation;
+    }
+    return filterObj;
+  }, [selectedLocation]);
+
+  // Fetch product performance with proper pagination
+  const { data: productPerformanceData, isLoading, error } = useQuery({
+    queryKey: ["product-performance", startDate, endDate, currentPage, selectedLocation],
+    queryFn: () => getProductPerformance(startDate, endDate, currentPage, ITEMS_PER_PAGE, filters),
+    initialData: currentPage === 1 && !selectedLocation ? initialData?.productData : undefined,
     staleTime: 30 * 60 * 1000,
     enabled: !!startDate && !!endDate,
   });
 
-  // Filter and paginate data client-side
-  const { productData, totalPages, total } = useMemo(() => {
-    if (!allProductData?.records) {
-      return { productData: [], totalPages: 0, total: 0 };
-    }
-    
-    // Filter by location
-    let filtered = allProductData.records;
-    if (selectedLocation !== "all") {
-      filtered = filtered.filter((product: any) => 
-        product.location_id === selectedLocation
-      );
-    }
-    
-    // Paginate client-side
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginated = filtered.slice(startIndex, endIndex);
-    
-    return {
-      productData: paginated,
-      totalPages: Math.ceil(filtered.length / ITEMS_PER_PAGE),
-      total: filtered.length,
-    };
-  }, [allProductData?.records, selectedLocation, currentPage]);
+  const productData = productPerformanceData?.records || [];
+  const totalPages = productPerformanceData?.totalPages || 0;
+  const total = productPerformanceData?.total || 0;
 
   return {
     selectedYear,
@@ -139,6 +128,8 @@ export function useProductPerformanceViewModel() {
     error: error as Error | null,
     totalPages,
     total,
+    startDate,
+    endDate,
   };
 }
 

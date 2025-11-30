@@ -22,6 +22,8 @@ interface PageFiltersContextType {
   clearFilters: () => void;
   isFilterOpen: boolean;
   setIsFilterOpen: (open: boolean) => void;
+  isFilterSheetOpen: boolean;
+  setIsFilterSheetOpen: (open: boolean) => void;
 }
 
 const PageFiltersContext = createContext<PageFiltersContextType | undefined>(undefined);
@@ -29,6 +31,7 @@ const PageFiltersContext = createContext<PageFiltersContextType | undefined>(und
 export function PageFiltersProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<PageFilters | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   const registerFilters = useCallback((newFilters: PageFilters) => {
     setFilters(newFilters);
@@ -37,10 +40,19 @@ export function PageFiltersProvider({ children }: { children: ReactNode }) {
   const clearFilters = useCallback(() => {
     setFilters(null);
     setIsFilterOpen(false);
+    setIsFilterSheetOpen(false);
   }, []);
 
   return (
-    <PageFiltersContext.Provider value={{ filters, registerFilters, clearFilters, isFilterOpen, setIsFilterOpen }}>
+    <PageFiltersContext.Provider value={{ 
+      filters, 
+      registerFilters, 
+      clearFilters, 
+      isFilterOpen, 
+      setIsFilterOpen,
+      isFilterSheetOpen,
+      setIsFilterSheetOpen,
+    }}>
       {children}
     </PageFiltersContext.Provider>
   );

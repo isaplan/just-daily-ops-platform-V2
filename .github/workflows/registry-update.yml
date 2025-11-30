@@ -11,19 +11,11 @@ jobs:
     name: Update Function Registry
     runs-on: ubuntu-latest
     
-    # Skip if between 3am-10am UTC
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && (
-        github.run_number % 3 == 1 ||
-        github.run_number % 3 == 2
-      ))
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

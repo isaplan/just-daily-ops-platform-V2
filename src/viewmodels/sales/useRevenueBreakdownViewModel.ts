@@ -11,7 +11,7 @@ import { getRevenueBreakdown } from "@/lib/services/graphql/queries";
 import { getLocations } from "@/lib/services/graphql/queries";
 import { LocationOption } from "@/models/sales/bork-sales-v2.model";
 
-export function useRevenueBreakdownViewModel() {
+export function useRevenueBreakdownViewModel(initialData?: { revenueData?: any; locations?: any[] }) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -20,9 +20,10 @@ export function useRevenueBreakdownViewModel() {
 
   const dateRange = useMemo(() => getDateRangeForPreset(selectedDatePreset), [selectedDatePreset]);
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -78,26 +79,26 @@ export function useRevenueBreakdownViewModel() {
     };
   }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
 
-  // Fetch revenue breakdown for ALL locations
-  const { data: allRevenueData, isLoading, error } = useQuery({
-    queryKey: ["revenue-breakdown", startDate, endDate],
-    queryFn: () => getRevenueBreakdown(startDate, endDate, {}),
+  // Build filters for GraphQL query
+  const filters = useMemo(() => {
+    const filterObj: { locationId?: string } = {};
+    if (selectedLocation !== "all") {
+      filterObj.locationId = selectedLocation;
+    }
+    return filterObj;
+  }, [selectedLocation]);
+
+  // Fetch revenue breakdown data
+  const { data: revenueBreakdownData, isLoading, error } = useQuery({
+    queryKey: ["revenue-breakdown", startDate, endDate, selectedLocation],
+    queryFn: () => getRevenueBreakdown(startDate, endDate, filters),
+    initialData: selectedLocation === "all" ? initialData?.revenueData : undefined,
     staleTime: 30 * 60 * 1000,
     enabled: !!startDate && !!endDate,
   });
 
-  // Filter data client-side
-  const revenueData = useMemo(() => {
-    if (!allRevenueData?.records) return [];
-    
-    if (selectedLocation === "all") {
-      return allRevenueData.records;
-    }
-    
-    return allRevenueData.records.filter((record: any) => 
-      record.location_id === selectedLocation
-    );
-  }, [allRevenueData?.records, selectedLocation]);
+  // Get revenue data from query result
+  const revenueData = revenueBreakdownData?.records || [];
 
   return {
     selectedYear,
@@ -115,6 +116,8 @@ export function useRevenueBreakdownViewModel() {
     revenueData,
     isLoading,
     error: error as Error | null,
+    startDate,
+    endDate,
   };
 }
 

@@ -48,6 +48,43 @@ const nextConfig: NextConfig = {
           '@yaacovcr/transform': stubPath,
         };
       }
+    } else {
+      // Client-side: Exclude MongoDB and Node.js built-in modules from client bundles
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        dns: false,
+        child_process: false,
+        'fs/promises': false,
+        'timers/promises': false,
+        crypto: false,
+        http: false,
+        https: false,
+        stream: false,
+        url: false,
+        zlib: false,
+        util: false,
+        buffer: false,
+        events: false,
+        os: false,
+        path: false,
+      };
+      
+      // Use IgnorePlugin to completely exclude MongoDB from client bundles
+      const webpack = require('webpack');
+      config.plugins = config.plugins || [];
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^mongodb$/,
+          contextRegExp: /node_modules/,
+        }),
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^mongodb\/lib/,
+          contextRegExp: /node_modules/,
+        })
+      );
     }
     
     // Exclude large directories from file watching for faster dev server

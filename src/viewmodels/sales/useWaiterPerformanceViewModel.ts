@@ -33,9 +33,13 @@ export interface UseWaiterPerformanceViewModelReturn {
   waiterData: any;
   isLoading: boolean;
   error: Error | null;
+  
+  // Date range
+  startDate: string;
+  endDate: string;
 }
 
-export function useWaiterPerformanceViewModel(): UseWaiterPerformanceViewModelReturn {
+export function useWaiterPerformanceViewModel(initialData?: { waiterData?: any; locations?: any[] }): UseWaiterPerformanceViewModelReturn {
   // State management
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -48,10 +52,11 @@ export function useWaiterPerformanceViewModel(): UseWaiterPerformanceViewModelRe
     return getDateRangeForPreset(selectedDatePreset);
   }, [selectedDatePreset]);
 
-  // Fetch locations via GraphQL
-  const { data: locations = [] } = useQuery({
+  // Fetch locations via GraphQL - use initialData if provided
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 60 * 60 * 1000, // 60 minutes
   });
 
@@ -119,29 +124,26 @@ export function useWaiterPerformanceViewModel(): UseWaiterPerformanceViewModelRe
     };
   }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
 
-  // Fetch waiter performance data for ALL locations (no location filter)
-  // This allows us to cache the full dataset and filter client-side
-  const { data: allWaiterData, isLoading, error } = useQuery({
-    queryKey: ["waiter-performance", startDate, endDate], // No location in key - fetch all
-    queryFn: () => getWaiterPerformance(startDate, endDate, {}), // No filters - get all locations
+  // Build filters for GraphQL query
+  const filters = useMemo(() => {
+    const filterObj: { locationId?: string } = {};
+    if (selectedLocation !== "all") {
+      filterObj.locationId = selectedLocation;
+    }
+    return filterObj;
+  }, [selectedLocation]);
+
+  // Fetch waiter performance data
+  const { data: waiterPerformanceData, isLoading, error } = useQuery({
+    queryKey: ["waiter-performance", startDate, endDate, selectedLocation],
+    queryFn: () => getWaiterPerformance(startDate, endDate, filters),
+    initialData: selectedLocation === "all" ? initialData?.waiterData : undefined,
     staleTime: 30 * 60 * 1000, // 30 minutes
     enabled: !!startDate && !!endDate,
   });
 
-  // Filter data client-side based on selected location
-  const waiterData = useMemo(() => {
-    if (!allWaiterData?.records) return [];
-    
-    // If "all" is selected, return all data
-    if (selectedLocation === "all") {
-      return allWaiterData.records;
-    }
-    
-    // Filter by location
-    return allWaiterData.records.filter((waiter: any) => 
-      waiter.location_id === selectedLocation
-    );
-  }, [allWaiterData?.records, selectedLocation]);
+  // Get waiter data from query result
+  const waiterData = waiterPerformanceData?.records || [];
 
   return {
     selectedYear,
@@ -159,6 +161,8 @@ export function useWaiterPerformanceViewModel(): UseWaiterPerformanceViewModelRe
     waiterData,
     isLoading,
     error: error as Error | null,
+    startDate,
+    endDate,
   };
 }
 

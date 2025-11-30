@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Filter } from "lucide-react";
 import { usePageFilters } from "@/contexts/page-filters-context";
+import { FilterSheet } from "@/components/navigation/filter-sheet";
 
 interface TopnavFilterDropdownV2Props {
   onActiveFiltersChange?: (filters: Array<{ key: string; label: string; value: string | number | null }>) => void;
 }
 
 export function TopnavFilterDropdownV2({ onActiveFiltersChange }: TopnavFilterDropdownV2Props) {
-  const { filters, isFilterOpen, setIsFilterOpen } = usePageFilters();
+  const { filters, isFilterSheetOpen, setIsFilterSheetOpen } = usePageFilters();
   const callbackRef = useRef(onActiveFiltersChange);
   const prevFiltersKeyRef = useRef<string>("");
   
@@ -57,32 +58,28 @@ export function TopnavFilterDropdownV2({ onActiveFiltersChange }: TopnavFilterDr
         (filter) => filter.value !== null && filter.value !== "" && filter.value !== "all"
       );
 
-  // Toggle filter visibility on page
+  // Toggle sheet open/close
   const handleToggleFilter = () => {
-    setIsFilterOpen(!isFilterOpen);
-    
-    // Scroll to filter card if opening
-    if (!isFilterOpen && filters?.filterCardRef?.current) {
-      setTimeout(() => {
-        filters.filterCardRef?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
-    }
+    setIsFilterSheetOpen(!isFilterSheetOpen);
   };
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="bg-white border-2 border-black rounded-lg h-10 w-10 shadow-none relative"
-      onClick={handleToggleFilter}
-    >
-      <Filter className="h-4 w-4" />
-      {activeFilters.length > 0 && (
-        <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
-          {activeFilters.length}
-        </span>
-      )}
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="bg-white border-2 border-black rounded-lg h-10 w-10 shadow-none relative"
+        onClick={handleToggleFilter}
+      >
+        <Filter className="h-4 w-4" />
+        {activeFilters.length > 0 && (
+          <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
+            {activeFilters.length}
+          </span>
+        )}
+      </Button>
+      <FilterSheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen} />
+    </>
   );
 }
 

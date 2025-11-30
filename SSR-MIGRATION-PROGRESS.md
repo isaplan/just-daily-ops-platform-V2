@@ -1,18 +1,18 @@
 # 🚀 SSR Migration Progress
 
-**Status**: 3 of 18 pages migrated ✅  
+**Status**: 13 of 18 pages migrated ✅  
 **Started**: 2025-01-XX  
 **Pattern**: Server Component wrapper + Client Component UI
 
 ---
 
-## ✅ **Completed Pages (3)**
+## ✅ **Completed Pages - SSR with Data Fetching (3)**
 
 ### 1. `/data/sales/bork` ✅
-- **Server Component**: `src/app/(dashboard)/data/sales/bork/page.tsx`
+- **Server Component**: `src/app/(dashboard)/data/sales/bork/page.tsx` (async, fetches data)
 - **Client Component**: `src/app/(dashboard)/data/sales/bork/BorkSalesClient.tsx`
 - **ViewModel Updated**: `src/viewmodels/sales/useBorkSalesV2ViewModel.ts`
-- **Status**: ✅ Complete - Fast SSR with ISR caching
+- **Status**: ✅ Complete - True SSR with initial data fetching + ISR caching
 
 ### 2. `/data/sales/categories-products` ✅
 - **Server Component**: `src/app/(dashboard)/data/sales/categories-products/page.tsx`
@@ -28,26 +28,37 @@
 
 ---
 
-## ⏳ **Remaining Pages (15)**
+## ✅ **Completed Pages - Static HTML (ISR Only) (10)**
 
-### **High Priority** (Most Used)
-- [ ] `/data/labor/workers` - Workers table
-- [ ] `/data/labor/locations-teams` - Locations & teams view
-- [ ] `/data/labor/labor-cost` - Labor cost calculations
+These pages use Server Components but are **static** (no async data fetching). They return HTML structure immediately, and client components fetch data after HTML is painted. This is good for ISR caching but not true SSR.
 
-### **Medium Priority** (Sales Sub-pages)
-- [ ] `/data/sales/bork/products` - Products analysis
-- [ ] `/data/sales/bork/revenue` - Revenue analysis
-- [ ] `/data/sales/bork/tables` - Tables analysis
-- [ ] `/data/sales/bork/waiters` - Waiters analysis
-- [ ] `/data/sales/bork/payment-methods` - Payment methods
-- [ ] `/data/sales/bork/transactions` - Transactions
-- [ ] `/data/sales/bork/time-analysis` - Time analysis
+### Sales Analysis Pages (7)
+- ✅ `/data/sales/bork/products` - Products analysis
+- ✅ `/data/sales/bork/revenue` - Revenue analysis
+- ✅ `/data/sales/bork/tables` - Tables analysis
+- ✅ `/data/sales/bork/waiters` - Waiters analysis
+- ✅ `/data/sales/bork/payment-methods` - Payment methods
+- ✅ `/data/sales/bork/transactions` - Transactions
+- ✅ `/data/sales/bork/time-analysis` - Time analysis
+
+### Labor Pages (3)
+- ✅ `/data/labor/workers` - Workers table
+- ✅ `/data/labor/labor-cost` - Labor cost calculations
+- ⚠️ `/data/labor/locations-teams` - **Still uses "use client" directly** (needs migration)
+
+**Note**: These static pages should be upgraded to true SSR (async data fetching) for better first paint performance.
+
+---
+
+## ⏳ **Remaining Pages (5)**
+
+### **High Priority** (Needs Migration)
+- [ ] `/data/labor/locations-teams` - **Currently Client Component** - Needs Server Component wrapper
+- [ ] `/data/labor/productivity` - Productivity page
 
 ### **Lower Priority** (Settings Pages)
 - [ ] `/settings/bork-api` - Bork API settings (2019 lines - needs splitting!)
 - [ ] `/settings/eitje-api` - Eitje API settings
-- [ ] `/data/labor/productivity` - Productivity page
 
 ---
 
@@ -211,7 +222,51 @@ For each page:
 
 ---
 
+---
+
+## 📊 **Migration Status Summary**
+
+| Category | Count | Status |
+|----------|-------|--------|
+| **True SSR** (async data fetching) | 3 | ✅ Complete |
+| **Static HTML** (ISR only) | 10 | ✅ Partial (should upgrade to SSR) |
+| **Client Component** (needs migration) | 2 | ⏳ Pending |
+| **Settings Pages** (low priority) | 2 | ⏳ Pending |
+| **Total** | **17** | **13/17 migrated (76%)** |
+
+---
+
+## ⚠️ **Upgrade Needed: Static → SSR**
+
+The 10 static pages should be upgraded to **true SSR** (async data fetching) like `/data/sales/bork`:
+
+**Current Pattern (Static):**
+```typescript
+export default function Page() {
+  return <PageClient />; // No data fetching
+}
+```
+
+**Target Pattern (SSR):**
+```typescript
+export default async function Page() {
+  const [initialData, locations] = await Promise.all([
+    fetchData(...).catch(() => null),
+    getLocations().catch(() => []),
+  ]);
+  return <PageClient initialData={{ data: initialData, locations }} />;
+}
+```
+
+**Benefits of upgrading:**
+- ⚡ Faster first paint (data in HTML, not fetched after)
+- 🔍 Better SEO (content in initial HTML)
+- 📦 Smaller client bundle (less JavaScript needed)
+
+---
+
 **Last Updated**: 2025-01-XX  
-**Pages Migrated**: 3/18 (17%)  
-**Estimated Time Remaining**: 4-5 hours for all pages
+**Pages Migrated**: 13/17 (76%)  
+**True SSR Pages**: 3/17 (18%)  
+**Estimated Time Remaining**: 2-3 hours to upgrade static pages to SSR
 

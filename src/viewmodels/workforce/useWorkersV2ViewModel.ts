@@ -93,7 +93,7 @@ export interface UseWorkersV2ViewModelReturn {
   };
 }
 
-export function useWorkersV2ViewModel(): UseWorkersV2ViewModelReturn {
+export function useWorkersV2ViewModel(initialData?: { workersData?: any; locations?: any[] }): UseWorkersV2ViewModelReturn {
   // State management
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -116,9 +116,10 @@ export function useWorkersV2ViewModel(): UseWorkersV2ViewModelReturn {
   }, [selectedYear, selectedMonth, selectedDay, activeFilter, selectedLocation, contractTypeFilter]);
 
   // Fetch locations via GraphQL
-  const { data: locations = [] } = useQuery({
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 10 * 60 * 1000,
   });
 
@@ -209,6 +210,7 @@ export function useWorkersV2ViewModel(): UseWorkersV2ViewModelReturn {
       ITEMS_PER_PAGE,
       queryFilters
     ),
+    initialData: currentPage === 1 && selectedYear === new Date().getFullYear() && !selectedMonth && !selectedDay ? initialData?.workersData : undefined,
   });
 
   // Create mutation

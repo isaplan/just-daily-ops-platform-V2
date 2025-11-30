@@ -11,7 +11,7 @@ import { getTableAnalysis } from "@/lib/services/graphql/queries";
 import { getLocations } from "@/lib/services/graphql/queries";
 import { LocationOption } from "@/models/sales/bork-sales-v2.model";
 
-export function useTableAnalysisViewModel() {
+export function useTableAnalysisViewModel(initialData?: { tableData?: any; locations?: any[] }) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -20,9 +20,10 @@ export function useTableAnalysisViewModel() {
 
   const dateRange = useMemo(() => getDateRangeForPreset(selectedDatePreset), [selectedDatePreset]);
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = initialData?.locations || [] } = useQuery({
     queryKey: ["locations"],
     queryFn: getLocations,
+    initialData: initialData?.locations,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -78,26 +79,26 @@ export function useTableAnalysisViewModel() {
     };
   }, [selectedYear, selectedMonth, selectedDay, selectedDatePreset, dateRange]);
 
-  // Fetch table analysis for ALL locations
-  const { data: allTableData, isLoading, error } = useQuery({
-    queryKey: ["table-analysis", startDate, endDate],
-    queryFn: () => getTableAnalysis(startDate, endDate, {}),
+  // Build filters for GraphQL query
+  const filters = useMemo(() => {
+    const filterObj: { locationId?: string } = {};
+    if (selectedLocation !== "all") {
+      filterObj.locationId = selectedLocation;
+    }
+    return filterObj;
+  }, [selectedLocation]);
+
+  // Fetch table analysis data
+  const { data: tableAnalysisData, isLoading, error } = useQuery({
+    queryKey: ["table-analysis", startDate, endDate, selectedLocation],
+    queryFn: () => getTableAnalysis(startDate, endDate, filters),
+    initialData: selectedLocation === "all" ? initialData?.tableData : undefined,
     staleTime: 30 * 60 * 1000,
     enabled: !!startDate && !!endDate,
   });
 
-  // Filter data client-side
-  const tableData = useMemo(() => {
-    if (!allTableData?.records) return [];
-    
-    if (selectedLocation === "all") {
-      return allTableData.records;
-    }
-    
-    return allTableData.records.filter((record: any) => 
-      record.location_id === selectedLocation
-    );
-  }, [allTableData?.records, selectedLocation]);
+  // Get table data from query result
+  const tableData = tableAnalysisData?.records || [];
 
   return {
     selectedYear,
@@ -115,6 +116,8 @@ export function useTableAnalysisViewModel() {
     tableData,
     isLoading,
     error: error as Error | null,
+    startDate,
+    endDate,
   };
 }
 
