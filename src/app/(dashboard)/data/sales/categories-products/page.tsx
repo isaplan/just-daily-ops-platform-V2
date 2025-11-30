@@ -5,7 +5,7 @@
  * Client component uses initialData for instant display, then updates client-side
  */
 
-import { CategoriesProductsClient } from './CategoriesProductsClient';
+import { CategoriesProductsClient } from '../daily/categories-products/CategoriesProductsClient';
 import { fetchCategoriesProductsAggregate } from '@/lib/services/sales/categories-products.service';
 import { getLocations } from '@/lib/services/graphql/queries';
 
