@@ -132,7 +132,26 @@ class CronJobManager {
    * Execute a cron job
    */
   private async executeJob(config: CronJobConfig): Promise<void> {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Get base URL for internal API calls
+    // Priority: NEXT_PUBLIC_APP_URL > VERCEL_URL (with https) > localhost
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    
+    if (!baseUrl) {
+      // Vercel automatically sets VERCEL_URL (e.g., "your-app.vercel.app")
+      // We need to add https:// protocol
+      const vercelUrl = process.env.VERCEL_URL;
+      if (vercelUrl) {
+        baseUrl = `https://${vercelUrl}`;
+      } else {
+        // Fallback to localhost for development
+        baseUrl = 'http://localhost:3000';
+      }
+    }
+    
+    // Ensure baseUrl doesn't have trailing slash
+    baseUrl = baseUrl.replace(/\/$/, '');
+    
+    console.log(`[Cron Job] Executing ${config.jobType} job with baseUrl: ${baseUrl}`);
     
     if (config.jobType === 'daily-data') {
       // Execute daily data sync
@@ -172,7 +191,10 @@ class CronJobManager {
       for (const [key, enabled] of Object.entries(enabledEndpoints)) {
         if (enabled && endpointMap[key]) {
           try {
-            const response = await fetch(`${baseUrl}/api/eitje/v2/sync`, {
+            const syncUrl = `${baseUrl}/api/eitje/v2/sync`;
+            console.log(`[Cron Job] Syncing ${endpointMap[key]} via ${syncUrl}`);
+            
+            const response = await fetch(syncUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -182,10 +204,17 @@ class CronJobManager {
               }),
             });
             
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
             const result = await response.json();
             console.log(`[Cron Job] Synced ${endpointMap[key]}: ${result.recordsSaved || 0} records`);
           } catch (error: any) {
             console.error(`[Cron Job] Error syncing ${endpointMap[key]}:`, error.message);
+            console.error(`[Cron Job] Base URL used: ${baseUrl}`);
+            console.error(`[Cron Job] Full error:`, error);
           }
         }
       }
@@ -203,7 +232,10 @@ class CronJobManager {
       for (const [key, enabled] of Object.entries(enabledEndpoints)) {
         if (enabled && endpointMap[key]) {
           try {
-            const response = await fetch(`${baseUrl}/api/eitje/v2/sync`, {
+            const syncUrl = `${baseUrl}/api/eitje/v2/sync`;
+            console.log(`[Cron Job] Syncing master data ${endpointMap[key]} via ${syncUrl}`);
+            
+            const response = await fetch(syncUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -212,10 +244,17 @@ class CronJobManager {
               }),
             });
             
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
             const result = await response.json();
             console.log(`[Cron Job] Synced ${endpointMap[key]}: ${result.recordsSaved || 0} records`);
           } catch (error: any) {
             console.error(`[Cron Job] Error syncing ${endpointMap[key]}:`, error.message);
+            console.error(`[Cron Job] Base URL used: ${baseUrl}`);
+            console.error(`[Cron Job] Full error:`, error);
           }
         }
       }
@@ -285,7 +324,10 @@ class CronJobManager {
           
           for (const chunk of dateChunks) {
             try {
-              const response = await fetch(`${baseUrl}/api/eitje/v2/sync`, {
+              const syncUrl = `${baseUrl}/api/eitje/v2/sync`;
+              console.log(`[Cron Job] Historical sync ${endpoint} (${chunk.startDate} to ${chunk.endDate}) via ${syncUrl}`);
+              
+              const response = await fetch(syncUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -295,12 +337,19 @@ class CronJobManager {
                 }),
               });
               
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+              }
+              
               const result = await response.json();
               const recordsSaved = result.recordsSaved || 0;
               totalRecords += recordsSaved;
               console.log(`[Cron Job] Historical sync ${endpoint} (${chunk.startDate} to ${chunk.endDate}): ${recordsSaved} records`);
             } catch (error: any) {
               console.error(`[Cron Job] Error in historical sync ${endpoint} (${chunk.startDate} to ${chunk.endDate}):`, error.message);
+              console.error(`[Cron Job] Base URL used: ${baseUrl}`);
+              console.error(`[Cron Job] Full error:`, error);
             }
           }
           
