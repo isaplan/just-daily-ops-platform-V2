@@ -26,6 +26,7 @@ import {
   Receipt,
   ChefHat,
   Megaphone,
+  FileCheck,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -166,9 +167,19 @@ const dataItems: MenuItem[] = [
   { title: "Inventory", icon: Package, comingSoon: true },
 ];
 
+const settingsDataStatusItems: MenuItem[] = [
+  { title: "Overview", icon: BarChart3, url: "/settings/data-status" },
+  { title: "Eitje Data Check", icon: FileCheck, url: "/settings/data-status/eitje-data-check" },
+];
+
 const settingsItems: MenuItem[] = [
   { title: "Documentation", icon: FileText, url: "/docs" },
-  { title: "Data & Status", icon: BarChart3, url: "/settings/data-status" },
+  {
+    title: "Data & Status",
+    icon: BarChart3,
+    isCollapsible: true,
+    children: settingsDataStatusItems,
+  },
   { title: "Eitje API Connect", icon: Plug, url: "/settings/eitje-api" },
   { title: "Bork API Connect", icon: Plug, url: "/settings/bork-api" },
   { title: "Company Settings", icon: Building2, url: "/settings/company" },
@@ -202,6 +213,7 @@ export function AppSidebar({ layoutVersion, onVersionChange }: AppSidebarProps) 
     checkCollapsible(dataItems);
     checkCollapsible(dailyOpsItems);
     checkCollapsible(operationsItems);
+    checkCollapsible(settingsDataStatusItems);
     return initialStates;
   };
   
