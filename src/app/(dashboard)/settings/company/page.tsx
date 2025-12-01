@@ -17,3 +17,5 @@ export default async function CompanySettingsPage() {
   return <CompanySettingsClient initialSettings={settings} />;
 }
 
+
+

@@ -1106,11 +1106,13 @@ export const resolvers = {
           teamCategory?: 'KITCHEN' | 'SERVICE' | 'MANAGEMENT' | 'OTHER';
           subTeam?: string;
           workerId?: string;
-        };
+        } | null;
         page?: number;
         limit?: number;
       }
     ) => {
+      // Ensure filters is an object (handle null/undefined)
+      const safeFilters = filters || {};
       try {
         const { fetchProductivityEnhanced } = await import('@/lib/services/workforce/productivity-enhanced.service');
         
@@ -1143,10 +1145,10 @@ export const resolvers = {
           endDate,
           periodType: periodTypeMap[periodType] || 'day',
           locationId: locationId || 'all',
-          division: filters.division ? divisionMap[filters.division] : undefined,
-          teamCategory: filters.teamCategory ? teamCategoryMap[filters.teamCategory] : undefined,
-          subTeam: filters.subTeam,
-          workerId: filters.workerId,
+          division: safeFilters.division ? divisionMap[safeFilters.division] : undefined,
+          teamCategory: safeFilters.teamCategory ? teamCategoryMap[safeFilters.teamCategory] : undefined,
+          subTeam: safeFilters.subTeam,
+          workerId: safeFilters.workerId,
           page,
           limit,
         };

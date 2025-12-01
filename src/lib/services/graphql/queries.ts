@@ -2185,10 +2185,37 @@ export async function getLaborProductivityEnhanced(
     teamCategory?: 'KITCHEN' | 'SERVICE' | 'MANAGEMENT' | 'OTHER';
     subTeam?: string;
     workerId?: string;
-  },
+  } | null,
   page: number = 1,
   limit: number = 50
 ): Promise<LaborProductivityEnhancedResponse> {
+  // Build variables object - always include all variables
+  const variables: Record<string, any> = {
+    startDate,
+    endDate,
+    periodType,
+    page,
+    limit,
+  };
+  
+  // Always include locationId (use null if undefined)
+  variables.locationId = locationId || null;
+  
+  // Always include filters - build filter object with only defined values
+  // If filters is null/undefined or empty, pass null (resolver handles it)
+  if (filters && typeof filters === 'object' && Object.keys(filters).length > 0) {
+    const filterObj: Record<string, any> = {};
+    if (filters.division) filterObj.division = filters.division;
+    if (filters.teamCategory) filterObj.teamCategory = filters.teamCategory;
+    if (filters.subTeam) filterObj.subTeam = filters.subTeam;
+    if (filters.workerId) filterObj.workerId = filters.workerId;
+    
+    // Only include filters if it has at least one property
+    variables.filters = Object.keys(filterObj).length > 0 ? filterObj : null;
+  } else {
+    variables.filters = null;
+  }
+  
   const query = `
     query GetLaborProductivityEnhanced(
       $startDate: String!
@@ -2290,7 +2317,7 @@ export async function getLaborProductivityEnhanced(
 
   const result = await executeGraphQL<{ laborProductivityEnhanced: LaborProductivityEnhancedResponse }>(
     query,
-    { startDate, endDate, periodType, locationId, filters, page, limit }
+    variables
   );
 
   return result.data?.laborProductivityEnhanced || {

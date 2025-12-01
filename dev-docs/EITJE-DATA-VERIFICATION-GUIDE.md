@@ -211,3 +211,5 @@ const laborCostPercentage = (dbRecord.totalWageCost / dbRecord.totalRevenue) * 1
 - `POST /api/eitje/v2/aggregate` - Re-aggregate data
 - `GET /api/eitje/v2/check-data` - Check aggregated data
 
+
+

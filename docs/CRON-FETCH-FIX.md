@@ -126,3 +126,5 @@ Instead of making HTTP calls to internal API routes, we could:
 
 This would require refactoring but would be more efficient.
 
+
+

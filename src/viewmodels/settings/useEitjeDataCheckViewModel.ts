@@ -15,6 +15,7 @@ export interface VerificationSummary {
 export interface FinanceVerification {
   files: number;
   records: number;
+  filteredRecords?: number;
   verifications: Array<{
     location: string;
     locationId: string;
@@ -28,6 +29,17 @@ export interface FinanceVerification {
     dbWageCost: number;
     dbRevenuePerHour: number;
     dbLaborCostPercentage: number;
+    // Productivity verification metrics
+    excelHours?: number;
+    excelWageCost?: number;
+    excelRevenuePerHour?: number;
+    excelLaborCostPercentage?: number;
+    revenuePerHourDifference?: number;
+    revenuePerHourPercentDiff?: string;
+    laborCostPercentDifference?: string;
+    revenueMatch?: boolean;
+    revenuePerHourMatch?: boolean;
+    laborCostPercentMatch?: boolean;
   }>;
   discrepancies: Array<{
     type: string;
@@ -45,6 +57,7 @@ export interface FinanceVerification {
 export interface HoursVerification {
   files: number;
   records: number;
+  filteredRecords?: number;
   verifications: Array<{
     location: string;
     locationId: string;
@@ -60,6 +73,35 @@ export interface HoursVerification {
     dbWageCost: number;
     dbRevenuePerHour: number;
     dbLaborCostPercentage: number;
+  }>;
+  // Worker-level verification (per worker per day per team)
+  // Shows ALL workers from Excel (source of truth)
+  workerVerifications?: Array<{
+    location: string;
+    locationId: string;
+    date: string;
+    worker: string;
+    team: string | null;
+    excelHours: number;
+    dbHours: number;
+    difference: number;
+    percentDiff: string;
+    isMatch: boolean;
+    foundInDb: boolean; // Whether worker was found in database
+    sourceFiles: string[];
+    dbRecordCount: number;
+  }>;
+  workerDiscrepancies?: Array<{
+    type: string;
+    location?: string;
+    locationId?: string;
+    date?: string;
+    worker?: string;
+    excelHours?: number;
+    dbHours?: number;
+    difference?: number;
+    percentDiff?: string;
+    message: string;
   }>;
   discrepancies: Array<{
     type: string;
@@ -79,9 +121,30 @@ export type DateFilter = 'this-week' | 'this-month' | 'last-month' | 'this-year'
 export interface EitjeDataCheckResponse {
   success: boolean;
   dateFilter?: DateFilter;
+  dateRange?: { start: string; end: string } | null;
+  actualDataRange?: { start: string; end: string } | null;
+  sampleDates?: string[]; // For debugging - shows actual dates found in Excel files
   summary?: VerificationSummary;
   finance?: FinanceVerification;
   hours?: HoursVerification;
+  diagnostics?: {
+    november2025?: {
+      dates: number;
+      excelWorkers: number;
+      dbWorkers: number;
+      missingWorkers: number;
+      missingWorkerNames: string[];
+      rawDataRecords: number;
+      processedRecords: number;
+      aggregatedRecords: number;
+      rawDataSample: {
+        hasData: boolean;
+        sampleDate?: any;
+        sampleEndpoint?: string;
+        hasExtracted?: boolean;
+      };
+    };
+  } | null;
   error?: string;
 }
 
@@ -123,6 +186,10 @@ export function useEitjeDataCheckViewModel(dateFilter: DateFilter = 'all') {
     finance: verificationData?.finance,
     hours: verificationData?.hours,
     dateFilter: verificationData?.dateFilter || dateFilter,
+    dateRange: verificationData?.dateRange,
+    actualDataRange: verificationData?.actualDataRange,
+    sampleDates: verificationData?.sampleDates,
+    diagnostics: verificationData?.diagnostics, // Exposed for November 2025 check
   };
 }
 
