@@ -121,12 +121,62 @@ export async function POST(request: NextRequest) {
       console.log(`[Worker Profiles Aggregation] Fallback: Added ${userNameMap.size} names from eitje_raw_data`);
     }
 
+    // ✅ DUPLICATE DETECTION: Check for duplicate eitje_user_id entries
+    console.log('[Worker Profiles Aggregation] Checking for duplicate worker profiles...');
+    const eitjeIdCounts = new Map<number, number>();
+    const duplicateProfiles: Array<{ eitjeUserId: number; profileIds: string[] }> = [];
+    
+    workerProfiles.forEach((profile: any) => {
+      const eitjeId = profile.eitje_user_id;
+      if (eitjeId) {
+        const count = (eitjeIdCounts.get(eitjeId) || 0) + 1;
+        eitjeIdCounts.set(eitjeId, count);
+      }
+    });
+    
+    // Find duplicates
+    eitjeIdCounts.forEach((count, eitjeId) => {
+      if (count > 1) {
+        const profileIds = workerProfiles
+          .filter((p: any) => p.eitje_user_id === eitjeId)
+          .map((p: any) => p._id.toString());
+        duplicateProfiles.push({ eitjeUserId: eitjeId, profileIds });
+      }
+    });
+    
+    if (duplicateProfiles.length > 0) {
+      console.warn(`[Worker Profiles Aggregation] ⚠️  Found ${duplicateProfiles.length} duplicate eitje_user_id entries:`);
+      duplicateProfiles.forEach((dup) => {
+        console.warn(`[Worker Profiles Aggregation]   - eitje_user_id ${dup.eitjeUserId}: ${dup.profileIds.length} profiles (IDs: ${dup.profileIds.join(', ')})`);
+      });
+      console.warn(`[Worker Profiles Aggregation] ⚠️  Using first profile for each duplicate eitje_user_id`);
+    } else {
+      console.log('[Worker Profiles Aggregation] ✅ No duplicate eitje_user_id entries found');
+    }
+    
+    // ✅ DEDUPLICATION: Filter to keep only first profile for each eitje_user_id
+    const seenEitjeIds = new Set<number>();
+    const uniqueProfiles = workerProfiles.filter((profile: any) => {
+      const eitjeId = profile.eitje_user_id;
+      if (!eitjeId) return true; // Keep profiles without eitje_user_id
+      if (seenEitjeIds.has(eitjeId)) {
+        console.warn(`[Worker Profiles Aggregation] ⚠️  Skipping duplicate profile ${profile._id} (eitje_user_id: ${eitjeId})`);
+        return false;
+      }
+      seenEitjeIds.add(eitjeId);
+      return true;
+    });
+    
+    if (uniqueProfiles.length < workerProfiles.length) {
+      console.log(`[Worker Profiles Aggregation] Deduplicated: ${workerProfiles.length} → ${uniqueProfiles.length} unique profiles`);
+    }
+
     // Aggregate each worker
     let processed = 0;
     let errors = 0;
     const bulkOps: any[] = [];
 
-    for (const profile of workerProfiles) {
+    for (const profile of uniqueProfiles) {
       try {
         const locationId = profile.location_id;
         const locationName = locationId ? locationMap.get(typeof locationId === 'string' ? locationId : locationId.toString()) : undefined;
@@ -173,8 +223,8 @@ export async function POST(request: NextRequest) {
 
           // ✅ Better progress logging - every 10 workers (more frequent updates)
           if (processed % 10 === 0) {
-            const progress = ((processed / workerProfiles.length) * 100).toFixed(1);
-            console.log(`[Worker Profiles Aggregation] Progress: ${processed}/${workerProfiles.length} (${progress}%) - ${errors} errors`);
+            const progress = ((processed / uniqueProfiles.length) * 100).toFixed(1);
+            console.log(`[Worker Profiles Aggregation] Progress: ${processed}/${uniqueProfiles.length} (${progress}%) - ${errors} errors`);
           }
         } else {
           errors++;

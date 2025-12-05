@@ -271,23 +271,10 @@ export async function buildWorkerAggregated(
     
     if (!hasData) {
       console.log(`[Worker Aggregation] ⚠️  Skipping worker ${workerProfile.eitje_user_id} - no hours or sales data found`);
-      // Still build basic record but skip expensive hierarchy
-      const [
-        thisMonthHours,
-        thisMonthSales,
-        thisMonthCost,
-        lastMonthHours,
-        lastMonthSales,
-        lastMonthCost,
-      ] = await Promise.all([
-        calculateHoursBreakdown(workerProfile.eitje_user_id, thisMonthStart, thisMonthEnd),
-        calculateSalesSummary(userName || null, thisMonthStart, thisMonthEnd),
-        calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, thisMonthStart, thisMonthEnd),
-        calculateHoursBreakdown(workerProfile.eitje_user_id, lastMonthStart, lastMonthEnd),
-        calculateSalesSummary(userName || null, lastMonthStart, lastMonthEnd),
-        calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, lastMonthStart, lastMonthEnd),
-      ]);
-
+      // ✅ TRUE OPTIMIZATION: Use zero values for workers with no data (no expensive calculations)
+      const zeroBreakdown = { gewerkt: 0, ziek: 0, verlof: 0, total: 0 };
+      const zeroSales = { totalRevenue: 0, totalTransactions: 0, averageTicketValue: 0, totalItems: 0 };
+      
       const aggregated: WorkerProfilesAggregated = {
         _id: workerProfile._id,
         eitjeUserId: workerProfile.eitje_user_id,
@@ -309,19 +296,19 @@ export async function buildWorkerAggregated(
         activeYears,
         activeMonths,
         thisMonth: {
-          hoursBreakdown: thisMonthHours,
-          salesSummary: thisMonthSales,
-          laborCost: thisMonthCost,
+          hoursBreakdown: zeroBreakdown,
+          salesSummary: zeroSales,
+          laborCost: 0,
         },
         lastMonth: {
-          hoursBreakdown: lastMonthHours,
-          salesSummary: lastMonthSales,
-          laborCost: lastMonthCost,
+          hoursBreakdown: zeroBreakdown,
+          salesSummary: zeroSales,
+          laborCost: 0,
         },
         total: {
           hoursBreakdown: totalHoursCheck,
           salesSummary: totalSalesCheck,
-          laborCost: await calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, allTimeStart, allTimeEnd),
+          laborCost: 0,
         },
         productivityByYear: undefined, // Skip hierarchy for workers with no data
         isActive,
@@ -330,7 +317,7 @@ export async function buildWorkerAggregated(
         updatedAt: new Date(),
       };
 
-      console.log(`[Worker Aggregation] ✅ Built basic aggregated record for user ${workerProfile.eitje_user_id} (no hierarchy - no data)`);
+      console.log(`[Worker Aggregation] ✅ Built basic aggregated record for user ${workerProfile.eitje_user_id} (no data - skipped all calculations)`);
       return aggregated;
     }
 
