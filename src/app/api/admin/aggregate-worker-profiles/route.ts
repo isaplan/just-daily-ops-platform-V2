@@ -10,7 +10,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb/v2-connection';
 import { buildWorkerAggregated } from '@/lib/services/workforce/worker-aggregation.service';
+import { V2_COLLECTIONS } from '@/lib/mongodb/v2-collections';
 import { ObjectId } from 'mongodb';
+
+// ✅ Set maximum execution time to 10 minutes (prevents infinite runs)
+export const maxDuration = 600; // 10 minutes
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,16 +51,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Worker Profiles Aggregation] Location map built: ${locationMap.size} locations`);
 
-    // ✅ Build user name map from unified_users (correct data source!)
-    console.log('[Worker Profiles Aggregation] Building user name map from unified_users...');
+    // ✅ Build unified user maps from unified_users (correct data source!)
+    console.log('[Worker Profiles Aggregation] Building unified user maps from unified_users...');
     const unifiedUsers = await db.collection('unified_users')
       .find({ isActive: true })
       .toArray();
 
-    const userNameMap = new Map<number, string>(); // Map from eitje_user_id to user name
+    // Maps from eitje_user_id to unified user data
+    const userNameMap = new Map<number, string>(); // eitjeUserId -> userName
+    const unifiedUserMap = new Map<number, { id: ObjectId; name: string; borkId?: string }>(); // eitjeUserId -> unified user info
+    
     unifiedUsers.forEach((user: any) => {
       if (user.systemMappings && Array.isArray(user.systemMappings)) {
         const eitjeMapping = user.systemMappings.find((m: any) => m.system === 'eitje');
+        const borkMapping = user.systemMappings.find((m: any) => m.system === 'bork');
+        
         if (eitjeMapping && eitjeMapping.externalId) {
           const eitjeUserId = parseInt(eitjeMapping.externalId);
           if (!isNaN(eitjeUserId)) {
@@ -71,12 +80,19 @@ export async function POST(request: NextRequest) {
             if (fullName) {
               userNameMap.set(eitjeUserId, fullName);
             }
+            
+            // Store unified user info
+            unifiedUserMap.set(eitjeUserId, {
+              id: user._id,
+              name: fullName || user.name || '',
+              borkId: borkMapping?.externalId || undefined,
+            });
           }
         }
       }
     });
 
-    console.log(`[Worker Profiles Aggregation] User name map built: ${userNameMap.size} users from unified_users`);
+    console.log(`[Worker Profiles Aggregation] Unified user maps built: ${userNameMap.size} users from unified_users`);
     if (userNameMap.size > 0) {
       console.log('[Worker Profiles Aggregation] Sample mappings:', Array.from(userNameMap.entries()).slice(0, 3));
     }
@@ -115,13 +131,30 @@ export async function POST(request: NextRequest) {
         const locationId = profile.location_id;
         const locationName = locationId ? locationMap.get(typeof locationId === 'string' ? locationId : locationId.toString()) : undefined;
         
-        // ✅ Fetch user name from unified_users
+        // ✅ Fetch unified user info from maps
+        const unifiedUserInfo = unifiedUserMap.get(profile.eitje_user_id);
         const userName = userNameMap.get(profile.eitje_user_id) || null;
+        const unifiedUserId = unifiedUserInfo?.id || null;
+        const unifiedUserName = unifiedUserInfo?.name || userName || null;
+        const borkUserId = unifiedUserInfo?.borkId || null;
+        const borkUserName = unifiedUserName; // Usually same as unifiedUserName
+        
         if (!userName) {
           console.warn(`[Worker Profiles Aggregation] ⚠️  No user name found for eitje_user_id ${profile.eitje_user_id}`);
         }
+        if (!unifiedUserId) {
+          console.warn(`[Worker Profiles Aggregation] ⚠️  No unified user found for eitje_user_id ${profile.eitje_user_id}`);
+        }
 
-        const aggregated = await buildWorkerAggregated(profile, locationName, userName);
+        const aggregated = await buildWorkerAggregated(
+          profile, 
+          locationName, 
+          userName,
+          unifiedUserId,
+          unifiedUserName,
+          borkUserId,
+          borkUserName
+        );
 
         if (aggregated) {
           // Prepare upsert operation
@@ -138,8 +171,10 @@ export async function POST(request: NextRequest) {
 
           processed++;
 
-          if (processed % 50 === 0) {
-            console.log(`[Worker Profiles Aggregation] Processed ${processed}/${workerProfiles.length} workers...`);
+          // ✅ Better progress logging - every 10 workers (more frequent updates)
+          if (processed % 10 === 0) {
+            const progress = ((processed / workerProfiles.length) * 100).toFixed(1);
+            console.log(`[Worker Profiles Aggregation] Progress: ${processed}/${workerProfiles.length} (${progress}%) - ${errors} errors`);
           }
         } else {
           errors++;
@@ -155,7 +190,7 @@ export async function POST(request: NextRequest) {
     if (bulkOps.length > 0) {
       console.log(`[Worker Profiles Aggregation] Writing ${bulkOps.length} aggregated records to database...`);
 
-      const result = await db.collection('worker_profiles_aggregated')
+      const result = await db.collection(V2_COLLECTIONS.WORKER_PROFILES_AGGREGATED)
         .bulkWrite(bulkOps);
 
       console.log(`[Worker Profiles Aggregation] ✅ Bulk write complete:`, {
@@ -166,7 +201,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify aggregation
-    const aggregatedCount = await db.collection('worker_profiles_aggregated')
+    const aggregatedCount = await db.collection(V2_COLLECTIONS.WORKER_PROFILES_AGGREGATED)
       .countDocuments({});
 
     console.log(`[Worker Profiles Aggregation] Total records in worker_profiles_aggregated: ${aggregatedCount}`);

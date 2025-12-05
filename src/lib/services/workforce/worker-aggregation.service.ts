@@ -125,6 +125,7 @@ export async function calculateHoursBreakdown(
 
 /**
  * Calculate sales summary for a worker based on waiter name
+ * ✅ Uses bork_aggregated.waiterBreakdown (aggregated collection, NOT raw data!)
  */
 export async function calculateSalesSummary(
   userName?: string | null,
@@ -143,47 +144,52 @@ export async function calculateSalesSummary(
       return { totalRevenue: 0, totalTransactions: 0, averageTicketValue: 0, totalItems: 0 };
     }
 
-    console.log(`[Worker Aggregation] Calculating sales for waiter "${userName}"`);
+    console.log(`[Worker Aggregation] Calculating sales for waiter "${userName}" from bork_aggregated`);
 
-    // Query bork_raw_data by waiter name
-    const pipeline: any[] = [
-      {
-        $match: {
-          $or: [
-            { 'extracted.waiter_name': userName },
-            { 'extracted.waiterName': userName },
-            { 'rawApiResponse.waiter_name': userName },
-            { 'rawApiResponse.waiterName': userName },
-          ],
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: { $toDouble: '$extracted.revenue' } || 0 },
-          totalTransactions: { $sum: 1 },
-          totalItems: { $sum: { $toDouble: '$extracted.quantity' } || 1 },
-        },
-      },
-    ];
-
+    // ✅ Query bork_aggregated.waiterBreakdown (aggregated collection, NOT raw data!)
+    const query: any = {};
+    
     if (startDate && endDate) {
-      pipeline.unshift({
-        $match: {
-          date: { $gte: startDate, $lte: endDate },
-        },
-      });
+      query.date = { $gte: startDate, $lte: endDate };
     }
 
-    const result = await db.collection('bork_raw_data')
-      .aggregate(pipeline)
+    // Fetch all bork_aggregated records in date range
+    const borkRecords = await db.collection('bork_aggregated')
+      .find(query)
       .toArray();
 
-    if (result.length === 0) {
-      return { totalRevenue: 0, totalTransactions: 0, averageTicketValue: 0, totalItems: 0 };
+    // Aggregate sales from waiterBreakdown arrays
+    let totalRevenue = 0;
+    let totalTransactions = 0;
+    let totalItems = 0;
+
+    // Normalize userName for matching (extract first name if full name provided)
+    const userNameLower = userName.toLowerCase().trim();
+    const userNameParts = userNameLower.split(/\s+/);
+    const firstName = userNameParts[0]; // First name for matching
+
+    for (const record of borkRecords) {
+      if (record.waiterBreakdown && Array.isArray(record.waiterBreakdown)) {
+        for (const waiter of record.waiterBreakdown) {
+          const waiterName = (waiter.waiterName || '').toLowerCase().trim();
+          
+          // Match waiter by name (multiple strategies):
+          // 1. Exact match (case-insensitive)
+          // 2. First name match (waiter name is first name of user)
+          // 3. Contains match (waiter name contains user name or vice versa)
+          const exactMatch = waiterName === userNameLower;
+          const firstNameMatch = waiterName === firstName;
+          const containsMatch = waiterName.includes(userNameLower) || userNameLower.includes(waiterName);
+          
+          if (exactMatch || firstNameMatch || containsMatch) {
+            totalRevenue += Number(waiter.totalRevenue || 0);
+            totalTransactions += Number(waiter.totalTransactions || 0);
+            totalItems += Number(waiter.totalItemsSold || 0);
+          }
+        }
+      }
     }
 
-    const { totalRevenue = 0, totalTransactions = 0, totalItems = 0 } = result[0];
     const averageTicketValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
     console.log(`[Worker Aggregation] Sales for ${userName}:`, {
@@ -232,7 +238,11 @@ export async function calculateLaborCost(
 export async function buildWorkerAggregated(
   workerProfile: WorkerProfile,
   locationName?: string | null,
-  userName?: string | null
+  userName?: string | null,
+  unifiedUserId?: ObjectId | null,
+  unifiedUserName?: string | null,
+  borkUserId?: string | null,
+  borkUserName?: string | null
 ): Promise<WorkerProfilesAggregated | null> {
   const { activeYears, activeMonths } = calculateActiveDateRanges(
     workerProfile.effective_from,
@@ -253,6 +263,78 @@ export async function buildWorkerAggregated(
   try {
     console.log(`[Worker Aggregation] Building aggregated record for user ${workerProfile.eitje_user_id} (${workerProfile._id})`);
 
+    // ✅ OPTIMIZATION: Check if worker has any data before expensive operations
+    const totalHoursCheck = await calculateHoursBreakdown(workerProfile.eitje_user_id, allTimeStart, allTimeEnd);
+    const totalSalesCheck = await calculateSalesSummary(userName || null, allTimeStart, allTimeEnd);
+    
+    const hasData = totalHoursCheck.total > 0 || totalSalesCheck.totalRevenue > 0;
+    
+    if (!hasData) {
+      console.log(`[Worker Aggregation] ⚠️  Skipping worker ${workerProfile.eitje_user_id} - no hours or sales data found`);
+      // Still build basic record but skip expensive hierarchy
+      const [
+        thisMonthHours,
+        thisMonthSales,
+        thisMonthCost,
+        lastMonthHours,
+        lastMonthSales,
+        lastMonthCost,
+      ] = await Promise.all([
+        calculateHoursBreakdown(workerProfile.eitje_user_id, thisMonthStart, thisMonthEnd),
+        calculateSalesSummary(userName || null, thisMonthStart, thisMonthEnd),
+        calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, thisMonthStart, thisMonthEnd),
+        calculateHoursBreakdown(workerProfile.eitje_user_id, lastMonthStart, lastMonthEnd),
+        calculateSalesSummary(userName || null, lastMonthStart, lastMonthEnd),
+        calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, lastMonthStart, lastMonthEnd),
+      ]);
+
+      const aggregated: WorkerProfilesAggregated = {
+        _id: workerProfile._id,
+        eitjeUserId: workerProfile.eitje_user_id,
+        userName: userName || null,
+        unifiedUserId: unifiedUserId || null,
+        unifiedUserName: unifiedUserName || null,
+        borkUserId: borkUserId || null,
+        borkUserName: borkUserName || null,
+        locationId: workerProfile.location_id ? new ObjectId(workerProfile.location_id) : undefined,
+        locationName: locationName || null,
+        contractType: workerProfile.contract_type,
+        contractHours: workerProfile.contract_hours,
+        hourlyWage: workerProfile.hourly_wage,
+        wageOverride: workerProfile.wage_override || false,
+        effectiveFrom: workerProfile.effective_from,
+        effectiveTo: workerProfile.effective_to,
+        notes: workerProfile.notes,
+        teams: workerProfile.teams,
+        activeYears,
+        activeMonths,
+        thisMonth: {
+          hoursBreakdown: thisMonthHours,
+          salesSummary: thisMonthSales,
+          laborCost: thisMonthCost,
+        },
+        lastMonth: {
+          hoursBreakdown: lastMonthHours,
+          salesSummary: lastMonthSales,
+          laborCost: lastMonthCost,
+        },
+        total: {
+          hoursBreakdown: totalHoursCheck,
+          salesSummary: totalSalesCheck,
+          laborCost: await calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, allTimeStart, allTimeEnd),
+        },
+        productivityByYear: undefined, // Skip hierarchy for workers with no data
+        isActive,
+        lastAggregated: new Date(),
+        createdAt: workerProfile._id ? new Date() : new Date(),
+        updatedAt: new Date(),
+      };
+
+      console.log(`[Worker Aggregation] ✅ Built basic aggregated record for user ${workerProfile.eitje_user_id} (no hierarchy - no data)`);
+      return aggregated;
+    }
+
+    // ✅ Worker has data - proceed with full aggregation including hierarchy
     // Calculate all periods in parallel (thisMonth, lastMonth, total)
     const [
       thisMonthHours,
@@ -272,10 +354,10 @@ export async function buildWorkerAggregated(
       calculateHoursBreakdown(workerProfile.eitje_user_id, lastMonthStart, lastMonthEnd),
       calculateSalesSummary(userName || null, lastMonthStart, lastMonthEnd), // ✅ Use userName, not profile ID
       calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, lastMonthStart, lastMonthEnd),
-      calculateHoursBreakdown(workerProfile.eitje_user_id, allTimeStart, allTimeEnd),
-      calculateSalesSummary(userName || null, allTimeStart, allTimeEnd), // ✅ Use userName, not profile ID
+      totalHoursCheck, // Reuse already calculated
+      totalSalesCheck, // Reuse already calculated
       calculateLaborCost(workerProfile.eitje_user_id, workerProfile.hourly_wage, allTimeStart, allTimeEnd),
-      // ✅ Build hierarchical daily/weekly/monthly/yearly breakdowns
+      // ✅ Build hierarchical daily/weekly/monthly/yearly breakdowns (only if worker has data)
       buildWorkerProductivityHierarchy(
         workerProfile.eitje_user_id,
         userName || '',
@@ -289,6 +371,10 @@ export async function buildWorkerAggregated(
       _id: workerProfile._id,
       eitjeUserId: workerProfile.eitje_user_id,
       userName: userName || null, // ✅ Use passed userName, don't use profile ID!
+      unifiedUserId: unifiedUserId || null, // ✅ Unified user ID from unified_users
+      unifiedUserName: unifiedUserName || null, // ✅ Unified user name (primary source of truth)
+      borkUserId: borkUserId || null, // ✅ Bork user ID from system mappings
+      borkUserName: borkUserName || null, // ✅ Bork user name (usually same as unifiedUserName)
       locationId: workerProfile.location_id ? new ObjectId(workerProfile.location_id) : undefined,
       locationName: locationName || null, // ✅ Use passed locationName
       contractType: workerProfile.contract_type,
